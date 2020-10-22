@@ -1,0 +1,63 @@
+use crate::error::*;
+use crate::types::*;
+use bytes::*;
+use std::cell::RefCell;
+use std::convert::{TryFrom, TryInto};
+use std::rc::Rc;
+
+pub const MARKER: u8 = 0xB1;
+pub const SIGNATURE: u8 = 0x71;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Record {
+    data: BoltList,
+}
+
+impl Record {
+    pub fn new(data: BoltList) -> Record {
+        Record { data }
+    }
+
+    pub fn matches(marker: u8, signature: u8) -> bool {
+        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
+    }
+}
+
+impl Into<Vec<BoltType>> for Record {
+    fn into(self) -> Vec<BoltType> {
+        self.data.into()
+    }
+}
+
+impl TryFrom<Rc<RefCell<Bytes>>> for Record {
+    type Error = Error;
+    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<Record> {
+        let marker = input.borrow_mut().get_u8();
+        let signature = input.borrow_mut().get_u8();
+        if Self::matches(marker, signature) {
+            Ok(Record {
+                data: input.try_into()?,
+            })
+        } else {
+            Err(Error::InvalidMessageMarker {
+                detail: format!("invalid marker: {}, signature: {}", marker, signature),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_deserialize_record_message() {
+        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+            MARKER, SIGNATURE, 0x92, 0x81, 0x61, 0x81, 0x62,
+        ])));
+
+        let record: Record = bytes.try_into().unwrap();
+
+        assert_eq!(record.data.len(), 2);
+    }
+}

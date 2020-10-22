@@ -1,0 +1,4 @@
+- connection pool
+- stream records
+- check neo is therad safe
+- bufstream
