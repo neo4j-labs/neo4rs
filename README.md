@@ -10,3 +10,11 @@
         println!("{:?}", row);
     }
 ```
+
+# Roadmap
+- [x] bolt protocol
+- [x] stream abstraction
+- [ ] Secure connection
+- [ ] use buffered TCP streams
+- [ ] connection pooling & multiplexing
+- [ ] documentation
