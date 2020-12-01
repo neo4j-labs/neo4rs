@@ -1,7 +1,6 @@
 pub mod bye;
 pub mod failure;
 pub mod hello;
-pub mod init;
 pub mod pull;
 pub mod record;
 pub mod run;
