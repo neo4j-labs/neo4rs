@@ -1,4 +1,5 @@
-# native neo4j client
+# Neo4j driver in rust
+The driver uses the native bolt 4.1 protocol to communicate with the server. 
 
 ```rust
     let uri = "127.0.0.1:7687".to_owned();
@@ -17,4 +18,5 @@
 - [ ] Secure connection
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
+- [ ] support multiple versions of bolt protocol
 - [ ] documentation
