@@ -10,7 +10,7 @@ pub const SIGNATURE: u8 = 0x71;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Record {
-    data: BoltList,
+    pub data: BoltList,
 }
 
 impl Record {
@@ -20,6 +20,14 @@ impl Record {
 
     pub fn matches(marker: u8, signature: u8) -> bool {
         (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
+    }
+}
+
+impl IntoIterator for Record {
+    type Item = BoltType;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 

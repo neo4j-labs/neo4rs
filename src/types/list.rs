@@ -40,9 +40,27 @@ impl BoltList {
     }
 }
 
+impl IntoIterator for BoltList {
+    type Item = BoltType;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
 impl Into<Vec<String>> for BoltList {
     fn into(self) -> Vec<String> {
         self.value.into_iter().map(|x| x.into()).collect()
+    }
+}
+
+impl From<Vec<BoltType>> for BoltList {
+    fn from(xs: Vec<BoltType>) -> BoltList {
+        let mut list = BoltList::with_capacity(xs.len());
+        for x in xs.into_iter() {
+            list.push(x);
+        }
+        list
     }
 }
 

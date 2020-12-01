@@ -9,7 +9,6 @@ use crate::messages::*;
 pub use crate::types::*;
 pub use crate::version::Version;
 use futures::stream::Stream;
-use futures::stream::TryStream;
 use futures::Future;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,13 +21,32 @@ pub struct Row {
     attributes: HashMap<String, BoltType>,
 }
 
+#[derive(Debug)]
+pub struct Node {
+    data: BoltNode,
+}
+
 impl Row {
-    fn new(fields: Vec<String>, values: Vec<BoltType>) -> Self {
+    fn new(fields: Vec<String>, data: BoltList) -> Self {
         let mut attributes = HashMap::with_capacity(fields.len());
-        for (field, value) in fields.into_iter().zip(values.into_iter()) {
+        for (field, value) in fields.into_iter().zip(data.into_iter()) {
             attributes.insert(field, value);
         }
         Row { attributes }
+    }
+
+    pub fn get_string(&self, key: &str) -> Option<String> {
+        match self.attributes.get(key) {
+            Some(BoltType::String(s)) => Some(s.value.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn get_node(&self, key: &str) -> Option<Node> {
+        match self.attributes.get(key) {
+            Some(BoltType::Node(n)) => Some(Node { data: n.clone() }),
+            _ => None,
+        }
     }
 }
 
@@ -50,12 +68,14 @@ impl Stream for RowStream {
         let mut connection = self.connection.borrow_mut();
         let mut future = Box::pin(connection.recv());
         match future.as_mut().poll(context) {
-            Poll::Ready(Ok(BoltResponse::SuccessMessage(success))) => Poll::Ready(None),
+            Poll::Ready(Ok(BoltResponse::SuccessMessage(_))) => Poll::Ready(None),
             Poll::Ready(Ok(BoltResponse::RecordMessage(record))) => {
-                let row = Row::new(self.fields.clone(), record.into());
-                Poll::Ready(Some(row))
+                Poll::Ready(Some(Row::new(self.fields.clone(), record.data)))
             }
-            Poll::Ready(_) => Poll::Ready(None),
+            Poll::Ready(m) => {
+                println!("got: {:?}", m);
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
         }
     }
@@ -99,9 +119,9 @@ pub enum State {
 }
 
 impl Graph {
-    pub async fn connect(uri: String, user: String, password: String) -> Result<Self> {
-        let (mut connection, version) = Connection::new(uri).await?;
-        let hello = BoltRequest::hello("neo4rs", user, password);
+    pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {
+        let (mut connection, version) = Connection::new(uri.to_owned()).await?;
+        let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
         match connection.request(hello).await? {
             BoltResponse::SuccessMessage(msg) => Ok(Graph {
                 version,

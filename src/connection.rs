@@ -34,6 +34,7 @@ impl Connection {
     }
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
+        println!("sending {:?}", message);
         let bytes: Bytes = message.try_into().unwrap();
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
@@ -63,10 +64,12 @@ impl Connection {
         }
 
         println!("{}", "=====================");
-        //println!("{:#04X?}", bytes.bytes());
-        println!("{:?}", bytes);
+        println!("{:#04X?}", bytes.bytes());
+        //println!("{:?}", bytes);
         println!("{}", "=====================");
 
-        Ok(bytes.freeze().try_into()?)
+        let msg = bytes.freeze().try_into()?;
+        println!("received: {:?}", msg);
+        Ok(msg)
     }
 }

@@ -2,12 +2,14 @@ pub mod boolean;
 pub mod integer;
 pub mod list;
 pub mod map;
+pub mod node;
 pub mod null;
 pub mod string;
 pub use boolean::BoltBoolean;
 pub use integer::BoltInteger;
 pub use list::BoltList;
 pub use map::BoltMap;
+pub use node::BoltNode;
 pub use null::BoltNull;
 pub use string::BoltString;
 
@@ -26,6 +28,7 @@ pub enum BoltType {
     Null(BoltNull),
     Integer(BoltInteger),
     List(BoltList),
+    Node(BoltNode),
 }
 
 pub fn null() -> BoltType {
@@ -40,7 +43,8 @@ impl Hash for BoltType {
             BoltType::Null(t) => t.hash(state),
             BoltType::Integer(t) => t.hash(state),
             BoltType::List(t) => t.hash(state),
-            BoltType::Map(_) => panic!("map cannot be hashed"),
+            BoltType::Node(_) => panic!("node not hashed"),
+            BoltType::Map(_) => panic!("map not hashed"),
         }
     }
 }
@@ -82,6 +86,7 @@ impl TryInto<Bytes> for BoltType {
             BoltType::String(t) => t.try_into(),
             BoltType::List(t) => t.try_into(),
             BoltType::Map(t) => t.try_into(),
+            BoltType::Node(t) => t.try_into(),
         }
     }
 }
@@ -95,6 +100,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             marker if string::matches(marker) => BoltType::String(input.try_into()?),
             marker if list::matches(marker) => BoltType::List(input.try_into()?),
             marker if map::matches(marker) => BoltType::Map(input.try_into()?),
+            marker if node::matches(marker, input.borrow()[1]) => BoltType::Node(input.try_into()?),
             _ => {
                 return Err(Error::InvalidTypeMarker {
                     detail: format!("unknown type marker {}", marker),
