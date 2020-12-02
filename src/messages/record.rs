@@ -25,25 +25,11 @@ pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
     (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
 }
 
-impl IntoIterator for Record {
-    type Item = BoltType;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
-    }
-}
-
-impl Into<Vec<BoltType>> for Record {
-    fn into(self) -> Vec<BoltType> {
-        self.data.into()
-    }
-}
-
 impl TryFrom<Rc<RefCell<Bytes>>> for Record {
     type Error = Error;
     fn try_from(input: Rc<RefCell<Bytes>>) -> Result<Record> {
-        let marker = input.borrow_mut().get_u8();
-        let signature = input.borrow_mut().get_u8();
+        let _marker = input.borrow_mut().get_u8();
+        let _signature = input.borrow_mut().get_u8();
         Ok(Record {
             data: input.try_into()?,
         })

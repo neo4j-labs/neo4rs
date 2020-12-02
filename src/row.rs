@@ -69,10 +69,7 @@ impl Stream for RowStream {
             Poll::Ready(Ok(BoltResponse::RecordMessage(record))) => {
                 Poll::Ready(Some(Row::new(self.fields.clone(), record.data)))
             }
-            Poll::Ready(m) => {
-                println!("got: {:?}", m);
-                Poll::Ready(None)
-            }
+            Poll::Ready(m) => panic!("unexpected message {:?}", m),
             Poll::Pending => Poll::Pending,
         }
     }

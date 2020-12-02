@@ -31,10 +31,6 @@ pub enum BoltType {
     Node(BoltNode),
 }
 
-pub fn null() -> BoltType {
-    BoltType::Null(BoltNull::new())
-}
-
 impl Hash for BoltType {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
