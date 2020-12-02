@@ -1,4 +1,5 @@
 mod connection;
+mod convert;
 mod error;
 mod messages;
 mod query;
@@ -6,9 +7,11 @@ mod row;
 mod types;
 mod version;
 use crate::connection::*;
+pub use crate::convert::*;
 pub use crate::error::*;
 use crate::messages::*;
 use crate::query::*;
+pub use crate::row::{Node, Row};
 pub use crate::types::*;
 pub use crate::version::Version;
 use std::cell::RefCell;

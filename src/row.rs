@@ -6,6 +6,7 @@ use futures::stream::Stream;
 use futures::Future;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -18,6 +19,25 @@ pub struct Row {
 #[derive(Debug)]
 pub struct Node {
     data: BoltNode,
+}
+
+impl Node {
+    pub fn new(data: BoltNode) -> Self {
+        Node { data }
+    }
+
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        match self.data.properties.get(key) {
+            Some(bolt_type) => {
+                if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Row {
@@ -39,6 +59,19 @@ impl Row {
     pub fn get_node(&self, key: &str) -> Option<Node> {
         match self.attributes.get(key) {
             Some(BoltType::Node(n)) => Some(Node { data: n.clone() }),
+            _ => None,
+        }
+    }
+
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        match self.attributes.get(key) {
+            Some(bolt_type) => {
+                if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }

@@ -28,15 +28,16 @@ async fn should_identify_invalid_credentials() {
 }
 
 #[tokio::test]
-async fn should_run_a_query() {
+async fn should_run_a_simple_query() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo4j";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph.query("RETURN 1").execute().await.unwrap();
-    while let Some(row) = result.next().await {
-        println!("{:?}", row);
-    }
+    let row = result.next().await.unwrap();
+    let value: i64 = row.get("1").unwrap();
+    assert_eq!(1, value);
+    assert!(result.next().await.is_none());
 }
 
 #[tokio::test]
@@ -60,14 +61,12 @@ async fn should_return_created_node() {
     let pass = "neo4j";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
-        .query("CREATE (friend:Person {name: 'Mark'}) \n RETURN friend")
+        .query("CREATE (friend:Person {name: 'Mark'}) RETURN friend")
         .execute()
         .await
         .unwrap();
-
-    while let Some(row) = result.next().await {
-        let node = row.get_node("friend").unwrap();
-        println!("row.................... {:?}", node);
-    }
-    assert!(true);
+    let row = result.next().await.unwrap();
+    let node: Node = row.get("friend").unwrap();
+    let name: String = node.get("name").unwrap();
+    assert_eq!(name, "Mark");
 }
