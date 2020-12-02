@@ -1,5 +1,5 @@
 use crate::connection::*;
-use crate::error::*;
+use crate::errors::*;
 use crate::messages::*;
 use crate::types::*;
 use futures::stream::Stream;
@@ -47,20 +47,6 @@ impl Row {
             attributes.insert(field, value);
         }
         Row { attributes }
-    }
-
-    pub fn get_string(&self, key: &str) -> Option<String> {
-        match self.attributes.get(key) {
-            Some(BoltType::String(s)) => Some(s.value.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_node(&self, key: &str) -> Option<Node> {
-        match self.attributes.get(key) {
-            Some(BoltType::Node(n)) => Some(Node { data: n.clone() }),
-            _ => None,
-        }
     }
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {

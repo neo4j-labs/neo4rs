@@ -5,7 +5,7 @@ pub mod pull;
 pub mod record;
 pub mod run;
 pub mod success;
-use crate::error::*;
+use crate::errors::*;
 use crate::types::*;
 use bye::Bye;
 use bytes::*;

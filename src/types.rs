@@ -13,7 +13,7 @@ pub use node::BoltNode;
 pub use null::BoltNull;
 pub use string::BoltString;
 
-use crate::error::*;
+use crate::errors::*;
 use bytes::Bytes;
 use core::hash::{Hash, Hasher};
 use std::cell::RefCell;

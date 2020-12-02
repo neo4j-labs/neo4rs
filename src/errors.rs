@@ -9,7 +9,7 @@ pub enum Error {
     UnexpectedMessage,
     UnknownTypeMarker,
     UnknownMessageMarker,
-    InvalidDataType,
+    ConverstionError,
     AuthenticationError { detail: String },
     InvalidMessageMarker { detail: String },
     InvalidTypeMarker { detail: String },

@@ -1,4 +1,4 @@
-use crate::error::*;
+use crate::errors::*;
 use bytes::*;
 use std::convert::TryInto;
 use std::mem;

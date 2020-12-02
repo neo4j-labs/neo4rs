@@ -1,7 +1,7 @@
 use crate::connection::*;
-use crate::error::*;
+use crate::errors::*;
 use crate::messages::*;
-use crate::row::*;
+use crate::result::*;
 use crate::types::*;
 use futures::stream::Stream;
 use std::cell::RefCell;

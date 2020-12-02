@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::errors::Result;
 use crate::messages::*;
 use crate::version::*;
 use bytes::*;
