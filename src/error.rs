@@ -7,6 +7,8 @@ pub enum Error {
     MapTooBig,
     ListTooLong,
     UnexpectedMessage,
+    UnknownTypeMarker,
+    UnknownMessageMarker,
     AuthenticationError { detail: String },
     InvalidMessageMarker { detail: String },
     InvalidTypeMarker { detail: String },

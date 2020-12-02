@@ -70,24 +70,17 @@ impl TryFrom<Bytes> for BoltResponse {
     type Error = Error;
 
     fn try_from(response: Bytes) -> Result<BoltResponse> {
-        let input = Rc::new(RefCell::new(response));
-        let marker: u8 = input.borrow()[0];
-        let signature: u8 = input.borrow()[1];
-
-        match (marker, signature) {
-            (marker, signature) if Success::matches(marker, signature) => {
+        match Rc::new(RefCell::new(response)) {
+            input if success::is_present(input.clone()) => {
                 Ok(BoltResponse::SuccessMessage(Success::try_from(input)?))
             }
-            (marker, signature) if Failure::matches(marker, signature) => {
+            input if failure::is_present(input.clone()) => {
                 Ok(BoltResponse::FailureMessage(Failure::try_from(input)?))
             }
-            (marker, signature) if Record::matches(marker, signature) => {
+            input if record::is_present(input.clone()) => {
                 Ok(BoltResponse::RecordMessage(Record::try_from(input)?))
             }
-            _ => panic!(format!(
-                "unknown (marker:{:#04X}, signature:{:#04X})",
-                marker, signature
-            )),
+            _ => Err(Error::UnknownMessageMarker),
         }
     }
 }

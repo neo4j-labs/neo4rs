@@ -16,7 +16,9 @@ pub struct BoltNode {
     pub properties: BoltMap,
 }
 
-pub fn matches(marker: u8, signature: u8) -> bool {
+pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
+    let marker = input.borrow()[0];
+    let signature = input.borrow()[1];
     return marker == MARKER && signature == SIGNATURE;
 }
 

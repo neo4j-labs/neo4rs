@@ -27,7 +27,8 @@ impl From<i64> for BoltInteger {
     }
 }
 
-pub fn matches(marker: u8) -> bool {
+pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
+    let marker = input.borrow()[0];
     (-16..=127).contains(&(marker as i8))
         || marker == INT_8
         || marker == INT_16

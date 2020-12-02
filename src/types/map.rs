@@ -39,7 +39,8 @@ impl BoltMap {
     }
 }
 
-pub fn matches(marker: u8) -> bool {
+pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
+    let marker = input.borrow()[0];
     (TINY..=(TINY | 0x0F)).contains(&marker)
         || marker == SMALL
         || marker == MEDIUM

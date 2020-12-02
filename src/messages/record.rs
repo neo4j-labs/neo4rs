@@ -17,10 +17,12 @@ impl Record {
     pub fn new(data: BoltList) -> Record {
         Record { data }
     }
+}
 
-    pub fn matches(marker: u8, signature: u8) -> bool {
-        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
-    }
+pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
+    let marker: u8 = input.borrow()[0];
+    let signature: u8 = input.borrow()[1];
+    (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
 }
 
 impl IntoIterator for Record {
@@ -42,15 +44,9 @@ impl TryFrom<Rc<RefCell<Bytes>>> for Record {
     fn try_from(input: Rc<RefCell<Bytes>>) -> Result<Record> {
         let marker = input.borrow_mut().get_u8();
         let signature = input.borrow_mut().get_u8();
-        if Self::matches(marker, signature) {
-            Ok(Record {
-                data: input.try_into()?,
-            })
-        } else {
-            Err(Error::InvalidMessageMarker {
-                detail: format!("invalid marker: {}, signature: {}", marker, signature),
-            })
-        }
+        Ok(Record {
+            data: input.try_into()?,
+        })
     }
 }
 

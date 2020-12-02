@@ -17,10 +17,12 @@ impl Success {
     pub fn new(metadata: BoltMap) -> Success {
         Success { metadata }
     }
+}
 
-    pub fn matches(marker: u8, signature: u8) -> bool {
-        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
-    }
+pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
+    let marker: u8 = input.borrow()[0];
+    let signature: u8 = input.borrow()[1];
+    (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
 }
 
 impl Success {
@@ -43,17 +45,11 @@ impl Success {
 impl TryFrom<Rc<RefCell<Bytes>>> for Success {
     type Error = Error;
     fn try_from(input: Rc<RefCell<Bytes>>) -> Result<Success> {
-        let marker = input.borrow_mut().get_u8();
-        let signature = input.borrow_mut().get_u8();
-        if Self::matches(marker, signature) {
-            Ok(Success {
-                metadata: input.try_into()?,
-            })
-        } else {
-            Err(Error::InvalidMessageMarker {
-                detail: format!("invalid marker: {}, signature: {}", marker, signature),
-            })
-        }
+        let _marker = input.borrow_mut().get_u8();
+        let _signature = input.borrow_mut().get_u8();
+        Ok(Success {
+            metadata: input.try_into()?,
+        })
     }
 }
 
