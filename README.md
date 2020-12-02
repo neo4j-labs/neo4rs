@@ -1,7 +1,9 @@
-# Neo4j driver in rust
-The driver uses the native bolt 4.1 protocol to communicate with the server. 
+# Neo4j native driver in rust
 
-##Examples
+Uses bolt 4.1 protocol to communicate with Neo4j server.
+
+
+## Examples
 
 ```rust
     //simple query
