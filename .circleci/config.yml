@@ -1,0 +1,11 @@
+jobs:
+  build:
+    docker:
+      - image: cimg/rust:1.48.0
+      - image: neo4j:4.1
+        environment:
+         - NEO4J_AUTH: "neo4j/neo"
+    steps:
+      - checkout
+      - run: cargo test
+

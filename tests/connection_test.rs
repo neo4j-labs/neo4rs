@@ -5,7 +5,7 @@ use neo4rs::*;
 async fn should_connect() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
-    let pass = "neo4j";
+    let pass = "neo";
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     assert_eq!(graph.version, Version::v4_1);
 }
@@ -31,7 +31,7 @@ async fn should_identify_invalid_credentials() {
 async fn should_run_a_simple_query() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
-    let pass = "neo4j";
+    let pass = "neo";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph.query("RETURN 1").execute().await.unwrap();
     let row = result.next().await.unwrap();
@@ -44,7 +44,7 @@ async fn should_run_a_simple_query() {
 async fn should_create_new_node() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
-    let pass = "neo4j";
+    let pass = "neo";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'})")
@@ -58,7 +58,7 @@ async fn should_create_new_node() {
 async fn should_return_created_node() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
-    let pass = "neo4j";
+    let pass = "neo";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'}) RETURN friend")
