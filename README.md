@@ -48,6 +48,7 @@ The driver uses the native bolt 4.1 protocol to communicate with the server.
 - [x] bolt protocol
 - [x] stream abstraction
 - [ ] explicit transactions
+- [ ] batch queries/pipelining
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
 - [ ] add support for older versions of the protocol
