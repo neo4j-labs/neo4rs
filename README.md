@@ -8,8 +8,8 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 ```rust
     //simple query
     let uri = "127.0.0.1:7687".to_owned();
-    let user = "neo4j".to_owned();
-    let pass = "neo4j".to_owned();
+    let user = "neo4j";
+    let pass = "neo4j";
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut stream = graph.query("RETURN 1").execute().await.unwrap();
     while let Some(row) = stream.next().await {
