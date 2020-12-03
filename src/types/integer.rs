@@ -19,21 +19,21 @@ impl BoltInteger {
     pub fn new(value: i64) -> BoltInteger {
         BoltInteger { value }
     }
+
+    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+        let marker = input.borrow()[0];
+        (-16..=127).contains(&(marker as i8))
+            || marker == INT_8
+            || marker == INT_16
+            || marker == INT_32
+            || marker == INT_64
+    }
 }
 
 impl From<i64> for BoltInteger {
     fn from(v: i64) -> Self {
         BoltInteger::new(v)
     }
-}
-
-pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
-    let marker = input.borrow()[0];
-    (-16..=127).contains(&(marker as i8))
-        || marker == INT_8
-        || marker == INT_16
-        || marker == INT_32
-        || marker == INT_64
 }
 
 impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {

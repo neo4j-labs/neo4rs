@@ -17,12 +17,12 @@ impl Failure {
     pub fn new(metadata: BoltMap) -> Failure {
         Failure { metadata }
     }
-}
 
-pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
-    let marker: u8 = input.borrow()[0];
-    let signature: u8 = input.borrow()[1];
-    (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
+    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+        let marker: u8 = input.borrow()[0];
+        let signature: u8 = input.borrow()[1];
+        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
+    }
 }
 
 impl Failure {

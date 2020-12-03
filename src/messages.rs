@@ -71,16 +71,16 @@ impl TryFrom<Bytes> for BoltResponse {
 
     fn try_from(response: Bytes) -> Result<BoltResponse> {
         match Rc::new(RefCell::new(response)) {
-            input if success::is_present(input.clone()) => {
+            input if Success::can_parse(input.clone()) => {
                 Ok(BoltResponse::SuccessMessage(Success::try_from(input)?))
             }
-            input if failure::is_present(input.clone()) => {
+            input if Failure::can_parse(input.clone()) => {
                 Ok(BoltResponse::FailureMessage(Failure::try_from(input)?))
             }
-            input if record::is_present(input.clone()) => {
+            input if Record::can_parse(input.clone()) => {
                 Ok(BoltResponse::RecordMessage(Record::try_from(input)?))
             }
-            _ => Err(Error::UnknownMessageMarker),
+            _ => Err(Error::UnknownMessage),
         }
     }
 }

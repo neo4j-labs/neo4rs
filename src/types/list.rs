@@ -38,6 +38,14 @@ impl BoltList {
     pub fn get(&self, index: usize) -> Option<&BoltType> {
         self.value.get(index)
     }
+
+    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+        let marker = input.borrow()[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
+    }
 }
 
 impl IntoIterator for BoltList {
@@ -65,14 +73,6 @@ impl From<Vec<BoltType>> for BoltList {
         }
         list
     }
-}
-
-pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
-    let marker = input.borrow()[0];
-    (TINY..=(TINY | 0x0F)).contains(&marker)
-        || marker == SMALL
-        || marker == MEDIUM
-        || marker == LARGE
 }
 
 impl TryInto<Bytes> for BoltList {

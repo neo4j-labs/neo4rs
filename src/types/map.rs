@@ -37,14 +37,14 @@ impl BoltMap {
     pub fn get(&self, key: &str) -> Option<BoltType> {
         self.value.get(&key.into()).map(|v| v.clone())
     }
-}
 
-pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
-    let marker = input.borrow()[0];
-    (TINY..=(TINY | 0x0F)).contains(&marker)
-        || marker == SMALL
-        || marker == MEDIUM
-        || marker == LARGE
+    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+        let marker = input.borrow()[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
+    }
 }
 
 impl FromIterator<(BoltString, BoltType)> for BoltMap {

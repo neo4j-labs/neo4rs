@@ -64,12 +64,12 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
     type Error = Error;
     fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltType> {
         let bolt_type = match input {
-            input if integer::is_present(input.clone()) => BoltType::Integer(input.try_into()?),
-            input if string::is_present(input.clone()) => BoltType::String(input.try_into()?),
-            input if list::is_present(input.clone()) => BoltType::List(input.try_into()?),
-            input if map::is_present(input.clone()) => BoltType::Map(input.try_into()?),
-            input if node::is_present(input.clone()) => BoltType::Node(input.try_into()?),
-            _ => return Err(Error::UnknownTypeMarker),
+            input if BoltInteger::can_parse(input.clone()) => BoltType::Integer(input.try_into()?),
+            input if BoltString::can_parse(input.clone()) => BoltType::String(input.try_into()?),
+            input if BoltList::can_parse(input.clone()) => BoltType::List(input.try_into()?),
+            input if BoltMap::can_parse(input.clone()) => BoltType::Map(input.try_into()?),
+            input if BoltNode::can_parse(input.clone()) => BoltType::Node(input.try_into()?),
+            _ => return Err(Error::UnknownType),
         };
         Ok(bolt_type)
     }

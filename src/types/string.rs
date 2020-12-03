@@ -22,6 +22,14 @@ impl BoltString {
             value: value.to_string(),
         }
     }
+
+    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+        let marker = input.borrow()[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
+    }
 }
 
 impl From<&str> for BoltString {
@@ -34,14 +42,6 @@ impl From<String> for BoltString {
     fn from(v: String) -> Self {
         BoltString::new(&v)
     }
-}
-
-pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
-    let marker = input.borrow()[0];
-    (TINY..=(TINY | 0x0F)).contains(&marker)
-        || marker == SMALL
-        || marker == MEDIUM
-        || marker == LARGE
 }
 
 impl TryInto<Bytes> for BoltString {
