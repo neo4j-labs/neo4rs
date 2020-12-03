@@ -57,8 +57,8 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(extra.get("n").unwrap(), BoltType::from(42));
-        assert_eq!(extra.get("qid").unwrap(), BoltType::from(1));
+        assert_eq!(extra.get("n").unwrap(), 42.into());
+        assert_eq!(extra.get("qid").unwrap(), 1.into());
     }
 
     #[test]
@@ -71,7 +71,7 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(extra.get("n").unwrap(), BoltType::from(255));
-        assert_eq!(extra.get("qid").unwrap(), BoltType::from(255));
+        assert_eq!(extra.get("n").unwrap(), 255.into());
+        assert_eq!(extra.get("qid").unwrap(), 255.into());
     }
 }

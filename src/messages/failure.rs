@@ -27,11 +27,11 @@ pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
 
 impl Failure {
     pub fn code(&self) -> String {
-        self.metadata.get("code").unwrap().into()
+        self.metadata.get("code").unwrap().try_into().unwrap() //TODO: unwrap
     }
 
     pub fn message(&self) -> String {
-        self.metadata.get("message").unwrap().into()
+        self.metadata.get("message").unwrap().try_into().unwrap() //TODO: unwrap
     }
 }
 

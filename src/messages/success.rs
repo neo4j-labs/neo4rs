@@ -27,11 +27,15 @@ pub fn is_present(input: Rc<RefCell<Bytes>>) -> bool {
 
 impl Success {
     pub fn server(&self) -> String {
-        self.metadata.get("server").unwrap().into() //TODO: remove unwrap
+        self.metadata.get("server").unwrap().try_into().unwrap() //TODO: remove unwrap
     }
 
     pub fn connection_id(&self) -> String {
-        self.metadata.get("connection_id").unwrap().into()
+        self.metadata
+            .get("connection_id")
+            .unwrap()
+            .try_into()
+            .unwrap() //TODO: unwrap
     }
 
     pub fn fields(&self) -> Vec<String> {

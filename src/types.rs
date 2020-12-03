@@ -45,33 +45,6 @@ impl Hash for BoltType {
     }
 }
 
-impl From<&str> for BoltType {
-    fn from(v: &str) -> Self {
-        BoltType::String(v.into())
-    }
-}
-
-impl From<String> for BoltType {
-    fn from(v: String) -> Self {
-        BoltType::String(v.into())
-    }
-}
-
-impl From<i64> for BoltType {
-    fn from(v: i64) -> Self {
-        BoltType::Integer(v.into())
-    }
-}
-
-impl Into<String> for BoltType {
-    fn into(self) -> String {
-        match self {
-            BoltType::String(t) => t.value,
-            _ => "".to_owned(),
-        }
-    }
-}
-
 impl TryInto<Bytes> for BoltType {
     type Error = Error;
     fn try_into(self) -> Result<Bytes> {

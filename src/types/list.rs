@@ -50,7 +50,10 @@ impl IntoIterator for BoltList {
 
 impl Into<Vec<String>> for BoltList {
     fn into(self) -> Vec<String> {
-        self.value.into_iter().map(|x| x.into()).collect()
+        self.value
+            .into_iter()
+            .map(|x| x.try_into().unwrap())
+            .collect() //TODO: unwrap
     }
 }
 

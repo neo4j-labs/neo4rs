@@ -1,7 +1,7 @@
 use crate::errors::*;
 use crate::result::*;
 use crate::types::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 impl TryFrom<BoltType> for i64 {
     type Error = Error;
@@ -22,5 +22,33 @@ impl TryFrom<BoltType> for Node {
             BoltType::Node(n) => Ok(Node::new(n)),
             _ => Err(Error::ConverstionError),
         }
+    }
+}
+
+impl TryFrom<BoltType> for String {
+    type Error = Error;
+    fn try_from(input: BoltType) -> Result<String> {
+        match input {
+            BoltType::String(t) => Ok(t.value),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl Into<BoltType> for i64 {
+    fn into(self) -> BoltType {
+        BoltType::Integer(self.into())
+    }
+}
+
+impl Into<BoltType> for String {
+    fn into(self) -> BoltType {
+        BoltType::String(self.into())
+    }
+}
+
+impl Into<BoltType> for &str {
+    fn into(self) -> BoltType {
+        BoltType::String(self.into())
     }
 }
