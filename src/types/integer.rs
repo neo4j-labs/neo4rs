@@ -30,12 +30,6 @@ impl BoltInteger {
     }
 }
 
-impl From<i64> for BoltInteger {
-    fn from(v: i64) -> Self {
-        BoltInteger::new(v)
-    }
-}
-
 impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
     type Error = Error;
 
@@ -54,7 +48,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
             }
         };
 
-        Ok(value.into())
+        Ok(BoltInteger::new(value))
     }
 }
 impl TryInto<Bytes> for BoltInteger {

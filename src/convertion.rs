@@ -37,7 +37,7 @@ impl TryFrom<BoltType> for String {
 
 impl Into<BoltType> for i64 {
     fn into(self) -> BoltType {
-        BoltType::Integer(self.into())
+        BoltType::Integer(BoltInteger::new(self))
     }
 }
 
