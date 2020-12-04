@@ -28,11 +28,11 @@ async fn should_identify_invalid_credentials() {
 }
 
 #[tokio::test]
-async fn should_run_a_simple_query() {
+async fn should_execute_a_simple_query() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph.query("RETURN 1").execute().await.unwrap();
     let row = result.next().await.unwrap();
     let value: i64 = row.get("1").unwrap();
@@ -45,7 +45,7 @@ async fn should_create_new_node() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'})")
         .execute()
@@ -59,7 +59,7 @@ async fn should_return_created_node() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'}) RETURN friend")
         .execute()
@@ -72,11 +72,11 @@ async fn should_return_created_node() {
 }
 
 #[tokio::test]
-async fn should_run_query_with_params() {
+async fn should_execute_query_with_params() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
         .param("name", "Mr Mark")
@@ -87,4 +87,32 @@ async fn should_run_query_with_params() {
     let node: Node = row.get("friend").unwrap();
     let name: String = node.get("name").unwrap();
     assert_eq!(name, "Mr Mark");
+}
+
+#[tokio::test]
+async fn should_run_query_with_params() {
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let mut result = graph
+        .query("CREATE (friend:Person {name: $name}) RETURN friend")
+        .param("name", "Mr Mark")
+        .execute()
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap();
+    let node: Node = row.get("friend").unwrap();
+    let name: String = node.get("name").unwrap();
+    assert_eq!(name, "Mr Mark");
+}
+
+#[tokio::test]
+async fn should_run_a_simple_query() {
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
+
+    assert!(graph.query("RETURN 1").run().await.is_ok());
 }

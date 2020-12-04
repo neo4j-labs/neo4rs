@@ -5,12 +5,23 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 
 ## Examples
 
+
 ```rust
-    //simple query
+    //run a simple query, ignore the response
     let uri = "127.0.0.1:7687".to_owned();
     let user = "neo4j";
     let pass = "neo4j";
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    assert!(graph.query("RETURN 1").run().await.is_ok());
+```
+
+
+```rust
+    //simple query and consume the response stream
+    let uri = "127.0.0.1:7687".to_owned();
+    let user = "neo4j";
+    let pass = "neo4j";
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut stream = graph.query("RETURN 1").execute().await.unwrap();
     while let Some(row) = stream.next().await {
         println!("{:?}", row);
@@ -20,7 +31,7 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 
 ```rust
     //create a node and return it
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
         .param("name", "Mr Mark")
@@ -34,7 +45,7 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 
 ```rust
     //stream result
-    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("MATCH (p:Person {name: 'Mark'}) RETURN p")
         .execute()
@@ -50,6 +61,7 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 # Roadmap
 - [x] bolt protocol
 - [x] stream abstraction
+- [x] discard response stream
 - [ ] explicit transactions
 - [ ] batch queries/pipelining
 - [ ] use buffered TCP streams

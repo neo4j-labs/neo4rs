@@ -1,4 +1,5 @@
 pub mod bye;
+pub mod discard;
 pub mod failure;
 pub mod hello;
 pub mod pull;
@@ -9,6 +10,7 @@ use crate::errors::*;
 use crate::types::*;
 use bye::Bye;
 use bytes::*;
+use discard::Discard;
 use failure::Failure;
 use hello::Hello;
 use pull::Pull;
@@ -32,6 +34,7 @@ pub enum BoltRequest {
     RunMessage(Run),
     GoodByeMessage(Bye),
     PullMessage(Pull),
+    DiscardMessage(Discard),
 }
 
 impl BoltRequest {
@@ -51,6 +54,10 @@ impl BoltRequest {
     pub fn pull() -> BoltRequest {
         BoltRequest::PullMessage(Pull::default())
     }
+
+    pub fn discard() -> BoltRequest {
+        BoltRequest::DiscardMessage(Discard::default())
+    }
 }
 
 impl TryInto<Bytes> for BoltRequest {
@@ -61,6 +68,7 @@ impl TryInto<Bytes> for BoltRequest {
             BoltRequest::GoodByeMessage(bye) => bye.try_into()?,
             BoltRequest::RunMessage(run) => run.try_into()?,
             BoltRequest::PullMessage(pull) => pull.try_into()?,
+            BoltRequest::DiscardMessage(discard) => discard.try_into()?,
         };
         Ok(bytes)
     }

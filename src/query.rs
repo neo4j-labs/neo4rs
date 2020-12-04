@@ -28,6 +28,19 @@ impl QueryBuilder {
         &self
     }
 
+    pub async fn run(&self) -> Result<()> {
+        let run = BoltRequest::run(&self.query, self.params.borrow().clone());
+        let response = self.connection.borrow_mut().request(run).await?;
+        match response {
+            BoltResponse::SuccessMessage(_) => {
+                let discard = BoltRequest::discard();
+                self.connection.borrow_mut().send(discard).await?;
+                Ok(())
+            }
+            _ => Err(Error::UnexpectedMessage),
+        }
+    }
+
     pub async fn execute(&self) -> Result<impl Stream<Item = Row>> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
         let response = self.connection.borrow_mut().request(run).await?;
