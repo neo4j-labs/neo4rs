@@ -23,9 +23,9 @@ impl QueryBuilder {
         }
     }
 
-    pub fn param<T: std::convert::Into<BoltType>>(self, key: &str, value: T) -> Self {
+    pub fn param<T: std::convert::Into<BoltType>>(&self, key: &str, value: T) -> &Self {
         self.params.borrow_mut().put(key.into(), value.into());
-        self
+        &self
     }
 
     pub async fn execute(&self) -> Result<impl Stream<Item = Row>> {
