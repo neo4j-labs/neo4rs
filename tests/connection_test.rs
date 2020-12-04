@@ -70,3 +70,21 @@ async fn should_return_created_node() {
     let name: String = node.get("name").unwrap();
     assert_eq!(name, "Mark");
 }
+
+#[tokio::test]
+async fn should_run_query_with_params() {
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let mut graph = Graph::connect(uri, user, pass).await.unwrap();
+    let mut result = graph
+        .query("CREATE (friend:Person {name: $name}) RETURN friend")
+        .param("name", "some name")
+        .execute()
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap();
+    let node: Node = row.get("friend").unwrap();
+    let name: String = node.get("name").unwrap();
+    assert_eq!(name, "some name");
+}
