@@ -79,12 +79,12 @@ async fn should_run_query_with_params() {
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
-        .param("name", "some name")
+        .param("name", "Mr Mark")
         .execute()
         .await
         .unwrap();
     let row = result.next().await.unwrap();
     let node: Node = row.get("friend").unwrap();
     let name: String = node.get("name").unwrap();
-    assert_eq!(name, "some name");
+    assert_eq!(name, "Mr Mark");
 }

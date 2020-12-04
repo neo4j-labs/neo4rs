@@ -22,7 +22,8 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
     //create a node and return it
     let mut graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
-        .query("CREATE (friend:Person {name: 'Mark'}) RETURN friend")
+        .query("CREATE (friend:Person {name: $name}) RETURN friend")
+        .param("name", "Mr Mark")
         .execute()
         .await
         .unwrap();
