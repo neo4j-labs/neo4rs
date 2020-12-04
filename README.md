@@ -15,20 +15,6 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
     assert!(graph.query("RETURN 1").run().await.is_ok());
 ```
 
-
-```rust
-    //simple query and consume the response stream
-    let uri = "127.0.0.1:7687".to_owned();
-    let user = "neo4j";
-    let pass = "neo4j";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
-    let mut stream = graph.query("RETURN 1").execute().await.unwrap();
-    while let Some(row) = stream.next().await {
-        println!("{:?}", row);
-    }
-```
-
-
 ```rust
     //create a node and return it
     let graph = Graph::connect(uri, user, pass).await.unwrap();
@@ -55,6 +41,7 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
     while let Some(row) = result.next().await {
         let node: Node = row.get("friend").unwrap();
         let name: String = node.get("name").unwrap();
+	//process name & node
     }
 ```
 
