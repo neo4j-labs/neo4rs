@@ -5,7 +5,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 
 ## Getting Started
 
-Run a simple query and discard the response stream.
+**Run a simple query, discard the response data**
 
 ```rust    
     let uri = "127.0.0.1:7687".to_owned();
@@ -16,7 +16,7 @@ Run a simple query and discard the response stream.
 ```
 ---
 
-Create a node and process it.
+**Create a node and process the response**
     
 ```rust
     let graph = Graph::connect(uri, user, pass).await.unwrap();
@@ -32,7 +32,7 @@ Create a node and process it.
 ```
 ---
 
-Consume the result stream.
+**Drain the result stream**
  
 ```rust
    
@@ -51,7 +51,7 @@ Consume the result stream.
 ```
 ---
 
-Create explicit transactions
+**Create explicit transactions**
 
 ```rust
     let graph = Graph::connect(uri, user, pass).await.unwrap();
