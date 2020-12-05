@@ -1,7 +1,7 @@
 use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
-use crate::result::*;
+use crate::stream::*;
 use crate::types::*;
 use futures::stream::Stream;
 use std::cell::RefCell;
@@ -31,9 +31,9 @@ impl QueryBuilder {
     pub async fn run(&self) -> Result<()> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
         let mut connection = self.connection.borrow_mut();
-        match connection.request(run).await? {
+        match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
-                match connection.request(BoltRequest::discard()).await? {
+                match connection.send_recv(BoltRequest::discard()).await? {
                     BoltResponse::SuccessMessage(_) => Ok(()),
                     _ => Err(Error::UnexpectedMessage),
                 }
@@ -44,11 +44,9 @@ impl QueryBuilder {
 
     pub async fn execute(&self) -> Result<impl Stream<Item = Row>> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let response = self.connection.borrow_mut().request(run).await?;
+        let response = self.connection.borrow_mut().send_recv(run).await?;
         match response {
             BoltResponse::SuccessMessage(success) => {
-                let pull = BoltRequest::pull();
-                self.connection.borrow_mut().send(pull).await?;
                 Ok(RowStream::new(success.fields(), self.connection.clone()).await?)
             }
             _ => Err(Error::UnexpectedMessage),

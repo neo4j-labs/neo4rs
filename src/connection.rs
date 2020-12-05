@@ -28,7 +28,7 @@ impl Connection {
         Ok((Connection { stream }, version))
     }
 
-    pub async fn request(&mut self, message: BoltRequest) -> Result<BoltResponse> {
+    pub async fn send_recv(&mut self, message: BoltRequest) -> Result<BoltResponse> {
         self.send(message).await?;
         self.recv().await
     }

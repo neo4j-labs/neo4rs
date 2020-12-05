@@ -74,6 +74,8 @@ impl RowStream {
         fields: Vec<String>,
         connection: Rc<RefCell<Connection>>,
     ) -> Result<RowStream> {
+        let pull = BoltRequest::pull();
+        connection.borrow_mut().send(pull).await?;
         Ok(RowStream { fields, connection })
     }
 }

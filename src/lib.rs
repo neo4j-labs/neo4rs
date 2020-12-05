@@ -3,7 +3,7 @@ mod convertion;
 mod errors;
 mod messages;
 mod query;
-mod result;
+mod stream;
 mod txn;
 mod types;
 mod version;
@@ -12,7 +12,7 @@ pub use crate::convertion::*;
 pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
-pub use crate::result::{Node, Row};
+pub use crate::stream::{Node, Row};
 pub use crate::txn::*;
 pub use crate::types::*;
 pub use crate::version::Version;
@@ -33,17 +33,13 @@ pub enum State {
 
 impl Graph {
     pub async fn begin_txn(&self) -> Result<Txn> {
-        let mut connection = self.connection.borrow_mut();
-        match connection.request(BoltRequest::begin()).await? {
-            BoltResponse::SuccessMessage(_) => Ok(Txn::new(self.connection.clone())),
-            _ => Err(Error::UnexpectedMessage),
-        }
+        Ok(Txn::new(self.connection.clone()).await?)
     }
 
     pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {
         let (mut connection, version) = Connection::new(uri.to_owned()).await?;
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
-        match connection.request(hello).await? {
+        match connection.send_recv(hello).await? {
             BoltResponse::SuccessMessage(msg) => Ok(Graph {
                 version,
                 state: State::Ready {

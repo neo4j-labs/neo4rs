@@ -10,13 +10,19 @@ pub struct Txn {
 }
 
 impl Txn {
-    pub fn new(connection: Rc<RefCell<Connection>>) -> Self {
-        Txn { connection }
+    pub async fn new(connection: Rc<RefCell<Connection>>) -> Result<Self> {
+        let begin = BoltRequest::begin();
+        match connection.borrow_mut().send_recv(begin).await? {
+            BoltResponse::SuccessMessage(_) => Ok(Txn {
+                connection: connection.clone(),
+            }),
+            _ => Err(Error::UnexpectedMessage),
+        }
     }
 
     pub async fn commit(&self) -> Result<()> {
         let mut connection = self.connection.borrow_mut();
-        match connection.request(BoltRequest::commit()).await? {
+        match connection.send_recv(BoltRequest::commit()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
         }
@@ -24,7 +30,7 @@ impl Txn {
 
     pub async fn rollback(&self) -> Result<()> {
         let mut connection = self.connection.borrow_mut();
-        match connection.request(BoltRequest::rollback()).await? {
+        match connection.send_recv(BoltRequest::rollback()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
         }
