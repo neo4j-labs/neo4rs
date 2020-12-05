@@ -77,10 +77,27 @@ neo4rs = "0.1.0"
 # Roadmap
 - [x] bolt protocol
 - [x] stream abstraction
+- [x] query.run() vs query.execute() abstraction
 - [x] explicit transactions
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
 - [ ] multi db support
+- [ ] support data types
+	- [ ] Float
+	- [ ] Bytes
+- [ ] support structures
+	- [ ] Relationship
+	- [ ] UnboundedRelationship
+	- [ ] Path
+	- [ ] Date
+	- [ ] Time
+	- [ ] LocalTime
+	- [ ] DateTime
+	- [ ] DateTimeZoneId
+	- [ ] LocalDateTime
+	- [ ] Duration
+	- [ ] Point2D
+	- [ ] Point3D
 - [ ] batch queries/pipelining
 - [ ] add support for older versions of the protocol
 - [ ] Secure connection
