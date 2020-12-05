@@ -2,7 +2,6 @@
 
 Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
 
----
 
 ## Getting Started
 
@@ -63,7 +62,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     //Rollback a transaction
     txn.rollback().await.unwrap();
 ```
----
+
 
 ## Installation
 neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be included in your Cargo enabled project like this:
@@ -72,6 +71,8 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 [dependencies]
 neo4rs = "0.1.0"
 ```
+
+---
 
 # Roadmap
 - [x] bolt protocol
