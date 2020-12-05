@@ -2,6 +2,7 @@
 
 Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
 
+---
 
 ## Getting Started
 
@@ -14,7 +15,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     assert!(graph.query("RETURN 1").run().await.is_ok());
 ```
----
+
 
 *Create a node and process the response*
     
@@ -30,7 +31,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     let node: Node = row.get("friend").unwrap();
     let name: String = node.get("name").unwrap();
 ```
----
+
 
 *Drain the result stream*
  
@@ -49,7 +50,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 	//process name & node
     }
 ```
----
+
 
 *Create explicit transactions*
 
