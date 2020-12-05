@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/yehohanan7/neo4rs.svg?style=shield)](https://circleci.com/gh/yehohanan7/neo4rs)
+
 # Neo4j native driver in rust
 
 Uses bolt 4.1 protocol to communicate with Neo4j server.
