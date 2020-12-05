@@ -55,19 +55,16 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
     
     //Rollback a transaction
     txn.rollback().await.unwrap();
-    
-    
 ```
 
 # Roadmap
 - [x] bolt protocol
 - [x] stream abstraction
-- [x] discard response stream
-- [ ] multi db support
-- [ ] explicit transactions
-- [ ] batch queries/pipelining
+- [x] explicit transactions
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
+- [ ] multi db support
+- [ ] batch queries/pipelining
 - [ ] add support for older versions of the protocol
 - [ ] Secure connection
 - [ ] documentation
