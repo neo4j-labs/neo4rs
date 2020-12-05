@@ -30,7 +30,7 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
 ```
 
 ```rust
-    //stream result
+    //consume the result stream
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("MATCH (p:Person {name: 'Mark'}) RETURN p")
@@ -45,10 +45,25 @@ Uses bolt 4.1 protocol to communicate with Neo4j server.
     }
 ```
 
+
+```rust
+    //Explicit transactions
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let txn = graph.begin_txn().await.unwrap();
+    graph.query("CREATE (p:Person {id: 'some_id'})") .run() .await .unwrap();
+    txn.commit().await.unwrap();
+    
+    //Rollback a transaction
+    txn.rollback().await.unwrap();
+    
+    
+```
+
 # Roadmap
 - [x] bolt protocol
 - [x] stream abstraction
 - [x] discard response stream
+- [ ] multi db support
 - [ ] explicit transactions
 - [ ] batch queries/pipelining
 - [ ] use buffered TCP streams

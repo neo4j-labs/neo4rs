@@ -11,4 +11,5 @@ license = "MIT"
 [dependencies]
 tokio = { version = "0.3.1", features = ["full"] }
 futures = { version = "0.3.1"}
+uuid = { version = "0.8", features = ["v4"] }
 bytes = "0.5"

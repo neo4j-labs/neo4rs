@@ -30,12 +30,13 @@ impl QueryBuilder {
 
     pub async fn run(&self) -> Result<()> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let response = self.connection.borrow_mut().request(run).await?;
-        match response {
+        let mut connection = self.connection.borrow_mut();
+        match connection.request(run).await? {
             BoltResponse::SuccessMessage(_) => {
-                let discard = BoltRequest::discard();
-                self.connection.borrow_mut().send(discard).await?;
-                Ok(())
+                match connection.request(BoltRequest::discard()).await? {
+                    BoltResponse::SuccessMessage(_) => Ok(()),
+                    _ => Err(Error::UnexpectedMessage),
+                }
             }
             _ => Err(Error::UnexpectedMessage),
         }

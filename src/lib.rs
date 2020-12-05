@@ -4,7 +4,7 @@ mod errors;
 mod messages;
 mod query;
 mod result;
-mod transaction;
+mod txn;
 mod types;
 mod version;
 use crate::connection::*;
@@ -13,7 +13,7 @@ pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
 pub use crate::result::{Node, Row};
-pub use crate::transaction::*;
+pub use crate::txn::*;
 pub use crate::types::*;
 pub use crate::version::Version;
 use std::cell::RefCell;
@@ -32,8 +32,12 @@ pub enum State {
 }
 
 impl Graph {
-    pub async fn begin_txn(&self) -> Result<TxnHandle> {
-        Ok(TxnHandle::new(self.connection.clone()))
+    pub async fn begin_txn(&self) -> Result<Txn> {
+        let mut connection = self.connection.borrow_mut();
+        match connection.request(BoltRequest::begin()).await? {
+            BoltResponse::SuccessMessage(_) => Ok(Txn::new(self.connection.clone())),
+            _ => Err(Error::UnexpectedMessage),
+        }
     }
 
     pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {

@@ -1,20 +1,26 @@
-pub mod bye;
-pub mod discard;
-pub mod failure;
-pub mod hello;
-pub mod pull;
-pub mod record;
-pub mod run;
-pub mod success;
+mod begin;
+mod bye;
+mod commit;
+mod discard;
+mod failure;
+mod hello;
+mod pull;
+mod record;
+mod rollback;
+mod run;
+mod success;
 use crate::errors::*;
 use crate::types::*;
+use begin::Begin;
 use bye::Bye;
 use bytes::*;
+use commit::Commit;
 use discard::Discard;
 use failure::Failure;
 use hello::Hello;
 use pull::Pull;
 use record::Record;
+use rollback::Rollback;
 use run::Run;
 use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
@@ -35,6 +41,9 @@ pub enum BoltRequest {
     GoodByeMessage(Bye),
     PullMessage(Pull),
     DiscardMessage(Discard),
+    BeginMessage(Begin),
+    CommitMessage(Commit),
+    RollbackMessage(Rollback),
 }
 
 impl BoltRequest {
@@ -58,6 +67,18 @@ impl BoltRequest {
     pub fn discard() -> BoltRequest {
         BoltRequest::DiscardMessage(Discard::default())
     }
+
+    pub fn begin() -> BoltRequest {
+        BoltRequest::BeginMessage(Begin::new(BoltMap::new()))
+    }
+
+    pub fn commit() -> BoltRequest {
+        BoltRequest::CommitMessage(Commit::new())
+    }
+
+    pub fn rollback() -> BoltRequest {
+        BoltRequest::RollbackMessage(Rollback::new())
+    }
 }
 
 impl TryInto<Bytes> for BoltRequest {
@@ -69,6 +90,9 @@ impl TryInto<Bytes> for BoltRequest {
             BoltRequest::RunMessage(run) => run.try_into()?,
             BoltRequest::PullMessage(pull) => pull.try_into()?,
             BoltRequest::DiscardMessage(discard) => discard.try_into()?,
+            BoltRequest::BeginMessage(begin) => begin.try_into()?,
+            BoltRequest::CommitMessage(commit) => commit.try_into()?,
+            BoltRequest::RollbackMessage(rollback) => rollback.try_into()?,
         };
         Ok(bytes)
     }
