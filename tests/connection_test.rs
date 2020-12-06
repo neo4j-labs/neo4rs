@@ -2,13 +2,16 @@ use futures::stream::StreamExt;
 use neo4rs::*;
 use uuid::Uuid;
 
-#[tokio::test]
-async fn should_connect() {
+async fn connect() -> Result<Graph> {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
-    assert_eq!(graph.version, Version::v4_1);
+    Graph::connect(uri, user, pass).await
+}
+
+#[tokio::test]
+async fn should_connect() {
+    assert_eq!(connect().await.unwrap().version, Version::v4_1);
 }
 
 #[tokio::test]
@@ -30,10 +33,7 @@ async fn should_identify_invalid_credentials() {
 
 #[tokio::test]
 async fn should_execute_a_simple_query() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let mut result = graph.query("RETURN 1").execute().await.unwrap();
     let row = result.next().await.unwrap();
     let value: i64 = row.get("1").unwrap();
@@ -43,10 +43,7 @@ async fn should_execute_a_simple_query() {
 
 #[tokio::test]
 async fn should_create_new_node() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'})")
         .execute()
@@ -57,10 +54,7 @@ async fn should_create_new_node() {
 
 #[tokio::test]
 async fn should_return_created_node() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: 'Mark'}) RETURN friend")
         .execute()
@@ -78,10 +72,7 @@ async fn should_return_created_node() {
 
 #[tokio::test]
 async fn should_execute_query_with_params() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
         .param("name", "Mr Mark")
@@ -96,20 +87,13 @@ async fn should_execute_query_with_params() {
 
 #[tokio::test]
 async fn should_run_a_simple_query() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
-
+    let graph = connect().await.unwrap();
     assert!(graph.query("RETURN 1").run().await.is_ok());
 }
 
 #[tokio::test]
 async fn should_commit_txn() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let txn = graph.begin_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     assert!(graph
@@ -132,10 +116,7 @@ async fn should_commit_txn() {
 
 #[tokio::test]
 async fn should_rollback_txn() {
-    let uri = "127.0.0.1:7687";
-    let user = "neo4j";
-    let pass = "neo";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let graph = connect().await.unwrap();
     let txn = graph.begin_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     assert!(graph
@@ -152,4 +133,21 @@ async fn should_rollback_txn() {
         .await
         .unwrap();
     assert!(result.next().await.is_none());
+}
+
+#[tokio::test]
+async fn should_create_bounded_relation() {
+    let graph = connect().await.unwrap();
+    let mut result = graph
+        .query("CREATE (p:Person { name: 'Oliver Stone' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
+        .execute()
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap();
+    let relation: Relation = row.get("r").unwrap();
+    assert!(relation.id() > 0);
+    assert!(relation.start_node_id() > 0);
+    assert!(relation.end_node_id() > 0);
+    assert_eq!(relation.typ(), "WORKS_AT");
+    assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
 }

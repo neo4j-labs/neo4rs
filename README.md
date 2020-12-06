@@ -67,6 +67,27 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     //txn.rollback().await.unwrap();
 ```
 
+*Create and parse bounded relationship*
+
+```rust
+    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    let mut result = graph
+        .query("CREATE (p:Person { name: 'Mark' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
+        .execute()
+        .await
+        .unwrap();
+	
+    let row = result.next().await.unwrap();
+    
+    let relation: Relation = row.get("r").unwrap();
+    assert!(relation.id() > 0);
+    assert!(relation.start_node_id() > 0);
+    assert!(relation.end_node_id() > 0);
+    assert_eq!(relation.typ(), "WORKS_AT");
+    assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
+```
+
+
 
 ## Installation
 neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be included in your Cargo enabled project like this:
@@ -90,7 +111,7 @@ neo4rs = "0.1.0"
 	- [ ] Float
 	- [ ] Bytes
 - [ ] support structures
-	- [ ] Relationship
+	- [X] Relationship
 	- [ ] UnboundedRelationship
 	- [ ] Path
 	- [ ] Date

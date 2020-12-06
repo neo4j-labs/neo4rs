@@ -13,7 +13,7 @@ pub use crate::convert::*;
 pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
-pub use crate::row::{Node, Row};
+pub use crate::row::{Node, Relation, Row};
 pub use crate::txn::*;
 pub use crate::types::*;
 pub use crate::version::Version;

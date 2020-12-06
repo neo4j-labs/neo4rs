@@ -4,6 +4,7 @@ pub mod list;
 pub mod map;
 pub mod node;
 pub mod null;
+pub mod relation;
 pub mod string;
 pub use boolean::BoltBoolean;
 pub use integer::BoltInteger;
@@ -11,6 +12,7 @@ pub use list::BoltList;
 pub use map::BoltMap;
 pub use node::BoltNode;
 pub use null::BoltNull;
+pub use relation::BoltRelation;
 pub use string::BoltString;
 
 use crate::errors::*;
@@ -30,6 +32,7 @@ pub enum BoltType {
     Integer(BoltInteger),
     List(BoltList),
     Node(BoltNode),
+    Relation(BoltRelation),
 }
 
 impl Display for BoltType {
@@ -52,6 +55,7 @@ impl Hash for BoltType {
             BoltType::List(t) => t.hash(state),
             BoltType::Node(_) => panic!("node not hashed"),
             BoltType::Map(_) => panic!("map not hashed"),
+            BoltType::Relation(_) => panic!("relation not hashed"),
         }
     }
 }
@@ -67,6 +71,7 @@ impl TryInto<Bytes> for BoltType {
             BoltType::List(t) => t.try_into(),
             BoltType::Map(t) => t.try_into(),
             BoltType::Node(t) => t.try_into(),
+            BoltType::Relation(t) => t.try_into(),
         }
     }
 }
@@ -80,6 +85,9 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             input if BoltList::can_parse(input.clone()) => BoltType::List(input.try_into()?),
             input if BoltMap::can_parse(input.clone()) => BoltType::Map(input.try_into()?),
             input if BoltNode::can_parse(input.clone()) => BoltType::Node(input.try_into()?),
+            input if BoltRelation::can_parse(input.clone()) => {
+                BoltType::Relation(input.try_into()?)
+            }
             _ => return Err(Error::UnknownType),
         };
         Ok(bolt_type)

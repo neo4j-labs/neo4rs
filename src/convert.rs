@@ -25,6 +25,17 @@ impl TryFrom<BoltType> for Node {
     }
 }
 
+impl TryFrom<BoltType> for Relation {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Relation> {
+        match input {
+            BoltType::Relation(r) => Ok(Relation::new(r)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for BoltList {
     type Error = Error;
     fn try_from(input: BoltType) -> Result<BoltList> {
