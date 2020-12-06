@@ -9,13 +9,11 @@ mod txn;
 mod types;
 mod version;
 use crate::connection::*;
-pub use crate::convert::*;
 pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
 pub use crate::row::{Node, Relation, Row};
-pub use crate::txn::*;
-pub use crate::types::*;
+pub use crate::txn::Txn;
 pub use crate::version::Version;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,12 +21,12 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct Graph {
     pub version: Version,
-    pub state: State,
+    state: State,
     connection: Rc<RefCell<Connection>>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum State {
+enum State {
     Ready { id: String, server: String },
 }
 
