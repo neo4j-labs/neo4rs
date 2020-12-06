@@ -46,6 +46,10 @@ impl BoltList {
             || marker == MEDIUM
             || marker == LARGE
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &BoltType> {
+        self.value.iter()
+    }
 }
 
 impl IntoIterator for BoltList {
@@ -58,10 +62,7 @@ impl IntoIterator for BoltList {
 
 impl Into<Vec<String>> for BoltList {
     fn into(self) -> Vec<String> {
-        self.value
-            .into_iter()
-            .map(|x| x.try_into().unwrap())
-            .collect() //TODO: unwrap
+        self.value.into_iter().map(|x| x.to_string()).collect()
     }
 }
 

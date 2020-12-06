@@ -3,6 +3,7 @@ use crate::types::*;
 use bytes::*;
 use std::cell::RefCell;
 use std::convert::{From, TryFrom, TryInto};
+use std::fmt::Display;
 use std::mem;
 use std::rc::Rc;
 
@@ -29,6 +30,12 @@ impl BoltString {
             || marker == SMALL
             || marker == MEDIUM
             || marker == LARGE
+    }
+}
+
+impl Display for BoltString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 

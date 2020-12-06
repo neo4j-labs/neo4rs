@@ -18,6 +18,7 @@ use bytes::Bytes;
 use core::hash::{Hash, Hasher};
 use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
+use std::fmt::Display;
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -29,6 +30,16 @@ pub enum BoltType {
     Integer(BoltInteger),
     List(BoltList),
     Node(BoltNode),
+}
+
+impl Display for BoltType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            BoltType::String(s) => s.to_string(),
+            _ => "to_string not implemented".to_owned(),
+        };
+        write!(f, "{}", value)
+    }
 }
 
 impl Hash for BoltType {

@@ -22,13 +22,17 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
-        .param("name", "Mr Mark")
+        .param("name", "Mark")
         .execute()
         .await
         .unwrap();
     let row = result.next().await.unwrap();
     let node: Node = row.get("friend").unwrap();
+    let id = node.id();
+    let labels = node.labels();
     let name: String = node.get("name").unwrap();
+    assert_eq!(name, "Mark");
+    assert_eq!(labels, vec!["Person"]);
 ```
 
 

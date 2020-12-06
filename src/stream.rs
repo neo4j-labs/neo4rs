@@ -26,6 +26,14 @@ impl Node {
         Node { data }
     }
 
+    pub fn id(&self) -> i64 {
+        self.data.id.value
+    }
+
+    pub fn labels(&self) -> Vec<String> {
+        self.data.labels.iter().map(|l| l.to_string()).collect()
+    }
+
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         match self.data.properties.get(key) {
             Some(bolt_type) => {

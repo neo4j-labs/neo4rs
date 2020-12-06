@@ -68,8 +68,12 @@ async fn should_return_created_node() {
         .unwrap();
     let row = result.next().await.unwrap();
     let node: Node = row.get("friend").unwrap();
+    let id = node.id();
+    let labels = node.labels();
     let name: String = node.get("name").unwrap();
     assert_eq!(name, "Mark");
+    assert_eq!(labels, vec!["Person"]);
+    assert!(id > 0);
 }
 
 #[tokio::test]
