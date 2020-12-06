@@ -57,8 +57,8 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(extra.get("n").unwrap(), 42.into());
-        assert_eq!(extra.get("qid").unwrap(), 1.into());
+        assert_eq!(extra.get::<i64>("n").unwrap(), 42.into());
+        assert_eq!(extra.get::<i64>("qid").unwrap(), 1.into());
     }
 
     #[test]
@@ -71,7 +71,7 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert_eq!(extra.get("n").unwrap(), 255.into());
-        assert_eq!(extra.get("qid").unwrap(), 255.into());
+        assert_eq!(extra.get::<i64>("n").unwrap(), 255.into());
+        assert_eq!(extra.get::<i64>("qid").unwrap(), 255.into());
     }
 }

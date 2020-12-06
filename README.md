@@ -60,11 +60,11 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 ```rust
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     let txn = graph.begin_txn().await.unwrap();
-    graph.query("CREATE (p:Person {id: 'some_id'})") .run() .await .unwrap();
+    graph.query("CREATE (p:Person {id: 'some_id'})").run().await.unwrap();
     txn.commit().await.unwrap();
     
     //Rollback a transaction
-    txn.rollback().await.unwrap();
+    //txn.rollback().await.unwrap();
 ```
 
 

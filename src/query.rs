@@ -48,7 +48,8 @@ impl QueryBuilder {
         let response = self.connection.borrow_mut().send_recv(run).await?;
         match response {
             BoltResponse::SuccessMessage(success) => {
-                Ok(RowStream::new(success.fields(), self.connection.clone()).await?)
+                let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
+                Ok(RowStream::new(fields, self.connection.clone()).await?)
             }
             _ => Err(Error::UnexpectedMessage),
         }

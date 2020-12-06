@@ -24,6 +24,12 @@ impl BoltNode {
     }
 }
 
+impl BoltNode {
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        self.properties.get(key)
+    }
+}
+
 impl TryFrom<Rc<RefCell<Bytes>>> for BoltNode {
     type Error = Error;
 

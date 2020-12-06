@@ -2,6 +2,7 @@ use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
 use crate::row::*;
+use crate::types::BoltList;
 use futures::stream::Stream;
 use futures::Future;
 use std::cell::RefCell;
@@ -11,15 +12,12 @@ use std::task::{Context, Poll};
 
 #[derive(Debug)]
 pub struct RowStream {
-    fields: Vec<String>,
+    fields: BoltList,
     connection: Rc<RefCell<Connection>>,
 }
 
 impl RowStream {
-    pub async fn new(
-        fields: Vec<String>,
-        connection: Rc<RefCell<Connection>>,
-    ) -> Result<RowStream> {
+    pub async fn new(fields: BoltList, connection: Rc<RefCell<Connection>>) -> Result<RowStream> {
         let pull = BoltRequest::pull();
         connection.borrow_mut().send(pull).await?;
         Ok(RowStream { fields, connection })

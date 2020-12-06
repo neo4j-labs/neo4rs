@@ -26,6 +26,12 @@ impl BoltMap {
         }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        BoltMap {
+            value: HashMap::with_capacity(capacity),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.value.len()
     }
@@ -34,8 +40,17 @@ impl BoltMap {
         self.value.insert(key, value);
     }
 
-    pub fn get(&self, key: &str) -> Option<BoltType> {
-        self.value.get(&key.into()).map(|v| v.clone())
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        match self.value.get(&BoltString::new(key)) {
+            Some(bolt_type) => {
+                if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 
     pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {

@@ -25,6 +25,26 @@ impl TryFrom<BoltType> for Node {
     }
 }
 
+impl TryFrom<BoltType> for BoltList {
+    type Error = Error;
+    fn try_from(input: BoltType) -> Result<BoltList> {
+        match input {
+            BoltType::List(l) => Ok(l),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for BoltString {
+    type Error = Error;
+    fn try_from(input: BoltType) -> Result<BoltString> {
+        match input {
+            BoltType::String(s) => Ok(s),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for String {
     type Error = Error;
     fn try_from(input: BoltType) -> Result<String> {

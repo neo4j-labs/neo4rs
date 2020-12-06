@@ -26,12 +26,8 @@ impl Failure {
 }
 
 impl Failure {
-    pub fn code(&self) -> String {
-        self.metadata.get("code").unwrap().try_into().unwrap() //TODO: unwrap
-    }
-
-    pub fn message(&self) -> String {
-        self.metadata.get("message").unwrap().try_into().unwrap() //TODO: unwrap
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        self.metadata.get(key)
     }
 }
 
@@ -66,9 +62,12 @@ mod tests {
 
         let failure: Failure = Rc::new(RefCell::new(data)).try_into().unwrap();
 
-        assert_eq!(failure.code(), "Neo.ClientError.Security.Unauthorized");
         assert_eq!(
-            failure.message(),
+            failure.get::<String>("code").unwrap(),
+            "Neo.ClientError.Security.Unauthorized"
+        );
+        assert_eq!(
+            failure.get::<String>("message").unwrap(),
             "The client is unauthorized due to authentication failure."
         );
     }

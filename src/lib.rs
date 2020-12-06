@@ -1,7 +1,5 @@
-#[macro_use]
-mod macros;
 mod connection;
-mod convertion;
+mod convert;
 mod errors;
 mod messages;
 mod query;
@@ -11,7 +9,7 @@ mod txn;
 mod types;
 mod version;
 use crate::connection::*;
-pub use crate::convertion::*;
+pub use crate::convert::*;
 pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
@@ -36,7 +34,6 @@ pub enum State {
 
 impl Graph {
     pub async fn begin_txn(&self) -> Result<Txn> {
-        vecs!();
         Ok(Txn::new(self.connection.clone()).await?)
     }
 
@@ -47,13 +44,13 @@ impl Graph {
             BoltResponse::SuccessMessage(msg) => Ok(Graph {
                 version,
                 state: State::Ready {
-                    id: msg.connection_id(),
-                    server: msg.server(),
+                    id: msg.get("connection_id").unwrap(),
+                    server: msg.get("server").unwrap(),
                 },
                 connection: Rc::new(RefCell::new(connection)),
             }),
             BoltResponse::FailureMessage(msg) => Err(Error::AuthenticationError {
-                detail: msg.message(),
+                detail: msg.get("message").unwrap(),
             }),
             _ => Err(Error::UnexpectedMessage),
         }

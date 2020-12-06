@@ -26,16 +26,8 @@ impl Success {
 }
 
 impl Success {
-    pub fn server(&self) -> String {
-        self.metadata.get("server").unwrap().try_into().unwrap() //TODO: remove unwrap
-    }
-
-    pub fn connection_id(&self) -> String {
-        self.metadata
-            .get("connection_id")
-            .unwrap()
-            .try_into()
-            .unwrap() //TODO: unwrap
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        self.metadata.get(key)
     }
 
     pub fn fields(&self) -> Vec<String> {
@@ -72,7 +64,7 @@ mod tests {
 
         let success: Success = Rc::new(RefCell::new(data)).try_into().unwrap();
 
-        assert_eq!(success.server(), "Neo4j/4.1.4");
-        assert_eq!(success.connection_id(), "bolt-31");
+        assert_eq!(success.get::<String>("server").unwrap(), "Neo4j/4.1.4");
+        assert_eq!(success.get::<String>("connection_id").unwrap(), "bolt-31");
     }
 }
