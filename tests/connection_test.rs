@@ -145,9 +145,26 @@ async fn should_create_bounded_relation() {
         .unwrap();
     let row = result.next().await.unwrap();
     let relation: Relation = row.get("r").unwrap();
-    assert!(relation.id() > 0);
-    assert!(relation.start_node_id() > 0);
-    assert!(relation.end_node_id() > 0);
+    assert!(relation.id() > -1);
+    assert!(relation.start_node_id() > -1);
+    assert!(relation.end_node_id() > -1);
     assert_eq!(relation.typ(), "WORKS_AT");
     assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
+}
+
+#[tokio::test]
+async fn should_create_unbounded_relation() {
+    let graph = connect().await.unwrap();
+    let mut result = graph
+        .query("MERGE (p1:Person { name: 'Oliver Stone' })-[r:RELATED {as: 'friend'}]-(p2: Person {name: 'Mark'}) RETURN r")
+        .execute()
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap();
+    let relation: Relation = row.get("r").unwrap();
+    assert!(relation.id() > -1);
+    assert!(relation.start_node_id() > -1);
+    assert!(relation.end_node_id() > -1);
+    assert_eq!(relation.typ(), "RELATED");
+    assert_eq!(relation.get::<String>("as").unwrap(), "friend");
 }
