@@ -107,6 +107,7 @@ neo4rs = "0.1.1"
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
 - [ ] multi db support
+- [ ] respect "has_more" flag returned for PULL
 - [ ] support data types
 	- [ ] Float
 	- [ ] Bytes
