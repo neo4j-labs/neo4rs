@@ -51,6 +51,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
         Ok(BoltInteger::new(value))
     }
 }
+
 impl TryInto<Bytes> for BoltInteger {
     type Error = Error;
 

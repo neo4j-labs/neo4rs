@@ -31,17 +31,7 @@ impl Stream for RowStream {
         let mut future = Box::pin(connection.recv());
         match future.as_mut().poll(context) {
             Poll::Ready(Ok(BoltResponse::SuccessMessage(msg))) => {
-                //TODO: handle "hash_more"
-                //if let Some(true) = msg.get("has_more") {
-                //    let mut f = Box::pin(connection.send(BoltRequest::pull()));
-                //    match f.as_mut().poll(context) {
-                //        Poll::Ready(_) => Poll::Ready(None),
-                //        Poll::Pending => Poll::Pending,
-                //    }
-                //} else {
-                //    Poll::Ready(None)
-                //}
-                Poll::Ready(None)
+                Poll::Ready(None) //TODO: handle "has_more"
             }
             Poll::Ready(Ok(BoltResponse::RecordMessage(record))) => {
                 Poll::Ready(Some(Row::new(self.fields.clone(), record.data)))

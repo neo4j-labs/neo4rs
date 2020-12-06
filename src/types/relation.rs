@@ -20,9 +20,8 @@ pub struct BoltRelation {
 
 impl BoltRelation {
     pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let marker = input.borrow()[0];
-        let signature = input.borrow()[1];
-        return marker == MARKER && signature == SIGNATURE;
+        let input = input.borrow();
+        input.len() > 1 && input[0] == MARKER && input[1] == SIGNATURE
     }
 }
 

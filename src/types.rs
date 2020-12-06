@@ -85,10 +85,15 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             input if BoltList::can_parse(input.clone()) => BoltType::List(input.try_into()?),
             input if BoltMap::can_parse(input.clone()) => BoltType::Map(input.try_into()?),
             input if BoltNode::can_parse(input.clone()) => BoltType::Node(input.try_into()?),
+            input if BoltBoolean::can_parse(input.clone()) => BoltType::Boolean(input.try_into()?),
             input if BoltRelation::can_parse(input.clone()) => {
                 BoltType::Relation(input.try_into()?)
             }
-            _ => return Err(Error::UnknownType),
+            _ => {
+                return Err(Error::UnknownType {
+                    detail: format!("{:#04X?}", input.borrow()),
+                })
+            }
         };
         Ok(bolt_type)
     }

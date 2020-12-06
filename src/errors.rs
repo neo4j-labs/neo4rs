@@ -7,7 +7,7 @@ pub enum Error {
     MapTooBig,
     ListTooLong,
     UnexpectedMessage,
-    UnknownType,
+    UnknownType { detail: String },
     UnknownMessage,
     ConverstionError,
     AuthenticationError { detail: String },
