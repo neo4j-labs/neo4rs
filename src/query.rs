@@ -31,7 +31,7 @@ impl QueryBuilder {
 
     pub async fn run(&self) -> Result<()> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let mut connection = self.connection.borrow_mut();
+        let connection = self.connection.borrow_mut();
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {

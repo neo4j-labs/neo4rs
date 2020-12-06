@@ -36,7 +36,7 @@ impl Graph {
     }
 
     pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let (mut connection, version) = Connection::new(uri.to_owned()).await?;
+        let (connection, version) = Connection::new(uri.to_owned()).await?;
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
         match connection.send_recv(hello).await? {
             BoltResponse::SuccessMessage(msg) => Ok(Graph {
