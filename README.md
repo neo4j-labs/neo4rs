@@ -67,7 +67,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     //txn.rollback().await.unwrap();
 ```
 
-*Create and parse bounded relationship*
+*Create and parse relationship*
 
 ```rust
     let graph = Graph::connect(uri, user, pass).await.unwrap();
