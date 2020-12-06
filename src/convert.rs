@@ -14,6 +14,17 @@ impl TryFrom<BoltType> for i64 {
     }
 }
 
+impl TryFrom<BoltType> for bool {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<bool> {
+        match input {
+            BoltType::Boolean(t) => Ok(t.value),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Node {
     type Error = Error;
 
