@@ -1,8 +1,11 @@
+#[macro_use]
+mod macros;
 mod connection;
 mod convertion;
 mod errors;
 mod messages;
 mod query;
+mod row;
 mod stream;
 mod txn;
 mod types;
@@ -12,7 +15,7 @@ pub use crate::convertion::*;
 pub use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
-pub use crate::stream::{Node, Row};
+pub use crate::row::{Node, Row};
 pub use crate::txn::*;
 pub use crate::types::*;
 pub use crate::version::Version;
@@ -33,6 +36,7 @@ pub enum State {
 
 impl Graph {
     pub async fn begin_txn(&self) -> Result<Txn> {
+        vecs!();
         Ok(Txn::new(self.connection.clone()).await?)
     }
 

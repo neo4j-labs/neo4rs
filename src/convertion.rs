@@ -1,5 +1,5 @@
 use crate::errors::*;
-use crate::stream::*;
+use crate::row::*;
 use crate::types::*;
 use std::convert::TryFrom;
 

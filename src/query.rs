@@ -1,6 +1,7 @@
 use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
+use crate::row::*;
 use crate::stream::*;
 use crate::types::*;
 use futures::stream::Stream;
