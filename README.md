@@ -5,21 +5,17 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 
 ## Getting Started
 
-*Run a simple query, discard the response data*
 
 ```rust    
+    //Connect to server
     let uri = "127.0.0.1:7687".to_owned();
     let user = "neo4j";
     let pass = "neo4j";
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     assert!(graph.query("RETURN 1").run().await.is_ok());
-```
-
-
-*Create a node and process the response*
     
-```rust
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    
+    //Create a node and process the response
     let mut result = graph
         .query("CREATE (friend:Person {name: $name}) RETURN friend")
         .param("name", "Mark")
@@ -33,14 +29,9 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     let name: String = node.get("name").unwrap();
     assert_eq!(name, "Mark");
     assert_eq!(labels, vec!["Person"]);
-```
-
-
-*Drain the result stream*
- 
-```rust
-   
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    
+    
+    //Drain the response stream
     let mut result = graph
         .query("MATCH (p:Person {name: 'Mark'}) RETURN p")
         .execute()
@@ -52,25 +43,15 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
         let name: String = node.get("name").unwrap();
 	//process name & node
     }
-```
-
-
-*Create explicit transactions*
-
-```rust
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    
+    
+    //Explicit transactions
     let txn = graph.begin_txn().await.unwrap();
     graph.query("CREATE (p:Person {id: 'some_id'})").run().await.unwrap();
-    txn.commit().await.unwrap();
+    txn.commit().await.unwrap(); //txn.rollback().await.unwrap();
     
-    //Rollback a transaction
-    //txn.rollback().await.unwrap();
-```
-
-*Create and parse relationship*
-
-```rust
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
+    
+    //Create and parse relationship
     let mut result = graph
         .query("CREATE (p:Person { name: 'Mark' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
         .execute()
