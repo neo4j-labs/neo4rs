@@ -45,9 +45,9 @@ impl QueryBuilder {
 
     pub async fn execute(self) -> Result<impl Stream<Item = Row>> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let run_response = self.connection.borrow().send_recv(run).await?;
+        let response = self.connection.borrow().send_recv(run).await?;
 
-        match run_response {
+        match response {
             BoltResponse::SuccessMessage(success) => {
                 let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
                 let connection = self.connection.clone();
@@ -66,27 +66,30 @@ impl QueryBuilder {
                                         yield Row::new(fields.clone(), record.data);
                                     },
                                     Ok(msg) => {
-                                        println!("Got unexpected message: {:?}", msg);
+                                        eprintln!("Got unexpected message: {:?}", msg);
                                         break;
                                     }
                                     Err(msg) => {
-                                        println!("Got error while streaming: {:?}", msg);
+                                        eprintln!("Got error while streaming: {:?}", msg);
                                         break;
                                     }
                                 }
                             },
-                            _ => break,
+                            Err(e) => {
+                                eprintln!("error executing query {:?}", e);
+                                break;
+                            }
                         }
                      }
                 };
                 Ok(Box::pin(stream))
             }
             BoltResponse::FailureMessage(msg) => {
-                println!("error executing query {:?}", msg);
+                eprintln!("error executing query {:?}", msg);
                 Err(Error::QueryError)
             }
             msg => {
-                println!("unexpected message received: {:?}", msg);
+                eprintln!("unexpected message received: {:?}", msg);
                 Err(Error::UnexpectedMessage)
             }
         }
