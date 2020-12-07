@@ -4,7 +4,6 @@ mod errors;
 mod messages;
 mod query;
 mod row;
-mod stream;
 mod txn;
 mod types;
 mod version;

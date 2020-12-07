@@ -9,7 +9,8 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.3.1", features = ["full"] }
 futures = { version = "0.3.1"}
+tokio = { version = "0.3.1", features = ["full"] }
+async-stream = "0.3.0"
 uuid = { version = "0.8", features = ["v4"] }
 bytes = "0.5"

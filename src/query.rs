@@ -2,8 +2,8 @@ use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
 use crate::row::*;
-use crate::stream::*;
 use crate::types::*;
+use async_stream::stream;
 use futures::stream::Stream;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,12 +24,12 @@ impl QueryBuilder {
         }
     }
 
-    pub fn param<T: std::convert::Into<BoltType>>(&self, key: &str, value: T) -> &Self {
+    pub fn param<T: std::convert::Into<BoltType>>(self, key: &str, value: T) -> Self {
         self.params.borrow_mut().put(key.into(), value.into());
-        &self
+        self
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
         let connection = self.connection.borrow_mut();
         match connection.send_recv(run).await? {
@@ -43,15 +43,52 @@ impl QueryBuilder {
         }
     }
 
-    pub async fn execute(&self) -> Result<impl Stream<Item = Row>> {
+    pub async fn execute(self) -> Result<impl Stream<Item = Row>> {
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let response = self.connection.borrow_mut().send_recv(run).await?;
-        match response {
+        let run_response = self.connection.borrow().send_recv(run).await?;
+
+        match run_response {
             BoltResponse::SuccessMessage(success) => {
                 let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
-                Ok(RowStream::new(fields, self.connection.clone()).await?)
+                let connection = self.connection.clone();
+                let stream = stream! {
+                     let mut has_more = true;
+                     while has_more {
+                        let pull = BoltRequest::pull();
+                        match connection.borrow().send(pull).await {
+                            Ok(()) => loop {
+                                match self.connection.borrow().recv().await {
+                                    Ok(BoltResponse::SuccessMessage(s)) => {
+                                        has_more = s.get("has_more").unwrap_or(false);
+                                        break;
+                                    },
+                                    Ok(BoltResponse::RecordMessage(record)) => {
+                                        yield Row::new(fields.clone(), record.data);
+                                    },
+                                    Ok(msg) => {
+                                        println!("Got unexpected message: {:?}", msg);
+                                        break;
+                                    }
+                                    Err(msg) => {
+                                        println!("Got error while streaming: {:?}", msg);
+                                        break;
+                                    }
+                                }
+                            },
+                            _ => break,
+                        }
+                     }
+                };
+                Ok(Box::pin(stream))
             }
-            _ => Err(Error::UnexpectedMessage),
+            BoltResponse::FailureMessage(msg) => {
+                println!("error executing query {:?}", msg);
+                Err(Error::QueryError)
+            }
+            msg => {
+                println!("unexpected message received: {:?}", msg);
+                Err(Error::UnexpectedMessage)
+            }
         }
     }
 }

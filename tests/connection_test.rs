@@ -119,12 +119,15 @@ async fn should_rollback_txn() {
     let graph = connect().await.unwrap();
     let txn = graph.begin_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
-    assert!(graph
+
+    let result = graph
         .query("CREATE (p:Person {id: $id}) RETURN p")
         .param("id", id.clone())
         .run()
-        .await
-        .is_ok());
+        .await;
+
+    assert!(result.is_ok());
+
     txn.rollback().await.unwrap();
     let mut result = graph
         .query("MATCH (p:Person) WHERE p.id = $id RETURN p.id")
