@@ -85,10 +85,10 @@ neo4rs = "0.1.1"
 - [x] stream abstraction
 - [x] query.run() vs query.execute() abstraction
 - [x] explicit transactions
+- [x] respect "has_more" flag returned for PULL
 - [ ] use buffered TCP streams
 - [ ] connection pooling & multiplexing
 - [ ] multi db support
-- [ ] respect "has_more" flag returned for PULL
 - [ ] support data types
 	- [ ] Float
 	- [ ] Bytes
