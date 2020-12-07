@@ -1,3 +1,30 @@
+//! Neo4j driver imlemented using bolt 4.1 specification
+//!
+//! #Example
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//!
+//! pub async fn run_me() {
+//!  let uri = "127.0.0.1:7687".to_owned();
+//!  let user = "neo4j";
+//!  let pass = "neo4j";
+//!  let graph = Graph::connect(&uri, user, pass).await.unwrap();
+//!  let mut result = graph
+//!        .query("CREATE (friend:Person {name: $name}) RETURN friend")
+//!        .param("name", "Mark")
+//!        .execute()
+//!        .await
+//!        .unwrap();
+//!
+//!  while let Some(row) = result.next().await {
+//!     let node: Node = row.get("friend").unwrap();
+//!     let name: String = node.get("name").unwrap();
+//!     assert_eq!(name, "Mark");
+//!  }
+//! }
+//! ```
+
 mod connection;
 mod convert;
 mod errors;
@@ -30,10 +57,6 @@ enum State {
 }
 
 impl Graph {
-    pub async fn begin_txn(&self) -> Result<Txn> {
-        Ok(Txn::new(self.connection.clone()).await?)
-    }
-
     pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {
         let (connection, version) = Connection::new(uri.to_owned()).await?;
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
@@ -55,5 +78,9 @@ impl Graph {
 
     pub fn query(&self, q: &str) -> QueryBuilder {
         QueryBuilder::new(q.to_owned(), self.connection.clone())
+    }
+
+    pub async fn begin_txn(&self) -> Result<Txn> {
+        Ok(Txn::new(self.connection.clone()).await?)
     }
 }

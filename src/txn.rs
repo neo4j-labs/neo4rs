@@ -21,7 +21,7 @@ impl Txn {
     }
 
     pub async fn commit(&self) -> Result<()> {
-        let mut connection = self.connection.borrow_mut();
+        let connection = self.connection.borrow();
         match connection.send_recv(BoltRequest::commit()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
@@ -29,7 +29,7 @@ impl Txn {
     }
 
     pub async fn rollback(&self) -> Result<()> {
-        let mut connection = self.connection.borrow_mut();
+        let connection = self.connection.borrow();
         match connection.send_recv(BoltRequest::rollback()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),

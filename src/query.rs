@@ -8,6 +8,10 @@ use futures::stream::Stream;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Provides a dsl to create the query and either run/execute it.
+///
+/// when you run() the query, the response stream will be discarded, but when you execute the
+/// query, then you will get a `Stream` back, you should make sure that you drain the stream.
 #[derive(Debug)]
 pub struct QueryBuilder {
     query: String,
