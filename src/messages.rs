@@ -6,6 +6,7 @@ mod failure;
 mod hello;
 mod pull;
 mod record;
+mod reset;
 mod rollback;
 mod run;
 mod success;
@@ -20,6 +21,7 @@ use failure::Failure;
 use hello::Hello;
 use pull::Pull;
 use record::Record;
+use reset::Reset;
 use rollback::Rollback;
 use run::Run;
 use std::cell::RefCell;
@@ -44,6 +46,7 @@ pub enum BoltRequest {
     BeginMessage(Begin),
     CommitMessage(Commit),
     RollbackMessage(Rollback),
+    ResetMessage(Reset),
 }
 
 impl BoltRequest {
@@ -60,8 +63,8 @@ impl BoltRequest {
         BoltRequest::RunMessage(Run::new(query.into(), params))
     }
 
-    pub fn pull() -> BoltRequest {
-        BoltRequest::PullMessage(Pull::default())
+    pub fn pull(qid: i64) -> BoltRequest {
+        BoltRequest::PullMessage(Pull::new(-1, qid))
     }
 
     pub fn discard() -> BoltRequest {
@@ -79,6 +82,10 @@ impl BoltRequest {
     pub fn rollback() -> BoltRequest {
         BoltRequest::RollbackMessage(Rollback::new())
     }
+
+    pub fn reset() -> BoltRequest {
+        BoltRequest::ResetMessage(Reset::new())
+    }
 }
 
 impl TryInto<Bytes> for BoltRequest {
@@ -93,6 +100,7 @@ impl TryInto<Bytes> for BoltRequest {
             BoltRequest::BeginMessage(begin) => begin.try_into()?,
             BoltRequest::CommitMessage(commit) => commit.try_into()?,
             BoltRequest::RollbackMessage(rollback) => rollback.try_into()?,
+            BoltRequest::ResetMessage(reset) => reset.try_into()?,
         };
         Ok(bytes)
     }

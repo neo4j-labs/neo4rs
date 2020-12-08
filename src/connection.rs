@@ -13,7 +13,7 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
 #[derive(Debug)]
 pub struct Connection {
-    stream: RefCell<TcpStream>,
+    stream: Box<TcpStream>,
 }
 
 impl Connection {
@@ -28,52 +28,45 @@ impl Connection {
         let version = Version::parse(response);
         Ok((
             Connection {
-                stream: RefCell::new(stream),
+                stream: Box::new(stream),
             },
             version,
         ))
     }
 
-    pub async fn send_recv(&self, message: BoltRequest) -> Result<BoltResponse> {
+    pub async fn send_recv(&mut self, message: BoltRequest) -> Result<BoltResponse> {
         self.send(message).await?;
         self.recv().await
     }
 
-    pub async fn send(&self, message: BoltRequest) -> Result<()> {
-        let mut stream = self.stream.borrow_mut();
+    pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
         let bytes: Bytes = message.try_into().unwrap();
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
-            stream.write_u16(c.len() as u16).await?;
-            stream.write_all(c).await?;
+            self.stream.write_u16(c.len() as u16).await?;
+            self.stream.write_all(c).await?;
         }
-        stream.write_all(&[0, 0]).await?;
-        stream.flush().await?;
+        self.stream.write_all(&[0, 0]).await?;
+        self.stream.flush().await?;
         Ok(())
     }
 
-    pub async fn recv(&self) -> Result<BoltResponse> {
-        let mut stream = self.stream.borrow_mut();
+    pub async fn recv(&mut self) -> Result<BoltResponse> {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
             let mut data = [0, 0];
-            stream.read_exact(&mut data).await?;
+            self.stream.read_exact(&mut data).await?;
             chunk_size = u16::from_be_bytes(data);
         }
 
         while chunk_size > 0 {
             let mut buf = vec![0; chunk_size as usize];
-            stream.read_exact(&mut buf).await?;
+            self.stream.read_exact(&mut buf).await?;
             bytes.put_slice(&buf);
             let mut data = [0, 0];
-            stream.read_exact(&mut data).await?;
+            self.stream.read_exact(&mut data).await?;
             chunk_size = u16::from_be_bytes(data);
         }
-
-        //println!("{}", "=====================");
-        //println!("{:#04X?}", bytes.bytes());
-        //println!("{:?}", bytes);
-        //println!("{}", "=====================");
 
         Ok(bytes.freeze().try_into()?)
     }

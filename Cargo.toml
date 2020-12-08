@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["John Vincent <yehohanan7@gmail.com>"]
 edition = "2018"
 description = "neo4j driver in rust"
@@ -14,3 +14,5 @@ tokio = { version = "0.3.1", features = ["full"] }
 async-stream = "0.3.0"
 uuid = { version = "0.8", features = ["v4"] }
 bytes = "0.5"
+bb8 = "0.6.1"
+async-trait = "0.1.42"
