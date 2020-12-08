@@ -94,11 +94,10 @@ neo4rs = "0.1.1"
 - [x] query.run() vs query.execute() abstraction
 - [x] respect "has_more" flag returned for PULL
 - [x] connection pooling
+- [ ] improve logging
 - [ ] explicit transactions
 - [ ] batch queries/pipelining
 - [ ] add support for older versions of the protocol
-- [ ] Secure connection
-- [ ] documentation
 - [ ] use buffered TCP streams
 - [ ] multi db support
 - [ ] support data types
