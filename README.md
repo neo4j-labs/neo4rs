@@ -14,6 +14,21 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     let graph = Graph::connect(uri, user, pass).await.unwrap();
     assert!(graph.query("RETURN 1").run().await.is_ok());
     
+    //Concurrent queries
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Arc::new(Graph::connect(uri, user, pass).await.unwrap());
+    for _ in 1..=10000 {
+        let graph = graph.clone();
+        tokio::spawn(async move {
+            let mut result = graph.query("MATCH (p) RETURN p").execute().await.unwrap();
+            while let Some(row) = result.next().await {
+                //process row
+            }
+        });
+    }
+    
     
     //Create a node and process the response
     let mut result = graph
@@ -43,12 +58,6 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
         let name: String = node.get("name").unwrap();
 	//process name & node
     }
-    
-    
-    //Explicit transactions
-    let txn = graph.begin_txn().await.unwrap();
-    graph.query("CREATE (p:Person {id: 'some_id'})").run().await.unwrap();
-    txn.commit().await.unwrap(); //txn.rollback().await.unwrap();
     
     
     //Create and parse relationship
@@ -84,14 +93,14 @@ neo4rs = "0.1.1"
 - [x] bolt protocol
 - [x] stream abstraction
 - [x] query.run() vs query.execute() abstraction
-- [x] explicit transactions
 - [x] respect "has_more" flag returned for PULL
+- [x] connection pooling
 - [ ] batch queries/pipelining
 - [ ] add support for older versions of the protocol
 - [ ] Secure connection
 - [ ] documentation
 - [ ] use buffered TCP streams
-- [ ] connection pooling & multiplexing
+- [ ] explicit transactions
 - [ ] multi db support
 - [ ] support data types
 	- [ ] Float

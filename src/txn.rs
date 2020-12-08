@@ -1,27 +1,25 @@
-use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::pool::ConnectionManager;
 
 #[derive(Debug)]
 pub struct Txn {
-    connection: Rc<RefCell<Connection>>,
+    connections: bb8::Pool<ConnectionManager>,
 }
 
 impl Txn {
-    pub async fn new(connection: Rc<RefCell<Connection>>) -> Result<Self> {
+    pub async fn new(connections: bb8::Pool<ConnectionManager>) -> Result<Self> {
         let begin = BoltRequest::begin();
-        match connection.borrow_mut().send_recv(begin).await? {
+        match connections.get().await?.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {
-                connection: connection.clone(),
+                connections: connections.clone(),
             }),
             _ => Err(Error::UnexpectedMessage),
         }
     }
 
     pub async fn commit(&self) -> Result<()> {
-        let connection = self.connection.borrow();
+        let mut connection = self.connections.get().await?;
         match connection.send_recv(BoltRequest::commit()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
@@ -29,7 +27,7 @@ impl Txn {
     }
 
     pub async fn rollback(&self) -> Result<()> {
-        let connection = self.connection.borrow();
+        let mut connection = self.connections.get().await?;
         match connection.send_recv(BoltRequest::rollback()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),

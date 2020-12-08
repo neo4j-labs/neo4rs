@@ -1,29 +1,22 @@
-use crate::connection::*;
 use crate::errors::*;
 use crate::messages::*;
+use crate::pool::*;
 use crate::row::*;
 use crate::types::*;
-use async_stream::stream;
-use futures::stream::Stream;
 use std::cell::RefCell;
-use std::rc::Rc;
 
-/// Provides a dsl to create the query and either run/execute it.
-///
-/// when you run() the query, the response stream will be discarded, but when you execute the
-/// query, then you will get a `Stream` back, you should make sure that you drain the stream.
 #[derive(Debug)]
 pub struct QueryBuilder {
     query: String,
-    connection: Rc<RefCell<Connection>>,
+    connections: bb8::Pool<ConnectionManager>,
     params: RefCell<BoltMap>,
 }
 
 impl QueryBuilder {
-    pub fn new(query: String, connection: Rc<RefCell<Connection>>) -> Self {
+    pub fn new(query: String, connections: bb8::Pool<ConnectionManager>) -> Self {
         QueryBuilder {
             query,
-            connection,
+            connections,
             params: RefCell::new(BoltMap::new()),
         }
     }
@@ -34,8 +27,9 @@ impl QueryBuilder {
     }
 
     pub async fn run(self) -> Result<()> {
+        //TODO: reset connection
         let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let connection = self.connection.borrow_mut();
+        let mut connection = self.connections.get().await?;
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {
@@ -47,28 +41,32 @@ impl QueryBuilder {
         }
     }
 
-    pub async fn execute(self) -> Result<impl Stream<Item = Row>> {
-        let run = BoltRequest::run(&self.query, self.params.borrow().clone());
-        let response = self.connection.borrow().send_recv(run).await?;
+    pub async fn execute(self) -> Result<tokio::sync::mpsc::Receiver<Row>> {
+        //TODO: reset connection
+        let (tx, rx) = tokio::sync::mpsc::channel(100); //TODO: configure buffer size
+        let query = self.query.clone();
+        let params = self.params.borrow().clone();
+        let connections = self.connections.clone();
 
-        match response {
-            BoltResponse::SuccessMessage(success) => {
-                let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
-                let connection = self.connection.clone();
-                let stream = stream! {
-                     let mut has_more = true;
-                     while has_more {
-                        let pull = BoltRequest::pull();
-                        match connection.borrow().send(pull).await {
+        tokio::spawn(async move {
+            let mut connection = connections.get().await.unwrap();
+            match connection.send_recv(BoltRequest::run(&query, params)).await {
+                Ok(BoltResponse::SuccessMessage(success)) => {
+                    let qid: i64 = success.get("qid").unwrap_or(-1);
+                    let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
+                    let mut has_more = true;
+                    while has_more {
+                        match connection.send(BoltRequest::pull(qid)).await {
                             Ok(()) => loop {
-                                match self.connection.borrow().recv().await {
+                                match connection.recv().await {
                                     Ok(BoltResponse::SuccessMessage(s)) => {
                                         has_more = s.get("has_more").unwrap_or(false);
                                         break;
-                                    },
+                                    }
                                     Ok(BoltResponse::RecordMessage(record)) => {
-                                        yield Row::new(fields.clone(), record.data);
-                                    },
+                                        let row = Row::new(fields.clone(), record.data);
+                                        tx.send(row).await.unwrap(); //TODO: fix unwrap
+                                    }
                                     Ok(msg) => {
                                         eprintln!("Got unexpected message: {:?}", msg);
                                         break;
@@ -81,21 +79,18 @@ impl QueryBuilder {
                             },
                             Err(e) => {
                                 eprintln!("error executing query {:?}", e);
-                                break;
                             }
                         }
-                     }
-                };
-                Ok(Box::pin(stream))
-            }
-            BoltResponse::FailureMessage(msg) => {
-                eprintln!("error executing query {:?}", msg);
-                Err(Error::QueryError)
-            }
-            msg => {
-                eprintln!("unexpected message received: {:?}", msg);
-                Err(Error::UnexpectedMessage)
-            }
-        }
+                    }
+                }
+                Ok(BoltResponse::FailureMessage(msg)) => {
+                    eprintln!("error executing query {:?}", msg);
+                }
+                msg => {
+                    eprintln!("unexpected message received: {:?}", msg);
+                }
+            };
+        });
+        Ok(rx)
     }
 }
