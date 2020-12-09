@@ -35,16 +35,16 @@ async fn main() {
     let pass = "neo";
     let graph = Arc::new(Graph::new(uri, user, pass).await.unwrap());
     let mut handles = Vec::new();
-    for _ in 1..=1000 {
+    for _ in 1..=5 {
         let graph = graph.clone();
         let handle = tokio::spawn(async move {
-            let query = graph.query("MATCH (p) RETURN p").await.unwrap();
-            let mut result = query.execute().await.unwrap();
+            let query = graph.query("MATCH (p) RETURN p");
+            let mut result = graph.execute(query).await.unwrap();
             let mut count = 0;
             while let Some(_) = result.next().await {
                 count += 1;
             }
-            //println!("{:?}", count);
+            println!("{:?}", count);
         });
         handles.push(handle);
     }

@@ -5,25 +5,22 @@
 //! use neo4rs::*;
 //! use futures::stream::*;
 //!
-//! pub async fn run_me() {
-//!  let uri = "127.0.0.1:7687".to_owned();
-//!  let user = "neo4j";
-//!  let pass = "neo4j";
-//!  let graph = Graph::new(&uri, user, pass).await.unwrap();
-//!  let mut result = graph
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let query = graph
 //!        .query("CREATE (friend:Person {name: $name}) RETURN friend")
-//!        .await
-//!        .unwrap()
-//!        .param("name", "Mark")
-//!        .execute()
-//!        .await
-//!        .unwrap();
+//!        .param("name", "Mr Mark");
+//!    let mut result = graph.execute(query).await.unwrap();
 //!
-//!  while let Some(row) = result.next().await {
-//!     let node: Node = row.get("friend").unwrap();
-//!     let name: String = node.get("name").unwrap();
-//!     assert_eq!(name, "Mark");
-//!  }
+//!    while let Some(row) = result.next().await {
+//!        let node: Node = row.get("friend").unwrap();
+//!        let name: String = node.get("name").unwrap();
+//!        assert_eq!(name, "Mr Mark");
+//!     }
 //! }
 //! ```
 
@@ -55,12 +52,21 @@ impl Graph {
         Ok(Graph { pool })
     }
 
+    pub fn query(&self, q: &str) -> Query {
+        Query::new(q.to_owned())
+    }
+
+    pub async fn run(&self, q: Query) -> Result<()> {
+        let connection = self.pool.get().await?;
+        q.run(connection.get()).await
+    }
+
     pub async fn version(&self) -> Result<Version> {
         Ok(self.pool.get().await?.version())
     }
 
-    pub async fn query(&self, q: &str) -> Result<Query> {
+    pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
         let connection = self.pool.get().await?;
-        Ok(Query::new(q.to_owned(), connection.get()))
+        q.execute(connection.get()).await
     }
 }

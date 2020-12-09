@@ -4,19 +4,18 @@ use crate::messages::*;
 use crate::row::*;
 use crate::types::*;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 pub struct Query {
     query: String,
     params: BoltMap,
-    connection: Arc<Mutex<Connection>>,
 }
 
 impl Query {
-    pub fn new(query: String, connection: Arc<Mutex<Connection>>) -> Self {
+    pub fn new(query: String) -> Self {
         Query {
             query,
-            connection,
             params: BoltMap::new(),
         }
     }
@@ -26,10 +25,10 @@ impl Query {
         self
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(self, connection: Arc<Mutex<Connection>>) -> Result<()> {
         //TODO: reset connection
         let run = BoltRequest::run(&self.query, self.params.clone());
-        let mut connection = self.connection.lock().await;
+        let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {
@@ -41,12 +40,12 @@ impl Query {
         }
     }
 
-    pub async fn execute(self) -> Result<tokio::sync::mpsc::Receiver<Row>> {
+    pub async fn execute(self, connection: Arc<Mutex<Connection>>) -> Result<mpsc::Receiver<Row>> {
         //TODO: reset connection
-        let (tx, rx) = tokio::sync::mpsc::channel(100); //TODO: configure buffer size
+        let (tx, rx) = mpsc::channel(100); //TODO: configure buffer size
         let query = self.query.clone();
         let params = self.params.clone();
-        let connection = self.connection.clone();
+        let connection = connection.clone();
 
         tokio::spawn(async move {
             let mut connection = connection.lock().await;
