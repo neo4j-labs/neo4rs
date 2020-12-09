@@ -42,6 +42,22 @@ pub use crate::row::{Node, Relation, Row};
 pub use crate::txn::Txn;
 pub use crate::version::Version;
 
+pub struct Neo4rs {
+    pool: bb8::Pool<GraphConnectionManager>,
+}
+
+impl Neo4rs {
+    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
+        let manager = GraphConnectionManager::new(uri, user, password);
+        let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
+        Ok(Neo4rs { pool })
+    }
+
+    pub async fn connect(&self) -> Result<bb8::PooledConnection<'_, GraphConnectionManager>> {
+        Ok(self.pool.get().await?)
+    }
+}
+
 #[derive(Debug)]
 pub struct Graph {
     pub version: Version,
