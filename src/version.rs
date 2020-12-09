@@ -2,7 +2,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
     v4_1,
 }

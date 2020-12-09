@@ -9,9 +9,11 @@
 //!  let uri = "127.0.0.1:7687".to_owned();
 //!  let user = "neo4j";
 //!  let pass = "neo4j";
-//!  let graph = Graph::connect(&uri, user, pass).await.unwrap();
+//!  let graph = Graph::new(&uri, user, pass).await.unwrap();
 //!  let mut result = graph
 //!        .query("CREATE (friend:Person {name: $name}) RETURN friend")
+//!        .await
+//!        .unwrap()
 //!        .param("name", "Mark")
 //!        .execute()
 //!        .await
@@ -42,44 +44,23 @@ pub use crate::row::{Node, Relation, Row};
 pub use crate::txn::Txn;
 pub use crate::version::Version;
 
-pub struct Neo4rs {
-    pool: bb8::Pool<GraphConnectionManager>,
-}
-
-impl Neo4rs {
-    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let manager = GraphConnectionManager::new(uri, user, password);
-        let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
-        Ok(Neo4rs { pool })
-    }
-
-    pub async fn connect(&self) -> Result<bb8::PooledConnection<'_, GraphConnectionManager>> {
-        Ok(self.pool.get().await?)
-    }
-}
-
-#[derive(Debug)]
 pub struct Graph {
-    pub version: Version,
-    connections: bb8::Pool<ConnectionManager>,
+    pool: bb8::Pool<ConnectionManager>,
 }
 
 impl Graph {
-    pub async fn connect(uri: &str, user: &str, password: &str) -> Result<Self> {
+    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
         let manager = ConnectionManager::new(uri, user, password);
-        let connections = bb8::Pool::builder().max_size(15).build(manager).await?;
-        let connection = connections.get().await?;
-        Ok(Graph {
-            version: connection.version.clone(),
-            connections: connections.clone(),
-        })
+        let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
+        Ok(Graph { pool })
     }
 
-    pub fn query(&self, q: &str) -> QueryBuilder {
-        QueryBuilder::new(q.to_owned(), self.connections.clone())
+    pub async fn version(&self) -> Result<Version> {
+        Ok(self.pool.get().await?.version())
     }
 
-    //pub async fn begin_txn(&self) -> Result<Txn> {
-    //    Ok(Txn::new(self.connections.clone()).await?)
-    //}
+    pub async fn query(&self, q: &str) -> Result<Query> {
+        let connection = self.pool.get().await?;
+        Ok(Query::new(q.to_owned(), connection.get()))
+    }
 }

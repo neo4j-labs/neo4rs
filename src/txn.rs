@@ -1,25 +1,27 @@
+use crate::connection::Connection;
 use crate::errors::*;
 use crate::messages::*;
-use crate::pool::ConnectionManager;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct Txn {
-    connections: bb8::Pool<ConnectionManager>,
+    connection: Arc<Mutex<Connection>>,
 }
 
 impl Txn {
-    pub async fn new(connections: bb8::Pool<ConnectionManager>) -> Result<Self> {
+    pub async fn new(connection: Arc<Mutex<Connection>>) -> Result<Self> {
         let begin = BoltRequest::begin();
-        match connections.get().await?.send_recv(begin).await? {
+        match connection.lock().await.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {
-                connections: connections.clone(),
+                connection: connection.clone(),
             }),
             _ => Err(Error::UnexpectedMessage),
         }
     }
 
     pub async fn commit(&self) -> Result<()> {
-        let mut connection = self.connections.get().await?;
+        let mut connection = self.connection.lock().await;
         match connection.send_recv(BoltRequest::commit()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
@@ -27,7 +29,7 @@ impl Txn {
     }
 
     pub async fn rollback(&self) -> Result<()> {
-        let mut connection = self.connections.get().await?;
+        let mut connection = self.connection.lock().await;
         match connection.send_recv(BoltRequest::rollback()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
