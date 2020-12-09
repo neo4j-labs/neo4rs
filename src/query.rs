@@ -27,8 +27,8 @@ impl Query {
 
     pub async fn run(self, connection: Arc<Mutex<Connection>>) -> Result<()> {
         //TODO: reset connection
-        let run = BoltRequest::run(&self.query, self.params.clone());
         let mut connection = connection.lock().await;
+        let run = BoltRequest::run(&self.query, self.params.clone());
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {
@@ -41,30 +41,28 @@ impl Query {
     }
 
     pub async fn execute(self, connection: Arc<Mutex<Connection>>) -> Result<mpsc::Receiver<Row>> {
-        //TODO: reset connection
-        let (tx, rx) = mpsc::channel(100); //TODO: configure buffer size
-        let query = self.query.clone();
-        let params = self.params.clone();
-        let connection = connection.clone();
+        let (sender, receiver) = mpsc::channel(100); //TODO: configure buffer size
 
         tokio::spawn(async move {
             let mut connection = connection.lock().await;
-            match connection.send_recv(BoltRequest::run(&query, params)).await {
+            let run = BoltRequest::run(&self.query, self.params);
+            match connection.send_recv(run).await {
                 Ok(BoltResponse::SuccessMessage(success)) => {
+                    let mut has_more_records = true;
                     let qid: i64 = success.get("qid").unwrap_or(-1);
                     let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
-                    let mut has_more = true;
-                    while has_more {
-                        match connection.send(BoltRequest::pull(qid)).await {
+                    while has_more_records {
+                        let pull = BoltRequest::pull(qid);
+                        match connection.send(pull).await {
                             Ok(()) => loop {
                                 match connection.recv().await {
                                     Ok(BoltResponse::SuccessMessage(s)) => {
-                                        has_more = s.get("has_more").unwrap_or(false);
+                                        has_more_records = s.get("has_more").unwrap_or(false);
                                         break;
                                     }
                                     Ok(BoltResponse::RecordMessage(record)) => {
                                         let row = Row::new(fields.clone(), record.data);
-                                        tx.send(row).await.unwrap(); //TODO: fix unwrap
+                                        sender.send(row).await.unwrap(); //TODO: fix unwrap
                                     }
                                     Ok(msg) => {
                                         eprintln!("Got unexpected message: {:?}", msg);
@@ -90,6 +88,6 @@ impl Query {
                 }
             };
         });
-        Ok(rx)
+        Ok(receiver)
     }
 }

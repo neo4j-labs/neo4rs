@@ -38,8 +38,7 @@ async fn main() {
     for _ in 1..=5 {
         let graph = graph.clone();
         let handle = tokio::spawn(async move {
-            let query = graph.query("MATCH (p) RETURN p");
-            let mut result = graph.execute(query).await.unwrap();
+            let mut result = graph.execute(query("MATCH (p) RETURN p")).await.unwrap();
             let mut count = 0;
             while let Some(_) = result.next().await {
                 count += 1;

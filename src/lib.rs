@@ -11,10 +11,10 @@
 //!    let user = "neo4j";
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let query = graph
-//!        .query("CREATE (friend:Person {name: $name}) RETURN friend")
-//!        .param("name", "Mr Mark");
-//!    let mut result = graph.execute(query).await.unwrap();
+//!    let mut result = graph.execute(
+//!      query( "CREATE (friend:Person {name: $name}) RETURN friend")
+//!     .param("name", "Mr Mark")
+//!    ).await.unwrap();
 //!
 //!    while let Some(row) = result.next().await {
 //!        let node: Node = row.get("friend").unwrap();
@@ -23,7 +23,6 @@
 //!     }
 //! }
 //! ```
-
 mod connection;
 mod convert;
 mod errors;
@@ -45,24 +44,24 @@ pub struct Graph {
     pool: bb8::Pool<ConnectionManager>,
 }
 
+pub fn query(q: &str) -> Query {
+    Query::new(q.to_owned())
+}
+
 impl Graph {
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let manager = ConnectionManager::new(uri, user, password);
-        let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
-        Ok(Graph { pool })
+        Ok(Graph {
+            pool: create_pool(uri, user, password).await?,
+        })
     }
 
-    pub fn query(&self, q: &str) -> Query {
-        Query::new(q.to_owned())
+    pub async fn version(&self) -> Result<Version> {
+        Ok(self.pool.get().await?.version())
     }
 
     pub async fn run(&self, q: Query) -> Result<()> {
         let connection = self.pool.get().await?;
         q.run(connection.get()).await
-    }
-
-    pub async fn version(&self) -> Result<Version> {
-        Ok(self.pool.get().await?.version())
     }
 
     pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {

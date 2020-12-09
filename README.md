@@ -7,62 +7,35 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 
 
 ```rust    
-    //Connect to server
+    //Run a query
     let uri = "127.0.0.1:7687".to_owned();
     let user = "neo4j";
     let pass = "neo4j";
-    let graph = Graph::connect(uri, user, pass).await.unwrap();
-    assert!(graph.query("RETURN 1").run().await.is_ok());
+    let graph = Graph::new(uri, user, pass).await.unwrap()
+    assert!(graph.run(query("RETURN 1")).await.is_ok());
     
     //Concurrent queries
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Arc::new(Graph::connect(uri, user, pass).await.unwrap());
+    let graph = Arc::new(Graph::new(uri, user, pass).await.unwrap());
     for _ in 1..=42 {
         let graph = graph.clone();
         tokio::spawn(async move {
-            let mut result = graph.query("MATCH (p) RETURN p").execute().await.unwrap();
+            let mut result = graph.execute(
+	       query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
+	    ).await.unwrap();
             while let Some(row) = result.next().await {
-                //process row
+        	let node: Node = row.get("friend").unwrap();
+        	let name: String = node.get("name").unwrap();
+                //process data
             }
         });
     }
     
-    //Create a node and process the response
-    let mut result = graph
-        .query("CREATE (friend:Person {name: $name}) RETURN friend")
-        .param("name", "Mark")
-        .execute()
-        .await
-        .unwrap();
-    let row = result.next().await.unwrap();
-    let node: Node = row.get("friend").unwrap();
-    let id = node.id();
-    let labels = node.labels();
-    let name: String = node.get("name").unwrap();
-    assert_eq!(name, "Mark");
-    assert_eq!(labels, vec!["Person"]);
-    
-    
-    //Drain the response stream
-    let mut result = graph
-        .query("MATCH (p:Person {name: 'Mark'}) RETURN p")
-        .execute()
-        .await
-        .unwrap();
-
-    while let Some(row) = result.next().await {
-        let node: Node = row.get("friend").unwrap();
-        let name: String = node.get("name").unwrap();
-	//process name & node
-    }
-    
-    
     //Create and parse relationship
     let mut result = graph
-        .query("CREATE (p:Person { name: 'Mark' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
-        .execute()
+        .execute(query("CREATE (p:Person { name: 'Mark' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r"))
         .await
         .unwrap();
 	
@@ -83,7 +56,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.1.1"
+neo4rs = "0.2.0"
 ```
 
 ---
