@@ -8,12 +8,12 @@ use bb8::PooledConnection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct GraphConnection {
+pub struct ConnectionWrapper {
     version: Version,
     connection: Arc<Mutex<Connection>>,
 }
 
-impl GraphConnection {
+impl ConnectionWrapper {
     pub fn get(&self) -> Arc<Mutex<Connection>> {
         self.connection.clone()
     }
@@ -41,14 +41,14 @@ impl ConnectionManager {
 
 #[async_trait]
 impl ManageConnection for ConnectionManager {
-    type Connection = GraphConnection;
+    type Connection = ConnectionWrapper;
     type Error = Error;
 
-    async fn connect(&self) -> Result<Self::Connection, Self::Error> {
+    async fn connect(&self) -> Result<ConnectionWrapper, Self::Error> {
         let (mut connection, version) = Connection::new(self.uri.clone()).await?;
         let hello = BoltRequest::hello("neo4rs", self.user.clone(), self.password.clone());
         match connection.send_recv(hello).await? {
-            BoltResponse::SuccessMessage(msg) => Ok(GraphConnection {
+            BoltResponse::SuccessMessage(_msg) => Ok(ConnectionWrapper {
                 version,
                 connection: Arc::new(Mutex::new(connection)),
             }),
@@ -66,4 +66,14 @@ impl ManageConnection for ConnectionManager {
     fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
         false
     }
+}
+
+pub async fn create_pool(
+    uri: &str,
+    user: &str,
+    password: &str,
+) -> Result<bb8::Pool<ConnectionManager>, Error> {
+    let manager = ConnectionManager::new(uri, user, password);
+    let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
+    Ok(pool)
 }

@@ -17,8 +17,7 @@ async fn should_connect() {
 #[tokio::test]
 async fn should_execute_a_simple_query() {
     let graph = graph().await;
-    let query = graph.query("RETURN 1");
-    let mut result = graph.execute(query).await.unwrap();
+    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
     let row = result.next().await.unwrap();
     let value: i64 = row.get("1").unwrap();
     assert_eq!(1, value);
@@ -28,16 +27,20 @@ async fn should_execute_a_simple_query() {
 #[tokio::test]
 async fn should_create_new_node() {
     let graph = graph().await;
-    let query = graph.query("CREATE (friend:Person {name: 'Mark'})");
-    let mut result = graph.execute(query).await.unwrap();
+    let mut result = graph
+        .execute(query("CREATE (friend:Person {name: 'Mark'})"))
+        .await
+        .unwrap();
     assert!(result.next().await.is_none());
 }
 
 #[tokio::test]
 async fn should_return_created_node() {
     let graph = graph().await;
-    let query = graph.query("CREATE (friend:Person {name: 'Mark'}) RETURN friend");
-    let mut result = graph.execute(query).await.unwrap();
+    let mut result = graph
+        .execute(query("CREATE (friend:Person {name: 'Mark'}) RETURN friend"))
+        .await
+        .unwrap();
     let row = result.next().await.unwrap();
     let node: Node = row.get("friend").unwrap();
     let id = node.id();
@@ -51,10 +54,12 @@ async fn should_return_created_node() {
 #[tokio::test]
 async fn should_execute_query_with_params() {
     let graph = graph().await;
-    let query = graph
-        .query("CREATE (friend:Person {name: $name}) RETURN friend")
-        .param("name", "Mr Mark");
-    let mut result = graph.execute(query).await.unwrap();
+    let mut result = graph
+        .execute(
+            query("CREATE (friend:Person {name: $name}) RETURN friend").param("name", "Mr Mark"),
+        )
+        .await
+        .unwrap();
 
     let row = result.next().await.unwrap();
     let node: Node = row.get("friend").unwrap();
@@ -65,8 +70,37 @@ async fn should_execute_query_with_params() {
 #[tokio::test]
 async fn should_run_a_simple_query() {
     let graph = graph().await;
-    let query = graph.query("RETURN 1");
-    assert!(graph.run(query).await.is_ok());
+    assert!(graph.run(query("RETURN 1")).await.is_ok());
+}
+
+#[tokio::test]
+async fn should_create_bounded_relation() {
+    let graph = graph().await;
+    let mut result = graph.execute(
+        query("CREATE (p:Person { name: 'Oliver Stone' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
+    ).await.unwrap();
+    let row = result.next().await.unwrap();
+    let relation: Relation = row.get("r").unwrap();
+    assert!(relation.id() > -1);
+    assert!(relation.start_node_id() > -1);
+    assert!(relation.end_node_id() > -1);
+    assert_eq!(relation.typ(), "WORKS_AT");
+    assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
+}
+
+#[tokio::test]
+async fn should_create_unbounded_relation() {
+    let graph = graph().await;
+    let mut result = graph.execute(
+        query("MERGE (p1:Person { name: 'Oliver Stone' })-[r:RELATED {as: 'friend'}]-(p2: Person {name: 'Mark'}) RETURN r")
+    ).await.unwrap();
+    let row = result.next().await.unwrap();
+    let relation: Relation = row.get("r").unwrap();
+    assert!(relation.id() > -1);
+    assert!(relation.start_node_id() > -1);
+    assert!(relation.end_node_id() > -1);
+    assert_eq!(relation.typ(), "RELATED");
+    assert_eq!(relation.get::<String>("as").unwrap(), "friend");
 }
 
 //#[tokio::test]
@@ -115,35 +149,3 @@ async fn should_run_a_simple_query() {
 //        .unwrap();
 //    assert!(result.next().await.is_none());
 //}
-
-#[tokio::test]
-async fn should_create_bounded_relation() {
-    let graph = graph().await;
-    let query = graph.query(
-        "CREATE (p:Person { name: 'Oliver Stone' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r",
-    );
-    let mut result = graph.execute(query).await.unwrap();
-    let row = result.next().await.unwrap();
-    let relation: Relation = row.get("r").unwrap();
-    assert!(relation.id() > -1);
-    assert!(relation.start_node_id() > -1);
-    assert!(relation.end_node_id() > -1);
-    assert_eq!(relation.typ(), "WORKS_AT");
-    assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
-}
-
-#[tokio::test]
-async fn should_create_unbounded_relation() {
-    let graph = graph().await;
-    let query = graph.query(
-        "MERGE (p1:Person { name: 'Oliver Stone' })-[r:RELATED {as: 'friend'}]-(p2: Person {name: 'Mark'}) RETURN r",
-    );
-    let mut result = graph.execute(query).await.unwrap();
-    let row = result.next().await.unwrap();
-    let relation: Relation = row.get("r").unwrap();
-    assert!(relation.id() > -1);
-    assert!(relation.start_node_id() > -1);
-    assert!(relation.end_node_id() > -1);
-    assert_eq!(relation.typ(), "RELATED");
-    assert_eq!(relation.get::<String>("as").unwrap(), "friend");
-}

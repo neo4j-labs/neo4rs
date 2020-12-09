@@ -2,10 +2,8 @@ use crate::errors::Result;
 use crate::messages::*;
 use crate::version::*;
 use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::mem;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -13,7 +11,7 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
 #[derive(Debug)]
 pub struct Connection {
-    stream: Box<TcpStream>,
+    stream: TcpStream,
 }
 
 impl Connection {
@@ -26,12 +24,7 @@ impl Connection {
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response);
-        Ok((
-            Connection {
-                stream: Box::new(stream),
-            },
-            version,
-        ))
+        Ok((Connection { stream: stream }, version))
     }
 
     pub async fn send_recv(&mut self, message: BoltRequest) -> Result<BoltResponse> {
