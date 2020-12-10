@@ -37,12 +37,11 @@ async fn main() {
     let pass = "neo";
     let graph = Arc::new(Graph::new(uri, user, pass).await.unwrap());
     let txn = graph.start_txn().await.unwrap();
-    graph
-        .run_queries(vec![
-            query("CREATE (p:Person:Txn1)"),
-            query("CREATE (p:Person:Txn2)"),
-        ])
-        .await
-        .unwrap();
+    txn.run_queries(vec![
+        query("CREATE (p:Person:Txn1)"),
+        query("CREATE (p:Person:Txn2)"),
+    ])
+    .await
+    .unwrap();
     txn.commit().await.unwrap();
 }

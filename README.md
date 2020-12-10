@@ -35,7 +35,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     
     //Transactions
     let txn = graph.start_txn().await.unwrap();
-    graph.run_queries(vec![
+    txn.run_queries(vec![
          query("CREATE (p:Person {id: 1})"),
          query("CREATE (p:Person {id: 2})"),
          query("CREATE (p:Person {id: 2})"),
@@ -66,7 +66,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.2.0"
+neo4rs = "0.2.1"
 ```
 
 ---
@@ -79,6 +79,7 @@ neo4rs = "0.2.0"
 - [x] connection pooling
 - [x] explicit transactions
 - [x] use buffered TCP streams
+- [ ] query & transaction macros/dsl
 - [ ] improve logging
 - [ ] add support for older versions of the protocol
 - [ ] multi db support

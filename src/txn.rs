@@ -1,6 +1,7 @@
 use crate::connection::Connection;
 use crate::errors::*;
 use crate::messages::*;
+use crate::query::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -26,6 +27,13 @@ impl Txn {
             BoltResponse::SuccessMessage(_) => Ok(()),
             _ => Err(Error::UnexpectedMessage),
         }
+    }
+
+    pub async fn run_queries(&self, queries: Vec<Query>) -> Result<()> {
+        for query in queries.into_iter() {
+            query.run(self.connection.clone()).await?;
+        }
+        Ok(())
     }
 
     pub async fn rollback(&self) -> Result<()> {

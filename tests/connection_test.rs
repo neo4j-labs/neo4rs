@@ -108,7 +108,7 @@ async fn should_commit_txn() {
     let graph = graph().await;
     let txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
-    assert!(graph
+    assert!(txn
         .run_queries(vec![
             query("CREATE (p:Person {id: $id})").param("id", id.clone())
         ])
@@ -129,7 +129,7 @@ async fn should_rollback_txn() {
     let graph = graph().await;
     let txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
-    assert!(graph
+    assert!(txn
         .run_queries(vec![
             query("CREATE (p:Person {id: $id})").param("id", id.clone())
         ])

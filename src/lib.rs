@@ -64,14 +64,6 @@ impl Graph {
         Txn::new(connection.get()).await
     }
 
-    pub async fn run_queries(&self, queries: Vec<Query>) -> Result<()> {
-        let connection = self.pool.get().await?.get();
-        for query in queries.into_iter() {
-            query.run(connection.clone()).await?;
-        }
-        Ok(())
-    }
-
     pub async fn run(&self, q: Query) -> Result<()> {
         let connection = self.pool.get().await?;
         q.run(connection.get()).await
