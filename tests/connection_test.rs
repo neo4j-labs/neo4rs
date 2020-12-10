@@ -103,49 +103,43 @@ async fn should_create_unbounded_relation() {
     assert_eq!(relation.get::<String>("as").unwrap(), "friend");
 }
 
-//#[tokio::test]
-//async fn should_commit_txn() {
-//    let graph = connect().await.unwrap();
-//    let txn = graph.begin_txn().await.unwrap();
-//    let id = Uuid::new_v4().to_string();
-//    assert!(graph
-//        .query("CREATE (p:Person {id: $id}) RETURN p")
-//        .param("id", id.clone())
-//        .run()
-//        .await
-//        .is_ok());
-//    txn.commit().await.unwrap();
-//    let mut result = graph
-//        .query("MATCH (p:Person) WHERE p.id = $id RETURN p.id")
-//        .param("id", id.clone())
-//        .execute()
-//        .await
-//        .unwrap();
-//    let row = result.next().await.unwrap();
-//    let actual_id: String = row.get("p.id").unwrap();
-//    assert_eq!(actual_id, id);
-//}
+#[tokio::test]
+async fn should_commit_txn() {
+    let graph = graph().await;
+    let txn = graph.start_txn().await.unwrap();
+    let id = Uuid::new_v4().to_string();
+    assert!(graph
+        .run_queries(vec![
+            query("CREATE (p:Person {id: $id})").param("id", id.clone())
+        ])
+        .await
+        .is_ok());
+    txn.commit().await.unwrap();
+    let mut result = graph
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap();
+    let actual_id: String = row.get("p.id").unwrap();
+    assert_eq!(actual_id, id);
+}
 
-//#[tokio::test]
-//async fn should_rollback_txn() {
-//    let graph = connect().await.unwrap();
-//    let txn = graph.begin_txn().await.unwrap();
-//    let id = Uuid::new_v4().to_string();
-//
-//    let result = graph
-//        .query("CREATE (p:Person {id: $id}) RETURN p")
-//        .param("id", id.clone())
-//        .run()
-//        .await;
-//
-//    assert!(result.is_ok());
-//
-//    txn.rollback().await.unwrap();
-//    let mut result = graph
-//        .query("MATCH (p:Person) WHERE p.id = $id RETURN p.id")
-//        .param("id", id.clone())
-//        .execute()
-//        .await
-//        .unwrap();
-//    assert!(result.next().await.is_none());
-//}
+#[tokio::test]
+async fn should_rollback_txn() {
+    let graph = graph().await;
+    let txn = graph.start_txn().await.unwrap();
+    let id = Uuid::new_v4().to_string();
+    assert!(graph
+        .run_queries(vec![
+            query("CREATE (p:Person {id: $id})").param("id", id.clone())
+        ])
+        .await
+        .is_ok());
+    txn.rollback().await.unwrap();
+    let mut result = graph
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .await
+        .unwrap();
+
+    assert!(result.next().await.is_none());
+}
