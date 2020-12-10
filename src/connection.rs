@@ -4,6 +4,7 @@ use crate::version::*;
 use bytes::*;
 use std::convert::TryInto;
 use std::mem;
+use tokio::io::BufStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -11,12 +12,12 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
 #[derive(Debug)]
 pub struct Connection {
-    stream: TcpStream,
+    stream: BufStream<TcpStream>,
 }
 
 impl Connection {
     pub async fn new(uri: String) -> Result<(Connection, Version)> {
-        let mut stream = TcpStream::connect(uri).await?;
+        let mut stream = BufStream::new(TcpStream::connect(uri).await?);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
         stream.write_all(&Version::supported_versions()).await?;
         stream.flush().await?;
@@ -33,12 +34,13 @@ impl Connection {
     }
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
+        let end_marker: [u8; 2] = [0, 0];
         let bytes: Bytes = message.try_into().unwrap();
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
             self.stream.write_all(c).await?;
         }
-        self.stream.write_all(&[0, 0]).await?;
+        self.stream.write_all(&end_marker).await?;
         self.stream.flush().await?;
         Ok(())
     }
