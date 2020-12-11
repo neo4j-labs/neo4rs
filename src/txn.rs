@@ -2,6 +2,7 @@ use crate::connection::Connection;
 use crate::errors::*;
 use crate::messages::*;
 use crate::query::*;
+use crate::row::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -34,6 +35,14 @@ impl Txn {
             query.run(self.connection.clone()).await?;
         }
         Ok(())
+    }
+
+    pub async fn run(&self, q: Query) -> Result<()> {
+        q.run(self.connection.clone()).await
+    }
+
+    pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
+        q.execute(self.connection.clone()).await
     }
 
     pub async fn rollback(&self) -> Result<()> {

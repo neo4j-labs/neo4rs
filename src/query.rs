@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct Query {
     query: String,
     params: BoltMap,
