@@ -1,4 +1,4 @@
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::messages::*;
 use crate::version::*;
 use bytes::*;
@@ -12,20 +12,29 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
 #[derive(Debug)]
 pub struct Connection {
+    version: Version,
     stream: BufStream<TcpStream>,
 }
 
 impl Connection {
-    pub async fn new(uri: String) -> Result<(Connection, Version)> {
+    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
         let mut stream = BufStream::new(TcpStream::connect(uri).await?);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
         stream.write_all(&Version::supported_versions()).await?;
         stream.flush().await?;
-
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response);
-        Ok((Connection { stream: stream }, version))
+
+        let mut connection = Connection { version, stream };
+        let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
+        match connection.send_recv(hello).await? {
+            BoltResponse::SuccessMessage(_msg) => Ok(connection),
+            BoltResponse::FailureMessage(msg) => Err(Error::AuthenticationError {
+                detail: msg.get("message").unwrap(),
+            }),
+            _ => Err(Error::UnexpectedMessage),
+        }
     }
 
     pub async fn send_recv(&mut self, message: BoltRequest) -> Result<BoltResponse> {
