@@ -81,8 +81,8 @@ neo4rs = "0.2.3"
 - [x] connection pooling
 - [x] explicit transactions
 - [x] use buffered TCP streams
+- [x] improve error messages & logging
 - [ ] query & transaction macros/dsl
-- [ ] improve logging
 - [ ] add support for older versions of the protocol
 - [ ] multi db support
 - [ ] support data types

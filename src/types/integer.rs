@@ -41,11 +41,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
             INT_64 => input.get_i64() as i64,
-            _ => {
-                return Err(Error::InvalidTypeMarker {
-                    detail: "invalid integer marker".into(),
-                })
-            }
+            _ => return Err(Error::InvalidTypeMarker("invalid integer marker".into())),
         };
 
         Ok(BoltInteger::new(value))

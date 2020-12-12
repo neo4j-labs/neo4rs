@@ -32,10 +32,16 @@ impl Query {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {
                     BoltResponse::SuccessMessage(_) => Ok(()),
-                    _ => Err(Error::UnexpectedMessage),
+                    msg => Err(Error::UnexpectedMessage(format!(
+                        "unexpected response for DISCARD: {:?}",
+                        msg
+                    ))),
                 }
             }
-            _ => Err(Error::UnexpectedMessage),
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for RUN: {:?}",
+                msg
+            ))),
         }
     }
 
@@ -47,10 +53,10 @@ impl Query {
                 let qid: i64 = success.get("qid").unwrap_or(-1);
                 Ok(RowStream::new(qid, fields, connection.clone()))
             }
-            msg => {
-                eprintln!("unexpected message received: {:?}", msg);
-                Err(Error::QueryError)
-            }
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for RUN: {:?}",
+                msg
+            ))),
         }
     }
 }

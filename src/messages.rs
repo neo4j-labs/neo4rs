@@ -120,7 +120,7 @@ impl TryFrom<Bytes> for BoltResponse {
             input if Record::can_parse(input.clone()) => {
                 Ok(BoltResponse::RecordMessage(Record::try_from(input)?))
             }
-            _ => Err(Error::UnknownMessage),
+            msg => Err(Error::UnknownMessage(format!("unknown message {:?}", msg))),
         }
     }
 }

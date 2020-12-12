@@ -52,8 +52,10 @@ impl RowStream {
                         return Ok(Some(row));
                     }
                     msg => {
-                        eprintln!("Got unexpected message: {:?}", msg);
-                        return Err(Error::QueryError);
+                        return Err(Error::UnexpectedMessage(format!(
+                            "unexpected response for PULL: {:?}",
+                            msg
+                        )))
                     }
                 },
                 state => panic!("invalid state {:?}", state),

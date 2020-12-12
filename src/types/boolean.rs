@@ -42,11 +42,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltBoolean {
         match value {
             TRUE => Ok(BoltBoolean::new(true)),
             FALSE => Ok(BoltBoolean::new(false)),
-            _ => {
-                return Err(Error::InvalidTypeMarker {
-                    detail: "invalid boolean marker".into(),
-                })
-            }
+            _ => return Err(Error::InvalidTypeMarker("invalid boolean marker".into())),
         }
     }
 }

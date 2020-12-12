@@ -7,15 +7,13 @@ pub enum Error {
     StringTooLong,
     MapTooBig,
     ListTooLong,
-    UnexpectedMessage,
-    QueryError,
-    UnknownType { detail: String },
-    UnknownMessage,
+    UnexpectedMessage(String),
+    UnknownType(String),
+    UnknownMessage(String),
     ConverstionError,
-    AuthenticationError { detail: String },
-    InvalidMessageMarker { detail: String },
-    InvalidTypeMarker { detail: String },
-    DeserializationError { detail: String },
+    AuthenticationError(String),
+    InvalidTypeMarker(String),
+    DeserializationError(String),
 }
 
 impl std::convert::From<std::io::Error> for Error {

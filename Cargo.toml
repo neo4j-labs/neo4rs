@@ -12,7 +12,10 @@ license = "MIT"
 futures = { version = "0.3.1"}
 tokio = { version = "0.3.1", features = ["full"] }
 async-stream = "0.3.0"
-uuid = { version = "0.8", features = ["v4"] }
 bytes = "0.5"
 async-trait = "0.1.42"
 deadpool = "0.6.0"
+log = "0.4"
+
+[dev-dependencies]
+uuid = { version = "0.8", features = ["v4"] }

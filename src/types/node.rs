@@ -46,9 +46,10 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltNode {
                     properties,
                 })
             }
-            _ => Err(Error::InvalidTypeMarker {
-                detail: format!("invalid node marker/tag ({}, {})", marker, tag),
-            }),
+            _ => Err(Error::InvalidTypeMarker(format!(
+                "invalid node marker/tag ({}, {})",
+                marker, tag
+            ))),
         }
     }
 }

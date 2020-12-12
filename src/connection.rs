@@ -1,6 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::messages::*;
-use crate::version::*;
+use crate::version::Version;
 use bytes::*;
 use std::convert::TryInto;
 use std::mem;
@@ -25,22 +25,27 @@ impl Connection {
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response);
-
         let mut connection = Connection { version, stream };
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
         match connection.send_recv(hello).await? {
             BoltResponse::SuccessMessage(_msg) => Ok(connection),
-            BoltResponse::FailureMessage(msg) => Err(Error::AuthenticationError {
-                detail: msg.get("message").unwrap(),
-            }),
-            _ => Err(Error::UnexpectedMessage),
+            BoltResponse::FailureMessage(msg) => {
+                Err(Error::AuthenticationError(msg.get("message").unwrap()))
+            }
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for HELLO: {:?}",
+                msg
+            ))),
         }
     }
 
     pub async fn reset(&mut self) -> Result<()> {
         match self.send_recv(BoltRequest::reset()).await? {
-            BoltResponse::SuccessMessage(s) => Ok(()),
-            _ => Err(Error::UnexpectedMessage),
+            BoltResponse::SuccessMessage(_) => Ok(()),
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for RESET: {:?}",
+                msg
+            ))),
         }
     }
 

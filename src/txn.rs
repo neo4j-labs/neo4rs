@@ -17,7 +17,10 @@ impl Txn {
             BoltResponse::SuccessMessage(_) => Ok(Txn {
                 connection: Arc::new(Mutex::new(connection)),
             }),
-            _ => Err(Error::UnexpectedMessage),
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for BEGIN: {:?}",
+                msg
+            ))),
         }
     }
 
@@ -40,10 +43,10 @@ impl Txn {
         let commit = BoltRequest::commit();
         match self.connection.lock().await.send_recv(commit).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
-            msg => {
-                eprintln!("unexpected message {:?}", msg);
-                Err(Error::UnexpectedMessage)
-            }
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for COMMIT: {:?}",
+                msg
+            ))),
         }
     }
 
@@ -51,7 +54,10 @@ impl Txn {
         let rollback = BoltRequest::rollback();
         match self.connection.lock().await.send_recv(rollback).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
-            _ => Err(Error::UnexpectedMessage),
+            msg => Err(Error::UnexpectedMessage(format!(
+                "unexpected response for COMMIT: {:?}",
+                msg
+            ))),
         }
     }
 }
