@@ -11,12 +11,12 @@
 //!    let user = "neo4j";
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let mut result = graph.stream(
+//!    let mut result = graph.execute(
 //!      query( "CREATE (friend:Person {name: $name}) RETURN friend")
 //!     .param("name", "Mr Mark")
 //!    ).await.unwrap();
 //!
-//!    while let Some(row) = result.next().await {
+//!    while let Ok(Some(row)) = result.next().await {
 //!        let node: Node = row.get("friend").unwrap();
 //!        let name: String = node.get("name").unwrap();
 //!        assert_eq!(name, "Mr Mark");
@@ -35,7 +35,7 @@ mod types;
 mod version;
 pub use crate::errors::*;
 use crate::pool::{create_pool, ConnectionPool};
-use crate::query::Query;
+pub use crate::query::{Query, RowStream};
 pub use crate::row::{Node, Relation, Row};
 pub use crate::txn::Txn;
 pub use crate::version::Version;
@@ -64,8 +64,8 @@ impl Graph {
         q.run(&mut connection).await
     }
 
-    pub async fn stream(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
+    pub async fn execute(&self, q: Query) -> Result<RowStream> {
         let connection = self.pool.get().await?;
-        q.stream(connection).await
+        q.execute(connection).await
     }
 }

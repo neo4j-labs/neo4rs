@@ -25,7 +25,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
             let mut result = graph.execute(
 	       query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
 	    ).await.unwrap();
-            while let Some(row) = result.next().await {
+            while let Ok(Some(row)) = result.next().await {
         	let node: Node = row.get("p").unwrap();
         	let name: String = node.get("name").unwrap();
                 println!("{}", name);
@@ -51,7 +51,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
         .await
         .unwrap();
 	
-    let row = result.next().await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     
     let relation: Relation = row.get("r").unwrap();
     assert!(relation.id() > 0);

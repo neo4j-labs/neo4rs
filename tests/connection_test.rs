@@ -12,31 +12,31 @@ async fn graph() -> Graph {
 #[tokio::test]
 async fn should_execute_a_simple_query() {
     let graph = graph().await;
-    let mut result = graph.stream(query("RETURN 1")).await.unwrap();
-    let row = result.next().await.unwrap();
+    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     let value: i64 = row.get("1").unwrap();
     assert_eq!(1, value);
-    assert!(result.next().await.is_none());
+    assert!(result.next().await.unwrap().is_none());
 }
 
 #[tokio::test]
 async fn should_create_new_node() {
     let graph = graph().await;
     let mut result = graph
-        .stream(query("CREATE (friend:Person {name: 'Mark'})"))
+        .execute(query("CREATE (friend:Person {name: 'Mark'})"))
         .await
         .unwrap();
-    assert!(result.next().await.is_none());
+    assert!(result.next().await.unwrap().is_none());
 }
 
 #[tokio::test]
 async fn should_return_created_node() {
     let graph = graph().await;
     let mut result = graph
-        .stream(query("CREATE (friend:Person {name: 'Mark'}) RETURN friend"))
+        .execute(query("CREATE (friend:Person {name: 'Mark'}) RETURN friend"))
         .await
         .unwrap();
-    let row = result.next().await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     let node: Node = row.get("friend").unwrap();
     let id = node.id();
     let labels = node.labels();
@@ -50,13 +50,13 @@ async fn should_return_created_node() {
 async fn should_execute_query_with_params() {
     let graph = graph().await;
     let mut result = graph
-        .stream(
+        .execute(
             query("CREATE (friend:Person {name: $name}) RETURN friend").param("name", "Mr Mark"),
         )
         .await
         .unwrap();
 
-    let row = result.next().await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     let node: Node = row.get("friend").unwrap();
     let name: String = node.get("name").unwrap();
     assert_eq!(name, "Mr Mark");
@@ -71,10 +71,10 @@ async fn should_run_a_simple_query() {
 #[tokio::test]
 async fn should_create_bounded_relation() {
     let graph = graph().await;
-    let mut result = graph.stream(
+    let mut result = graph.execute(
         query("CREATE (p:Person { name: 'Oliver Stone' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
     ).await.unwrap();
-    let row = result.next().await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     let relation: Relation = row.get("r").unwrap();
     assert!(relation.id() > -1);
     assert!(relation.start_node_id() > -1);
@@ -86,10 +86,10 @@ async fn should_create_bounded_relation() {
 #[tokio::test]
 async fn should_create_unbounded_relation() {
     let graph = graph().await;
-    let mut result = graph.stream(
+    let mut result = graph.execute(
         query("MERGE (p1:Person { name: 'Oliver Stone' })-[r:RELATED {as: 'friend'}]-(p2: Person {name: 'Mark'}) RETURN r")
     ).await.unwrap();
-    let row = result.next().await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
     let relation: Relation = row.get("r").unwrap();
     assert!(relation.id() > -1);
     assert!(relation.start_node_id() > -1);
@@ -112,7 +112,7 @@ async fn should_run_all_queries_in_txn() {
         .is_ok());
     txn.commit().await.unwrap();
     let result = graph
-        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 2);
@@ -130,13 +130,13 @@ async fn should_queries_within_txn() {
         .await
         .unwrap();
     let result = graph
-        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 0);
     txn.commit().await.unwrap();
     let result = graph
-        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 2);
@@ -155,15 +155,15 @@ async fn should_rollback_txn() {
         .unwrap();
     txn.rollback().await.unwrap();
     let result = graph
-        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 0);
 }
 
-async fn count_rows(mut rx: tokio::sync::mpsc::Receiver<Row>) -> usize {
+async fn count_rows(mut s: RowStream) -> usize {
     let mut count = 0;
-    while let Some(_) = rx.next().await {
+    while let Ok(Some(_)) = s.next().await {
         count += 1;
     }
     count

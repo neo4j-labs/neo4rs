@@ -3,12 +3,67 @@ use crate::messages::*;
 use crate::pool::*;
 use crate::row::*;
 use crate::types::*;
-use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct Query {
     query: String,
     params: BoltMap,
+}
+
+pub struct RowStream {
+    qid: i64,
+    fields: BoltList,
+    state: State,
+    connection: ManagedConnection,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+enum State {
+    Ready,
+    Pulling,
+    Complete,
+}
+
+impl RowStream {
+    fn new(qid: i64, fields: BoltList, connection: ManagedConnection) -> RowStream {
+        RowStream {
+            qid,
+            fields,
+            connection,
+            state: State::Ready,
+        }
+    }
+
+    pub async fn next(&mut self) -> Result<Option<Row>> {
+        while self.state == State::Ready || self.state == State::Pulling {
+            match self.state {
+                State::Ready => {
+                    self.connection.send(BoltRequest::pull(self.qid)).await?;
+                    self.state = State::Pulling;
+                }
+                State::Pulling => match self.connection.recv().await {
+                    Ok(BoltResponse::SuccessMessage(s)) => {
+                        if s.get("has_more").unwrap_or(false) {
+                            self.state = State::Ready;
+                        } else {
+                            self.state = State::Complete;
+                            return Ok(None);
+                        }
+                    }
+                    Ok(BoltResponse::RecordMessage(record)) => {
+                        let row = Row::new(self.fields.clone(), record.data);
+                        return Ok(Some(row));
+                    }
+                    msg => {
+                        eprintln!("Got unexpected message: {:?}", msg);
+                        return Err(Error::QueryError);
+                    }
+                },
+                state => panic!("invalid state {:?}", state),
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl Query {
@@ -25,7 +80,6 @@ impl Query {
     }
 
     pub async fn run(self, connection: &mut ManagedConnection) -> Result<()> {
-        //TODO: reset connection
         let run = BoltRequest::run(&self.query, self.params.clone());
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
@@ -38,53 +92,18 @@ impl Query {
         }
     }
 
-    pub async fn stream(self, mut connection: ManagedConnection) -> Result<mpsc::Receiver<Row>> {
-        let (sender, receiver) = mpsc::channel(100); //TODO: configure buffer size
-
-        tokio::spawn(async move {
-            let run = BoltRequest::run(&self.query, self.params);
-            match connection.send_recv(run).await {
-                Ok(BoltResponse::SuccessMessage(success)) => {
-                    let mut has_more_records = true;
-                    let qid: i64 = success.get("qid").unwrap_or(-1);
-                    let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
-                    while has_more_records {
-                        let pull = BoltRequest::pull(qid);
-                        match connection.send(pull).await {
-                            Ok(()) => loop {
-                                match connection.recv().await {
-                                    Ok(BoltResponse::SuccessMessage(s)) => {
-                                        has_more_records = s.get("has_more").unwrap_or(false);
-                                        break;
-                                    }
-                                    Ok(BoltResponse::RecordMessage(record)) => {
-                                        let row = Row::new(fields.clone(), record.data);
-                                        sender.send(row).await.unwrap(); //TODO: fix unwrap
-                                    }
-                                    Ok(msg) => {
-                                        eprintln!("Got unexpected message: {:?}", msg);
-                                        break;
-                                    }
-                                    Err(msg) => {
-                                        eprintln!("Got error while streaming: {:?}", msg);
-                                        break;
-                                    }
-                                }
-                            },
-                            Err(e) => {
-                                eprintln!("error executing query {:?}", e);
-                            }
-                        }
-                    }
-                }
-                Ok(BoltResponse::FailureMessage(msg)) => {
-                    eprintln!("error executing query {:?}", msg);
-                }
-                msg => {
-                    eprintln!("unexpected message received: {:?}", msg);
-                }
-            };
-        });
-        Ok(receiver)
+    pub async fn execute(self, mut connection: ManagedConnection) -> Result<RowStream> {
+        let run = BoltRequest::run(&self.query, self.params);
+        match connection.send_recv(run).await {
+            Ok(BoltResponse::SuccessMessage(success)) => {
+                let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
+                let qid: i64 = success.get("qid").unwrap_or(-1);
+                Ok(RowStream::new(qid, fields, connection))
+            }
+            msg => {
+                eprintln!("unexpected message received: {:?}", msg);
+                Err(Error::QueryError)
+            }
+        }
     }
 }
