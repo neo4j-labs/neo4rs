@@ -1,27 +1,10 @@
 use crate::connection::Connection;
 use crate::errors::Error;
 use crate::messages::*;
-use crate::version::Version;
 use async_trait::async_trait;
-use bb8::ManageConnection;
-use bb8::PooledConnection;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-pub struct ConnectionWrapper {
-    version: Version,
-    connection: Arc<Mutex<Connection>>,
-}
-
-impl ConnectionWrapper {
-    pub fn get(&self) -> Arc<Mutex<Connection>> {
-        self.connection.clone()
-    }
-
-    pub fn version(&self) -> Version {
-        self.version
-    }
-}
+pub type ConnectionPool = deadpool::managed::Pool<Connection, Error>;
+pub type ManagedConnection = deadpool::managed::Object<Connection, Error>;
 
 pub struct ConnectionManager {
     uri: String,
@@ -40,18 +23,12 @@ impl ConnectionManager {
 }
 
 #[async_trait]
-impl ManageConnection for ConnectionManager {
-    type Connection = ConnectionWrapper;
-    type Error = Error;
-
-    async fn connect(&self) -> Result<ConnectionWrapper, Self::Error> {
-        let (mut connection, version) = Connection::new(self.uri.clone()).await?;
+impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
+    async fn create(&self) -> std::result::Result<Connection, Error> {
+        let (mut connection, _version) = Connection::new(self.uri.clone()).await?;
         let hello = BoltRequest::hello("neo4rs", self.user.clone(), self.password.clone());
         match connection.send_recv(hello).await? {
-            BoltResponse::SuccessMessage(_msg) => Ok(ConnectionWrapper {
-                version,
-                connection: Arc::new(Mutex::new(connection)),
-            }),
+            BoltResponse::SuccessMessage(_msg) => Ok(connection),
             BoltResponse::FailureMessage(msg) => Err(Error::AuthenticationError {
                 detail: msg.get("message").unwrap(),
             }),
@@ -59,21 +36,12 @@ impl ManageConnection for ConnectionManager {
         }
     }
 
-    async fn is_valid(&self, conn: &mut PooledConnection<'_, Self>) -> Result<(), Self::Error> {
+    async fn recycle(&self, _conn: &mut Connection) -> deadpool::managed::RecycleResult<Error> {
         Ok(())
-    }
-
-    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
-        false
     }
 }
 
-pub async fn create_pool(
-    uri: &str,
-    user: &str,
-    password: &str,
-) -> Result<bb8::Pool<ConnectionManager>, Error> {
-    let manager = ConnectionManager::new(uri, user, password);
-    let pool = bb8::Pool::builder().max_size(15).build(manager).await?;
-    Ok(pool)
+pub async fn create_pool(uri: &str, user: &str, password: &str) -> ConnectionPool {
+    let mgr = ConnectionManager::new(uri, user, password);
+    ConnectionPool::new(mgr, 16)
 }

@@ -34,7 +34,7 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     }
     
     //Transactions
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     txn.run_queries(vec![
          query("CREATE (p:Person {id: 1})"),
          query("CREATE (p:Person {id: 2})"),

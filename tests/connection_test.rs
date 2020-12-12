@@ -10,11 +10,6 @@ async fn graph() -> Graph {
 }
 
 #[tokio::test]
-async fn should_connect() {
-    assert_eq!(graph().await.version().await.unwrap(), Version::v4_1);
-}
-
-#[tokio::test]
 async fn should_execute_a_simple_query() {
     let graph = graph().await;
     let mut result = graph.execute(query("RETURN 1")).await.unwrap();
@@ -106,7 +101,7 @@ async fn should_create_unbounded_relation() {
 #[tokio::test]
 async fn should_run_all_queries_in_txn() {
     let graph = graph().await;
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     assert!(txn
         .run_queries(vec![
@@ -126,33 +121,44 @@ async fn should_run_all_queries_in_txn() {
 #[tokio::test]
 async fn should_queries_within_txn() {
     let graph = graph().await;
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
-    let create_query = query("CREATE (p:Person {id: $id})").param("id", id.clone());
-    let match_query =
-        query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone());
-    txn.run(create_query.clone()).await.unwrap();
-    txn.run(create_query).await.unwrap();
-    let result = graph.execute(match_query).await.unwrap();
-    assert_eq!(count_rows(result).await, 2);
+    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+        .await
+        .unwrap();
+    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+        .await
+        .unwrap();
+    let result = graph
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .await
+        .unwrap();
+    assert_eq!(count_rows(result).await, 0);
     txn.commit().await.unwrap();
+    let result = graph
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .await
+        .unwrap();
+    assert_eq!(count_rows(result).await, 2);
 }
 
 #[tokio::test]
 async fn should_rollback_txn() {
     let graph = graph().await;
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
-    let create_query = query("CREATE (p:Person {id: $id})").param("id", id.clone());
-    let match_query =
-        query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone());
-    txn.run(create_query.clone()).await.unwrap();
-    txn.run(create_query).await.unwrap();
-    let result = graph.execute(match_query.clone()).await.unwrap();
-    assert_eq!(count_rows(result).await, 2);
+    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+        .await
+        .unwrap();
+    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+        .await
+        .unwrap();
     txn.rollback().await.unwrap();
-    let mut result = graph.execute(match_query).await.unwrap();
-    assert!(result.next().await.is_none());
+    let result = graph
+        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .await
+        .unwrap();
+    assert_eq!(count_rows(result).await, 0);
 }
 
 async fn count_rows(mut rx: tokio::sync::mpsc::Receiver<Row>) -> usize {

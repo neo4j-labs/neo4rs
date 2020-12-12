@@ -34,14 +34,14 @@ mod txn;
 mod types;
 mod version;
 pub use crate::errors::*;
-use crate::pool::*;
-use crate::query::*;
+use crate::pool::{create_pool, ConnectionPool};
+use crate::query::Query;
 pub use crate::row::{Node, Relation, Row};
 pub use crate::txn::Txn;
 pub use crate::version::Version;
 
 pub struct Graph {
-    pool: bb8::Pool<ConnectionManager>,
+    pool: ConnectionPool,
 }
 
 pub fn query(q: &str) -> Query {
@@ -50,27 +50,22 @@ pub fn query(q: &str) -> Query {
 
 impl Graph {
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        Ok(Graph {
-            pool: create_pool(uri, user, password).await?,
-        })
-    }
-
-    pub async fn version(&self) -> Result<Version> {
-        Ok(self.pool.get().await?.version())
+        let pool = create_pool(uri, user, password).await;
+        Ok(Graph { pool })
     }
 
     pub async fn start_txn(&self) -> Result<Txn> {
         let connection = self.pool.get().await?;
-        Txn::new(connection.get()).await
+        Txn::new(connection).await
     }
 
     pub async fn run(&self, q: Query) -> Result<()> {
-        let connection = self.pool.get().await?;
-        q.run(connection.get()).await
+        let mut connection = self.pool.get().await.unwrap();
+        q.run(&mut connection).await
     }
 
     pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
-        let connection = self.pool.get().await?;
-        q.execute(connection.get()).await
+        let connection = self.pool.get().await.unwrap();
+        q.execute(connection).await
     }
 }

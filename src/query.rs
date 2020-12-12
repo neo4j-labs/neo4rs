@@ -1,11 +1,9 @@
-use crate::connection::Connection;
 use crate::errors::*;
 use crate::messages::*;
+use crate::pool::*;
 use crate::row::*;
 use crate::types::*;
-use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::sync::Mutex;
 
 #[derive(Clone)]
 pub struct Query {
@@ -26,9 +24,8 @@ impl Query {
         self
     }
 
-    pub async fn run(self, connection: Arc<Mutex<Connection>>) -> Result<()> {
+    pub async fn run(self, connection: &mut ManagedConnection) -> Result<()> {
         //TODO: reset connection
-        let mut connection = connection.lock().await;
         let run = BoltRequest::run(&self.query, self.params.clone());
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
@@ -41,11 +38,10 @@ impl Query {
         }
     }
 
-    pub async fn execute(self, connection: Arc<Mutex<Connection>>) -> Result<mpsc::Receiver<Row>> {
+    pub async fn execute(self, mut connection: ManagedConnection) -> Result<mpsc::Receiver<Row>> {
         let (sender, receiver) = mpsc::channel(100); //TODO: configure buffer size
 
         tokio::spawn(async move {
-            let mut connection = connection.lock().await;
             let run = BoltRequest::run(&self.query, self.params);
             match connection.send_recv(run).await {
                 Ok(BoltResponse::SuccessMessage(success)) => {

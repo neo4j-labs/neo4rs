@@ -26,10 +26,10 @@ impl std::convert::From<std::io::Error> for Error {
     }
 }
 
-impl std::convert::From<bb8::RunError<Error>> for Error {
-    fn from(e: bb8::RunError<Error>) -> Self {
+impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {
+    fn from(e: deadpool::managed::PoolError<Error>) -> Self {
         match e {
-            bb8::RunError::User(e) => e,
+            deadpool::managed::PoolError::Backend(e) => e,
             _ => Error::ConnectionError,
         }
     }
