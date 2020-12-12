@@ -36,6 +36,7 @@ impl Txn {
     }
 
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
+        //TODO: discard any previous incomplete streams
         q.execute(self.connection.clone()).await
     }
 
