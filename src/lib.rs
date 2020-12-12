@@ -60,12 +60,12 @@ impl Graph {
     }
 
     pub async fn run(&self, q: Query) -> Result<()> {
-        let mut connection = self.pool.get().await.unwrap();
+        let mut connection = self.pool.get().await?;
         q.run(&mut connection).await
     }
 
     pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
-        let connection = self.pool.get().await.unwrap();
+        let connection = self.pool.get().await?;
         q.execute(connection).await
     }
 }
