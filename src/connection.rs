@@ -38,8 +38,10 @@ impl Connection {
     }
 
     pub async fn reset(&mut self) -> Result<()> {
-        let reset = BoltRequest::reset();
-        self.send(reset).await
+        match self.send_recv(BoltRequest::reset()).await? {
+            BoltResponse::SuccessMessage(s) => Ok(()),
+            _ => Err(Error::UnexpectedMessage),
+        }
     }
 
     pub async fn send_recv(&mut self, message: BoltRequest) -> Result<BoltResponse> {

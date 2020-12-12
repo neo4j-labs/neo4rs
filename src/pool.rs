@@ -28,8 +28,9 @@ impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
         Connection::new(&self.uri, &self.user, &self.password).await
     }
 
-    async fn recycle(&self, _conn: &mut Connection) -> deadpool::managed::RecycleResult<Error> {
-        Ok(())
+    async fn recycle(&self, conn: &mut Connection) -> deadpool::managed::RecycleResult<Error> {
+        println!("resetting connection");
+        Ok(conn.reset().await?)
     }
 }
 
