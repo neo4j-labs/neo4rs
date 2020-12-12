@@ -10,15 +10,15 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     //Run a query
     let uri = "127.0.0.1:7687".to_owned();
     let user = "neo4j";
-    let pass = "neo4j";
-    let graph = Graph::new(uri, user, pass).await.unwrap()
+    let pass = "neo";
+    let graph = Graph::new(&uri, user, pass).await.unwrap();
     assert!(graph.run(query("RETURN 1")).await.is_ok());
     
     //Concurrent queries
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Arc::new(Graph::new(uri, user, pass).await.unwrap());
+    let graph = Arc::new(Graph::new(&uri, user, pass).await.unwrap());
     for _ in 1..=42 {
         let graph = graph.clone();
         tokio::spawn(async move {
@@ -26,9 +26,9 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 	       query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
 	    ).await.unwrap();
             while let Some(row) = result.next().await {
-        	let node: Node = row.get("friend").unwrap();
+        	let node: Node = row.get("p").unwrap();
         	let name: String = node.get("name").unwrap();
-                //process data
+                println!("{}", name);
             }
         });
     }
@@ -36,10 +36,12 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     //Transactions
     let mut txn = graph.start_txn().await.unwrap();
     txn.run_queries(vec![
-         query("CREATE (p:Person {id: 1})"),
-         query("CREATE (p:Person {id: 2})"),
-         query("CREATE (p:Person {id: 2})"),
-    ]).await.unwrap();
+        query("CREATE (p:Person {name: 'mark'})"),
+        query("CREATE (p:Person {name: 'jake'})"),
+        query("CREATE (p:Person {name: 'luke'})"),
+    ])
+    .await
+    .unwrap();
     txn.commit().await.unwrap(); //or txn.rollback().await.unwrap();
     
     
