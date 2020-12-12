@@ -68,7 +68,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.2.3"
+neo4rs = "0.2.5"
 ```
 
 ---
@@ -101,3 +101,10 @@ neo4rs = "0.2.3"
 	- [ ] Duration
 	- [ ] Point2D
 	- [ ] Point3D
+
+## License
+
+Neo4rs is licensed under either of the following, at your option:
+
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
