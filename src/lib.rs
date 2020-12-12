@@ -30,15 +30,19 @@ mod messages;
 mod pool;
 mod query;
 mod row;
+mod stream;
 mod txn;
 mod types;
 mod version;
 pub use crate::errors::*;
 use crate::pool::{create_pool, ConnectionPool};
-pub use crate::query::{Query, RowStream};
+pub use crate::query::Query;
 pub use crate::row::{Node, Relation, Row};
+pub use crate::stream::RowStream;
 pub use crate::txn::Txn;
 pub use crate::version::Version;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct Graph {
     pool: ConnectionPool,
@@ -59,13 +63,13 @@ impl Graph {
         Txn::new(connection).await
     }
 
-    pub async fn run(&self, q: Query) -> Result<()> {
-        let mut connection = self.pool.get().await?;
-        q.run(&mut connection).await
+    pub async fn run(&mut self, q: Query) -> Result<()> {
+        let connection = self.pool.get().await?;
+        q.run(Arc::new(Mutex::new(connection))).await
     }
 
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
         let connection = self.pool.get().await?;
-        q.execute(connection).await
+        q.execute(Arc::new(Mutex::new(connection))).await
     }
 }

@@ -1,4 +1,3 @@
-use futures::stream::StreamExt;
 use neo4rs::*;
 use uuid::Uuid;
 
@@ -64,7 +63,7 @@ async fn should_execute_query_with_params() {
 
 #[tokio::test]
 async fn should_run_a_simple_query() {
-    let graph = graph().await;
+    let mut graph = graph().await;
     assert!(graph.run(query("RETURN 1")).await.is_ok());
 }
 
@@ -101,7 +100,7 @@ async fn should_create_unbounded_relation() {
 #[tokio::test]
 async fn should_run_all_queries_in_txn() {
     let graph = graph().await;
-    let mut txn = graph.start_txn().await.unwrap();
+    let txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     assert!(txn
         .run_queries(vec![
@@ -119,9 +118,9 @@ async fn should_run_all_queries_in_txn() {
 }
 
 #[tokio::test]
-async fn should_queries_within_txn() {
+async fn should_isolate_txn() {
     let graph = graph().await;
-    let mut txn = graph.start_txn().await.unwrap();
+    let txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
         .await
@@ -145,7 +144,7 @@ async fn should_queries_within_txn() {
 #[tokio::test]
 async fn should_rollback_txn() {
     let graph = graph().await;
-    let mut txn = graph.start_txn().await.unwrap();
+    let txn = graph.start_txn().await.unwrap();
     let id = Uuid::new_v4().to_string();
     txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
         .await

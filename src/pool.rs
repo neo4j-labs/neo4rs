@@ -24,6 +24,7 @@ impl ConnectionManager {
 #[async_trait]
 impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
     async fn create(&self) -> std::result::Result<Connection, Error> {
+        println!("creating new connection...");
         Connection::new(&self.uri, &self.user, &self.password).await
     }
 
