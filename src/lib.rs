@@ -63,7 +63,7 @@ impl Graph {
         Txn::new(connection).await
     }
 
-    pub async fn run(&mut self, q: Query) -> Result<()> {
+    pub async fn run(&self, q: Query) -> Result<()> {
         let connection = self.pool.get().await?;
         q.run(Arc::new(Mutex::new(connection))).await
     }
