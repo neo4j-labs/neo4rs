@@ -12,7 +12,7 @@ async fn graph() -> Graph {
 #[tokio::test]
 async fn should_execute_a_simple_query() {
     let graph = graph().await;
-    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
+    let mut result = graph.stream(query("RETURN 1")).await.unwrap();
     let row = result.next().await.unwrap();
     let value: i64 = row.get("1").unwrap();
     assert_eq!(1, value);
@@ -23,7 +23,7 @@ async fn should_execute_a_simple_query() {
 async fn should_create_new_node() {
     let graph = graph().await;
     let mut result = graph
-        .execute(query("CREATE (friend:Person {name: 'Mark'})"))
+        .stream(query("CREATE (friend:Person {name: 'Mark'})"))
         .await
         .unwrap();
     assert!(result.next().await.is_none());
@@ -33,7 +33,7 @@ async fn should_create_new_node() {
 async fn should_return_created_node() {
     let graph = graph().await;
     let mut result = graph
-        .execute(query("CREATE (friend:Person {name: 'Mark'}) RETURN friend"))
+        .stream(query("CREATE (friend:Person {name: 'Mark'}) RETURN friend"))
         .await
         .unwrap();
     let row = result.next().await.unwrap();
@@ -50,7 +50,7 @@ async fn should_return_created_node() {
 async fn should_execute_query_with_params() {
     let graph = graph().await;
     let mut result = graph
-        .execute(
+        .stream(
             query("CREATE (friend:Person {name: $name}) RETURN friend").param("name", "Mr Mark"),
         )
         .await
@@ -71,7 +71,7 @@ async fn should_run_a_simple_query() {
 #[tokio::test]
 async fn should_create_bounded_relation() {
     let graph = graph().await;
-    let mut result = graph.execute(
+    let mut result = graph.stream(
         query("CREATE (p:Person { name: 'Oliver Stone' })-[r:WORKS_AT {as: 'Engineer'}]->(neo) RETURN r")
     ).await.unwrap();
     let row = result.next().await.unwrap();
@@ -86,7 +86,7 @@ async fn should_create_bounded_relation() {
 #[tokio::test]
 async fn should_create_unbounded_relation() {
     let graph = graph().await;
-    let mut result = graph.execute(
+    let mut result = graph.stream(
         query("MERGE (p1:Person { name: 'Oliver Stone' })-[r:RELATED {as: 'friend'}]-(p2: Person {name: 'Mark'}) RETURN r")
     ).await.unwrap();
     let row = result.next().await.unwrap();
@@ -112,7 +112,7 @@ async fn should_run_all_queries_in_txn() {
         .is_ok());
     txn.commit().await.unwrap();
     let result = graph
-        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 2);
@@ -130,13 +130,13 @@ async fn should_queries_within_txn() {
         .await
         .unwrap();
     let result = graph
-        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 0);
     txn.commit().await.unwrap();
     let result = graph
-        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 2);
@@ -155,7 +155,7 @@ async fn should_rollback_txn() {
         .unwrap();
     txn.rollback().await.unwrap();
     let result = graph
-        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+        .stream(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 0);

@@ -11,7 +11,7 @@
 //!    let user = "neo4j";
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let mut result = graph.execute(
+//!    let mut result = graph.stream(
 //!      query( "CREATE (friend:Person {name: $name}) RETURN friend")
 //!     .param("name", "Mr Mark")
 //!    ).await.unwrap();
@@ -64,8 +64,8 @@ impl Graph {
         q.run(&mut connection).await
     }
 
-    pub async fn execute(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
+    pub async fn stream(&self, q: Query) -> Result<tokio::sync::mpsc::Receiver<Row>> {
         let connection = self.pool.get().await?;
-        q.execute(connection).await
+        q.stream(connection).await
     }
 }

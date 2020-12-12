@@ -38,7 +38,7 @@ impl Query {
         }
     }
 
-    pub async fn execute(self, mut connection: ManagedConnection) -> Result<mpsc::Receiver<Row>> {
+    pub async fn stream(self, mut connection: ManagedConnection) -> Result<mpsc::Receiver<Row>> {
         let (sender, receiver) = mpsc::channel(100); //TODO: configure buffer size
 
         tokio::spawn(async move {
