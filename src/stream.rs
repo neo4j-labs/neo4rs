@@ -32,7 +32,7 @@ impl RowStream {
 
     pub async fn next(&mut self) -> Result<Option<Row>> {
         let mut connection = self.connection.lock().await;
-        while self.state == State::Ready || self.state == State::Pulling {
+        loop {
             match self.state {
                 State::Ready => {
                     connection.send(BoltRequest::pull(self.qid)).await?;
@@ -58,9 +58,8 @@ impl RowStream {
                         )))
                     }
                 },
-                state => panic!("invalid state {:?}", state),
+                State::Complete => return Ok(None),
             }
         }
-        Ok(None)
     }
 }
