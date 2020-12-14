@@ -5,11 +5,12 @@ authors = ["John Vincent <yehohanan7@gmail.com>"]
 edition = "2018"
 description = "neo4j driver in rust"
 license = "MIT"
+repository = "https://github.com/yehohanan7/neo4rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = { version = "0.3.1"}
+futures = { version = "0.3.1" }
 tokio = { version = "0.3.1", features = ["full"] }
 async-stream = "0.3.0"
 bytes = "0.5"
