@@ -68,7 +68,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.2.5"
+neo4rs = "0.2.6"
 ```
 
 ---
