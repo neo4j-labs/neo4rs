@@ -4,6 +4,8 @@ pub mod list;
 pub mod map;
 pub mod node;
 pub mod null;
+pub mod point2d;
+pub mod point3d;
 pub mod relation;
 pub mod string;
 pub use boolean::BoltBoolean;
@@ -12,6 +14,8 @@ pub use list::BoltList;
 pub use map::BoltMap;
 pub use node::BoltNode;
 pub use null::BoltNull;
+pub use point2d::BoltPoint2D;
+pub use point3d::BoltPoint3D;
 pub use relation::BoltRelation;
 pub use string::BoltString;
 
@@ -33,6 +37,8 @@ pub enum BoltType {
     List(BoltList),
     Node(BoltNode),
     Relation(BoltRelation),
+    Point2D(BoltPoint2D),
+    Point3D(BoltPoint3D),
 }
 
 impl Display for BoltType {
@@ -53,6 +59,8 @@ impl Hash for BoltType {
             BoltType::Null(t) => t.hash(state),
             BoltType::Integer(t) => t.hash(state),
             BoltType::List(t) => t.hash(state),
+            BoltType::Point2D(t) => t.hash(state),
+            BoltType::Point3D(t) => t.hash(state),
             BoltType::Node(_) => panic!("node not hashed"),
             BoltType::Map(_) => panic!("map not hashed"),
             BoltType::Relation(_) => panic!("relation not hashed"),
@@ -69,6 +77,8 @@ impl TryInto<Bytes> for BoltType {
             BoltType::Integer(t) => t.try_into(),
             BoltType::String(t) => t.try_into(),
             BoltType::List(t) => t.try_into(),
+            BoltType::Point2D(t) => t.try_into(),
+            BoltType::Point3D(t) => t.try_into(),
             BoltType::Map(t) => t.try_into(),
             BoltType::Node(t) => t.try_into(),
             BoltType::Relation(t) => t.try_into(),
@@ -86,6 +96,8 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             input if BoltMap::can_parse(input.clone()) => BoltType::Map(input.try_into()?),
             input if BoltNode::can_parse(input.clone()) => BoltType::Node(input.try_into()?),
             input if BoltBoolean::can_parse(input.clone()) => BoltType::Boolean(input.try_into()?),
+            input if BoltPoint2D::can_parse(input.clone()) => BoltType::Point2D(input.try_into()?),
+            input if BoltPoint3D::can_parse(input.clone()) => BoltType::Point3D(input.try_into()?),
             input if BoltRelation::can_parse(input.clone()) => {
                 BoltType::Relation(input.try_into()?)
             }
