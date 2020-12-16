@@ -16,6 +16,54 @@ pub struct Relation {
     inner: BoltRelation,
 }
 
+pub struct Point2D {
+    inner: BoltPoint2D,
+}
+
+pub struct Point3D {
+    inner: BoltPoint3D,
+}
+
+impl Point2D {
+    pub fn new(inner: BoltPoint2D) -> Self {
+        Point2D { inner }
+    }
+
+    pub fn sr_id(&self) -> i64 {
+        self.inner.sr_id.value
+    }
+
+    pub fn x(&self) -> f64 {
+        self.inner.x.value
+    }
+
+    pub fn y(&self) -> f64 {
+        self.inner.y.value
+    }
+}
+
+impl Point3D {
+    pub fn new(inner: BoltPoint3D) -> Self {
+        Point3D { inner }
+    }
+
+    pub fn sr_id(&self) -> i64 {
+        self.inner.sr_id.value
+    }
+
+    pub fn x(&self) -> f64 {
+        self.inner.x.value
+    }
+
+    pub fn y(&self) -> f64 {
+        self.inner.y.value
+    }
+
+    pub fn z(&self) -> f64 {
+        self.inner.z.value
+    }
+}
+
 impl Row {
     pub fn new(fields: BoltList, data: BoltList) -> Self {
         let mut attributes = BoltMap::with_capacity(fields.len());

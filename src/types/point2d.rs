@@ -9,11 +9,11 @@ use std::rc::Rc;
 pub const MARKER: u8 = 0xB3;
 pub const SIGNATURE: u8 = 0x58;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoltPoint2D {
     pub sr_id: BoltInteger,
-    pub x: BoltInteger,
-    pub y: BoltInteger,
+    pub x: BoltFloat,
+    pub y: BoltFloat,
 }
 
 impl BoltPoint2D {
@@ -32,8 +32,8 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltPoint2D {
         match (marker, tag) {
             (MARKER, SIGNATURE) => {
                 let sr_id: BoltInteger = input.clone().try_into()?;
-                let x: BoltInteger = input.clone().try_into()?;
-                let y: BoltInteger = input.clone().try_into()?;
+                let x: BoltFloat = input.clone().try_into()?;
+                let y: BoltFloat = input.clone().try_into()?;
                 Ok(BoltPoint2D { sr_id, x, y })
             }
             _ => Err(Error::InvalidTypeMarker(format!(
@@ -70,8 +70,8 @@ mod tests {
     #[test]
     fn should_serialize_2d_point() {
         let sr_id = BoltInteger::new(42);
-        let x = BoltInteger::new(1);
-        let y = BoltInteger::new(2);
+        let x = BoltFloat::new(1.0);
+        let y = BoltFloat::new(2.0);
 
         let point = BoltPoint2D { sr_id, x, y };
 
@@ -79,19 +79,26 @@ mod tests {
 
         println!("{:#04X?}", bytes.bytes());
 
-        assert_eq!(bytes, Bytes::from_static(&[0xB3, 0x58, 0x2A, 0x01, 0x02,]));
+        assert_eq!(
+            bytes,
+            Bytes::from_static(&[
+                0xB3, 0x58, 0x2A, 0xC1, 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC1, 0x40,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ])
+        );
     }
 
     #[test]
     fn should_deserialize_2d_point() {
         let input = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xB3, 0x58, 0x2A, 0x01, 0x02,
+            0xB3, 0x58, 0x2A, 0xC1, 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC1, 0x40,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ])));
 
         let point: BoltPoint2D = input.try_into().unwrap();
 
         assert_eq!(point.sr_id, BoltInteger::new(42));
-        assert_eq!(point.x, BoltInteger::new(1));
-        assert_eq!(point.y, BoltInteger::new(2));
+        assert_eq!(point.x, BoltFloat::new(1.0));
+        assert_eq!(point.y, BoltFloat::new(2.0));
     }
 }

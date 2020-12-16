@@ -36,6 +36,28 @@ impl TryFrom<BoltType> for bool {
     }
 }
 
+impl TryFrom<BoltType> for Point2D {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Point2D> {
+        match input {
+            BoltType::Point2D(p) => Ok(Point2D::new(p)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for Point3D {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Point3D> {
+        match input {
+            BoltType::Point3D(p) => Ok(Point3D::new(p)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Node {
     type Error = Error;
 
