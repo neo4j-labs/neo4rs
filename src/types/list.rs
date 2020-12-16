@@ -11,7 +11,7 @@ pub const SMALL: u8 = 0xD4;
 pub const MEDIUM: u8 = 0xD5;
 pub const LARGE: u8 = 0xD6;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Hash, Clone)]
 pub struct BoltList {
     pub value: Vec<BoltType>,
 }

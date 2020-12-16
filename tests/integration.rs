@@ -63,7 +63,7 @@ async fn should_execute_query_with_params() {
 
 #[tokio::test]
 async fn should_run_a_simple_query() {
-    let mut graph = graph().await;
+    let graph = graph().await;
     assert!(graph.run(query("RETURN 1")).await.is_ok());
 }
 
@@ -158,6 +158,22 @@ async fn should_rollback_txn() {
         .await
         .unwrap();
     assert_eq!(count_rows(result).await, 0);
+}
+
+#[tokio::test]
+async fn should_calcualte_distance_between_points() {
+    let graph = graph().await;
+    let mut result = graph
+        .execute(query(
+            "WITH point({ x: 2.3, y: 4.5, crs: 'cartesian' }) AS p1, 
+             point({ x: 1.1, y: 5.4, crs: 'cartesian' }) AS p2 RETURN distance(p1,p2) AS dist",
+        ))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let value: f64 = row.get("dist").unwrap();
+    assert_eq!(1.5, value);
+    assert!(result.next().await.unwrap().is_none());
 }
 
 async fn count_rows(mut s: RowStream) -> usize {

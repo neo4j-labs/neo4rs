@@ -3,6 +3,17 @@ use crate::row::*;
 use crate::types::*;
 use std::convert::TryFrom;
 
+impl TryFrom<BoltType> for f64 {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<f64> {
+        match input {
+            BoltType::Float(t) => Ok(t.value),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for i64 {
     type Error = Error;
 

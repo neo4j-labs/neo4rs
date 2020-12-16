@@ -29,14 +29,14 @@ use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 use success::Success;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
     SuccessMessage(Success),
     FailureMessage(Failure),
     RecordMessage(Record),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BoltRequest {
     HelloMessage(Hello),
     RunMessage(Run),

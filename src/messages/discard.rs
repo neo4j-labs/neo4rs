@@ -7,7 +7,7 @@ use std::mem;
 pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x2F;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Discard {
     extra: BoltMap,
 }

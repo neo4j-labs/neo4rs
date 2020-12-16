@@ -86,10 +86,12 @@ neo4rs = "0.2.6"
 - [ ] add support for older versions of the protocol
 - [ ] multi db support
 - [ ] support data types
-	- [ ] Float
+	- [x] Float
 	- [ ] Bytes
 - [ ] support structures
-	- [X] Relationship
+	- [x] Relationship
+	- [x] Point2D
+	- [x] Point3D
 	- [ ] UnboundedRelationship
 	- [ ] Path
 	- [ ] Date
@@ -99,8 +101,6 @@ neo4rs = "0.2.6"
 	- [ ] DateTimeZoneId
 	- [ ] LocalDateTime
 	- [ ] Duration
-	- [ ] Point2D
-	- [ ] Point3D
 
 ## License
 

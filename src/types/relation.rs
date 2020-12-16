@@ -9,7 +9,7 @@ use std::rc::Rc;
 pub const MARKER: u8 = 0xB5;
 pub const SIGNATURE: u8 = 0x52;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoltRelation {
     pub id: BoltInteger,
     pub start_node_id: BoltInteger,

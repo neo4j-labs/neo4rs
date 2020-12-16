@@ -8,7 +8,7 @@ use std::rc::Rc;
 pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x71;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Record {
     pub data: BoltList,
 }

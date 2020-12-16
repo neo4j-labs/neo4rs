@@ -7,7 +7,7 @@ use std::mem;
 pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x10;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Run {
     query: BoltString,
     parameters: BoltMap,
