@@ -37,7 +37,7 @@ mod version;
 pub use crate::errors::*;
 use crate::pool::{create_pool, ConnectionPool};
 pub use crate::query::Query;
-pub use crate::row::{Node, Point2D, Point3D, Relation, Row};
+pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
 pub use crate::stream::RowStream;
 pub use crate::txn::Txn;
 pub use crate::version::Version;

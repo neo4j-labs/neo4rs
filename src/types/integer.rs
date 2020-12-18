@@ -77,6 +77,19 @@ impl TryInto<Bytes> for BoltInteger {
     }
 }
 
+impl Into<BoltInteger> for i64 {
+    fn into(self) -> BoltInteger {
+        BoltInteger::new(self)
+    }
+}
+
+//TODO: use macros
+impl Into<BoltInteger> for i32 {
+    fn into(self) -> BoltInteger {
+        BoltInteger::new(self as i64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

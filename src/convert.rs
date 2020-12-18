@@ -1,7 +1,6 @@
 use crate::errors::*;
 use crate::row::*;
 use crate::types::*;
-use bytes::*;
 use std::convert::TryFrom;
 
 impl TryFrom<BoltType> for f64 {
@@ -81,12 +80,34 @@ impl TryFrom<BoltType> for Node {
     }
 }
 
+impl TryFrom<BoltType> for Path {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Path> {
+        match input {
+            BoltType::Path(n) => Ok(Path::new(n)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Relation {
     type Error = Error;
 
     fn try_from(input: BoltType) -> Result<Relation> {
         match input {
             BoltType::Relation(r) => Ok(Relation::new(r)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for UnboundedRelation {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<UnboundedRelation> {
+        match input {
+            BoltType::UnboundedRelation(r) => Ok(UnboundedRelation::new(r)),
             _ => Err(Error::ConverstionError),
         }
     }

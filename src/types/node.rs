@@ -21,6 +21,14 @@ impl BoltNode {
         let input = input.borrow();
         input.len() > 1 && input[0] == MARKER && input[1] == SIGNATURE
     }
+
+    pub fn new(id: BoltInteger, labels: BoltList, properties: BoltMap) -> Self {
+        BoltNode {
+            id,
+            labels,
+            properties,
+        }
+    }
 }
 
 impl BoltNode {
@@ -74,6 +82,12 @@ impl TryInto<Bytes> for BoltNode {
         bytes.put(labels);
         bytes.put(properties);
         Ok(bytes.freeze())
+    }
+}
+
+impl Into<BoltType> for BoltNode {
+    fn into(self) -> BoltType {
+        BoltType::Node(self)
     }
 }
 

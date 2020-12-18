@@ -12,8 +12,18 @@ pub struct Node {
 }
 
 #[derive(Debug)]
+pub struct Path {
+    inner: BoltPath,
+}
+
+#[derive(Debug)]
 pub struct Relation {
     inner: BoltRelation,
+}
+
+#[derive(Debug)]
+pub struct UnboundedRelation {
+    inner: BoltUnboundedRelation,
 }
 
 pub struct Point2D {
@@ -22,6 +32,29 @@ pub struct Point2D {
 
 pub struct Point3D {
     inner: BoltPoint3D,
+}
+
+impl Path {
+    pub fn new(inner: BoltPath) -> Self {
+        Path { inner }
+    }
+
+    pub fn ids(&self) -> Vec<i64> {
+        let bolt_ids = self.inner.ids();
+        bolt_ids.into_iter().map(|id| id.value).collect()
+    }
+
+    pub fn nodes(&self) -> Vec<Node> {
+        let nodes = self.inner.nodes();
+        nodes.into_iter().map(|n| Node::new(n)).collect()
+    }
+
+    pub fn rels(&self) -> Vec<UnboundedRelation> {
+        let rels = self.inner.rels();
+        rels.into_iter()
+            .map(|r| UnboundedRelation::new(r))
+            .collect()
+    }
 }
 
 impl Point2D {
@@ -113,6 +146,24 @@ impl Relation {
 
     pub fn end_node_id(&self) -> i64 {
         self.inner.end_node_id.value
+    }
+
+    pub fn typ(&self) -> String {
+        self.inner.typ.value.clone()
+    }
+
+    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+        self.inner.get(key)
+    }
+}
+
+impl UnboundedRelation {
+    pub fn new(inner: BoltUnboundedRelation) -> Self {
+        UnboundedRelation { inner }
+    }
+
+    pub fn id(&self) -> i64 {
+        self.inner.id.value
     }
 
     pub fn typ(&self) -> String {

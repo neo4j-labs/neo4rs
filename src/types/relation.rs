@@ -164,6 +164,18 @@ impl TryInto<Bytes> for BoltUnboundedRelation {
     }
 }
 
+impl Into<BoltType> for BoltRelation {
+    fn into(self) -> BoltType {
+        BoltType::Relation(self)
+    }
+}
+
+impl Into<BoltType> for BoltUnboundedRelation {
+    fn into(self) -> BoltType {
+        BoltType::UnboundedRelation(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

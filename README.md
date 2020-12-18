@@ -82,6 +82,22 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     assert_eq!(point.x(), 56.7);
     assert_eq!(point.y(), 12.78);
     assert_eq!(point.z(), 8.0);
+    
+    //Work with paths
+    let mut result = graph
+        .execute(
+            query("MATCH p = (person:Person { name: $name })-[r:WORKS_AT]->(c:Company) RETURN p")
+                .param("name", name),
+        )
+        .await
+        .unwrap();
+
+    let row = result.next().await.unwrap().unwrap();
+    let path: Path = row.get("p").unwrap();
+    assert_eq!(path.ids().len(), 2);
+    assert_eq!(path.nodes().len(), 2);
+    assert_eq!(path.rels().len(), 1);
+    
 ```
 
 
@@ -115,8 +131,8 @@ neo4rs = "0.2.7"
 	- [x] Relationship
 	- [x] Point2D
 	- [x] Point3D
-	- [ ] UnboundedRelationship
-	- [ ] Path
+	- [x] UnboundedRelationship
+	- [x] Path
 	- [ ] Date
 	- [ ] Time
 	- [ ] LocalTime
