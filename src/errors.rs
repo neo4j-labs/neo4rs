@@ -6,6 +6,7 @@ pub enum Error {
     ConnectionError,
     StringTooLong,
     MapTooBig,
+    BytesTooBig,
     ListTooLong,
     UnexpectedMessage(String),
     UnknownType(String),

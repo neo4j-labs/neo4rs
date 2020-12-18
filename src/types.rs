@@ -1,3 +1,4 @@
+pub mod binary;
 pub mod boolean;
 pub mod float;
 pub mod integer;
@@ -9,6 +10,7 @@ pub mod point2d;
 pub mod point3d;
 pub mod relation;
 pub mod string;
+pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use float::BoltFloat;
 pub use integer::BoltInteger;
@@ -42,6 +44,7 @@ pub enum BoltType {
     Relation(BoltRelation),
     Point2D(BoltPoint2D),
     Point3D(BoltPoint3D),
+    Bytes(BoltBytes),
 }
 
 impl Display for BoltType {
@@ -61,10 +64,11 @@ impl Hash for BoltType {
             BoltType::Boolean(t) => t.hash(state),
             BoltType::Null(t) => t.hash(state),
             BoltType::Integer(t) => t.hash(state),
-            BoltType::Float(_) => panic!("float not hashed"),
             BoltType::List(t) => t.hash(state),
-            BoltType::Point2D(t) => panic!("point2d not hashed"),
-            BoltType::Point3D(t) => panic!("point3d not hashed"),
+            BoltType::Bytes(_) => panic!("bytes not hashed"),
+            BoltType::Float(_) => panic!("float not hashed"),
+            BoltType::Point2D(_) => panic!("point2d not hashed"),
+            BoltType::Point3D(_) => panic!("point3d not hashed"),
             BoltType::Node(_) => panic!("node not hashed"),
             BoltType::Map(_) => panic!("map not hashed"),
             BoltType::Relation(_) => panic!("relation not hashed"),
@@ -87,6 +91,7 @@ impl TryInto<Bytes> for BoltType {
             BoltType::Map(t) => t.try_into(),
             BoltType::Node(t) => t.try_into(),
             BoltType::Relation(t) => t.try_into(),
+            BoltType::Bytes(t) => t.try_into(),
         }
     }
 }
@@ -104,6 +109,7 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             input if BoltBoolean::can_parse(input.clone()) => BoltType::Boolean(input.try_into()?),
             input if BoltPoint2D::can_parse(input.clone()) => BoltType::Point2D(input.try_into()?),
             input if BoltPoint3D::can_parse(input.clone()) => BoltType::Point3D(input.try_into()?),
+            input if BoltBytes::can_parse(input.clone()) => BoltType::Bytes(input.try_into()?),
             input if BoltRelation::can_parse(input.clone()) => {
                 BoltType::Relation(input.try_into()?)
             }

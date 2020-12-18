@@ -47,6 +47,17 @@ impl TryFrom<BoltType> for Point2D {
     }
 }
 
+impl TryFrom<BoltType> for Vec<u8> {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Vec<u8>> {
+        match input {
+            BoltType::Bytes(b) => Ok(b.value.to_vec()),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Point3D {
     type Error = Error;
 
