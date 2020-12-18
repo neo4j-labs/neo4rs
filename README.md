@@ -60,7 +60,16 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
     assert_eq!(relation.typ(), "WORKS_AT");
     assert_eq!(relation.get::<String>("as").unwrap(), "Engineer");
     
-    //Handle points
+    //Work with raw bytes
+    let mut result = graph
+        .execute(query("RETURN $b as output").param("b", vec![11, 12]))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let b: Vec<u8> = row.get("output").unwrap();
+    assert_eq!(b, &[11, 12]);
+    
+    //Work with points
     let mut result = graph
         .execute(query(
             "RETURN point({ longitude: 56.7, latitude: 12.78, height: 8 }) AS point",
@@ -101,7 +110,7 @@ neo4rs = "0.2.7"
 - [ ] multi db support
 - [ ] support data types
 	- [x] Float
-	- [ ] Bytes
+	- [x] Bytes
 - [ ] support structures
 	- [x] Relationship
 	- [x] Point2D

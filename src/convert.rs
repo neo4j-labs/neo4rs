@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::row::*;
 use crate::types::*;
+use bytes::*;
 use std::convert::TryFrom;
 
 impl TryFrom<BoltType> for f64 {
@@ -118,6 +119,12 @@ impl TryFrom<BoltType> for String {
             BoltType::String(t) => Ok(t.value),
             _ => Err(Error::ConverstionError),
         }
+    }
+}
+
+impl Into<BoltType> for Vec<u8> {
+    fn into(self) -> BoltType {
+        BoltType::Bytes(BoltBytes::new(self.into()))
     }
 }
 

@@ -202,6 +202,19 @@ async fn should_handle_3d_points() {
     assert!(result.next().await.unwrap().is_none());
 }
 
+#[tokio::test]
+async fn should_handle_raw_bytes() {
+    let graph = graph().await;
+    let mut result = graph
+        .execute(query("RETURN $b as output").param("b", vec![11, 12]))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let b: Vec<u8> = row.get("output").unwrap();
+    assert_eq!(b, &[11, 12]);
+    assert!(result.next().await.unwrap().is_none());
+}
+
 async fn count_rows(mut s: RowStream) -> usize {
     let mut count = 0;
     while let Ok(Some(_)) = s.next().await {
