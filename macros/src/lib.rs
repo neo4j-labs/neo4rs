@@ -49,19 +49,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        use std::convert::{TryFrom, TryInto};
-        use bytes::{Bytes, BytesMut, Buf, BufMut};
+        use std::convert::*;
+        use bytes::*;
 
         impl std::convert::TryInto<bytes::Bytes> for #struct_name {
             type Error = crate::errors::Error;
 
             fn try_into(self) -> crate::errors::Result<bytes::Bytes> {
+                let (marker, signature) = Self::marker();
                 #(#serialize_fields;)*
                 let mut total_bytes = std::mem::size_of::<u8>() + std::mem::size_of::<u8>();
                 #(#allocate_bytes;)*
                 let mut bytes = BytesMut::with_capacity(total_bytes);
-                bytes.put_u8(MARKER);
-                bytes.put_u8(SIGNATURE);
+                bytes.put_u8(marker);
+                if let Some(signature) = signature {
+                    bytes.put_u8(signature);
+                }
                 #(#put_bytes;)*
                 Ok(bytes.freeze())
             }
@@ -70,7 +73,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
         impl #struct_name {
             pub fn can_parse(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
-                input.borrow().len() >= 2 && input.borrow()[0] == MARKER && input.borrow()[1] == SIGNATURE
+                match Self::marker() {
+                    (marker, Some(signature)) =>  {
+                        input.borrow().len() >= 2 && input.borrow()[0] == marker && input.borrow()[1] == signature
+                    },
+                    (marker, None) => {
+                        input.borrow().len() >= 1 && input.borrow()[0] == marker
+                    }
+                    _ => false
+                }
             }
         }
 
@@ -78,8 +89,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
             type Error = crate::errors::Error;
 
             fn try_from(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> crate::errors::Result<#struct_name> {
-                let marker = input.borrow_mut().get_u8();
-                let signature = input.borrow_mut().get_u8();
+
+                match Self::marker() {
+                    (marker, Some(signature)) =>  {
+                        input.borrow_mut().get_u8();
+                        input.borrow_mut().get_u8();
+                    },
+                    (marker, None) => {
+                        input.borrow_mut().get_u8();
+                    }
+                }
+
                 Ok(#struct_name {
                     #(#deserialize_fields,)*
                 })

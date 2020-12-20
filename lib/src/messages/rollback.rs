@@ -7,6 +7,12 @@ pub const SIGNATURE: u8 = 0x13;
 pub struct Rollback;
 
 impl Rollback {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Rollback {
     pub fn new() -> Rollback {
         Rollback {}
     }

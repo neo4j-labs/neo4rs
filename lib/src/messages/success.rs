@@ -10,6 +10,12 @@ pub struct Success {
 }
 
 impl Success {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Success {
     pub fn new(metadata: BoltMap) -> Success {
         Success { metadata }
     }

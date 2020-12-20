@@ -9,6 +9,12 @@ pub struct Discard {
     extra: BoltMap,
 }
 
+impl Discard {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
 impl Default for Discard {
     fn default() -> Self {
         Discard::new(-1 as i64, -1 as i64)

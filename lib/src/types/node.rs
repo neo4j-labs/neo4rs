@@ -1,15 +1,10 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
-use std::mem;
-use std::rc::Rc;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xB3;
 pub const SIGNATURE: u8 = 0x4E;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct BoltNode {
     pub id: BoltInteger,
     pub labels: BoltList,
@@ -17,11 +12,12 @@ pub struct BoltNode {
 }
 
 impl BoltNode {
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let input = input.borrow();
-        input.len() > 1 && input[0] == MARKER && input[1] == SIGNATURE
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
     }
+}
 
+impl BoltNode {
     pub fn new(id: BoltInteger, labels: BoltList, properties: BoltMap) -> Self {
         BoltNode {
             id,
@@ -37,54 +33,6 @@ impl BoltNode {
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltNode {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltNode> {
-        let marker = input.borrow_mut().get_u8();
-        let tag = input.borrow_mut().get_u8();
-        match (marker, tag) {
-            (MARKER, SIGNATURE) => {
-                let id: BoltInteger = input.clone().try_into()?;
-                let labels: BoltList = input.clone().try_into()?;
-                let properties: BoltMap = input.clone().try_into()?;
-                Ok(BoltNode {
-                    id,
-                    labels,
-                    properties,
-                })
-            }
-            _ => Err(Error::InvalidTypeMarker(format!(
-                "invalid node marker/tag ({}, {})",
-                marker, tag
-            ))),
-        }
-    }
-}
-
-impl TryInto<Bytes> for BoltNode {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let id: Bytes = self.id.try_into()?;
-        let labels: Bytes = self.labels.try_into()?;
-        let properties: Bytes = self.properties.try_into()?;
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>()
-                + mem::size_of::<u32>()
-                + id.len()
-                + labels.len()
-                + properties.len(),
-        );
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        bytes.put(id);
-        bytes.put(labels);
-        bytes.put(properties);
-        Ok(bytes.freeze())
-    }
-}
-
 impl Into<BoltType> for BoltNode {
     fn into(self) -> BoltType {
         BoltType::Node(self)
@@ -94,6 +42,9 @@ impl Into<BoltType> for BoltNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn should_deserialize_a_node() {

@@ -9,6 +9,12 @@ pub struct Pull {
     extra: BoltMap,
 }
 
+impl Pull {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
 impl Default for Pull {
     fn default() -> Self {
         Pull::new(-1 as i64, -1 as i64)

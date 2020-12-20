@@ -10,6 +10,12 @@ pub struct Failure {
 }
 
 impl Failure {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Failure {
     pub fn new(metadata: BoltMap) -> Failure {
         Failure { metadata }
     }

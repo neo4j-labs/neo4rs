@@ -10,6 +10,12 @@ pub struct Record {
 }
 
 impl Record {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Record {
     pub fn new(data: BoltList) -> Record {
         Record { data }
     }

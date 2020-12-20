@@ -6,6 +6,12 @@ pub const SIGNATURE: u8 = 0x02;
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 pub struct Bye;
 
+impl Bye {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

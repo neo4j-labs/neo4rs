@@ -12,6 +12,12 @@ pub struct Run {
 }
 
 impl Run {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Run {
     pub fn new(query: BoltString, parameters: BoltMap) -> Run {
         Run {
             query,

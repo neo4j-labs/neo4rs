@@ -13,6 +13,12 @@ impl BoltNull {
     }
 }
 
+impl BoltNull {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, None)
+    }
+}
+
 impl TryInto<Bytes> for BoltNull {
     type Error = Error;
     fn try_into(self) -> Result<Bytes> {

@@ -15,6 +15,12 @@ impl Begin {
     }
 }
 
+impl Begin {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

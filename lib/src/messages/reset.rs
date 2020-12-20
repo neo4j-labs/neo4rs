@@ -7,6 +7,12 @@ pub const SIGNATURE: u8 = 0x0F;
 pub struct Reset;
 
 impl Reset {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Reset {
     pub fn new() -> Reset {
         Reset
     }

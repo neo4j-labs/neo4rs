@@ -1,10 +1,5 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
-use std::mem;
-use std::rc::Rc;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER_REL: u8 = 0xB5;
 pub const SIGNATURE_REL: u8 = 0x52;
@@ -12,7 +7,7 @@ pub const SIGNATURE_REL: u8 = 0x52;
 pub const MARKER_UNBOUNDED_REL: u8 = 0xB3;
 pub const SIGNATURE_UNBOUNDED_REL: u8 = 0x72;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct BoltRelation {
     pub id: BoltInteger,
     pub start_node_id: BoltInteger,
@@ -21,26 +16,26 @@ pub struct BoltRelation {
     pub properties: BoltMap,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+impl BoltRelation {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER_REL, Some(SIGNATURE_REL))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct BoltUnboundedRelation {
     pub id: BoltInteger,
     pub typ: BoltString,
     pub properties: BoltMap,
 }
 
-impl BoltRelation {
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let input = input.borrow();
-        input.len() > 1 && input[0] == MARKER_REL && input[1] == SIGNATURE_REL
+impl BoltUnboundedRelation {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER_UNBOUNDED_REL, Some(SIGNATURE_UNBOUNDED_REL))
     }
 }
 
 impl BoltUnboundedRelation {
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let input = input.borrow();
-        input.len() > 1 && input[0] == MARKER_UNBOUNDED_REL && input[1] == SIGNATURE_UNBOUNDED_REL
-    }
-
     pub fn new(id: BoltInteger, typ: BoltString, properties: BoltMap) -> Self {
         BoltUnboundedRelation {
             id,
@@ -62,108 +57,6 @@ impl BoltUnboundedRelation {
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltRelation {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltRelation> {
-        let marker = input.borrow_mut().get_u8();
-        let tag = input.borrow_mut().get_u8();
-        match (marker, tag) {
-            (MARKER_REL, SIGNATURE_REL) => {
-                let id: BoltInteger = input.clone().try_into()?;
-                let start_node_id: BoltInteger = input.clone().try_into()?;
-                let end_node_id: BoltInteger = input.clone().try_into()?;
-                let typ: BoltString = input.clone().try_into()?;
-                let properties: BoltMap = input.clone().try_into()?;
-                Ok(BoltRelation {
-                    id,
-                    start_node_id,
-                    end_node_id,
-                    typ,
-                    properties,
-                })
-            }
-            _ => Err(Error::InvalidTypeMarker(format!(
-                "invalid relation marker/tag ({}, {})",
-                marker, tag
-            ))),
-        }
-    }
-}
-
-impl TryInto<Bytes> for BoltRelation {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let id: Bytes = self.id.try_into()?;
-        let start_node_id: Bytes = self.start_node_id.try_into()?;
-        let end_node_id: Bytes = self.end_node_id.try_into()?;
-        let typ: Bytes = self.typ.try_into()?;
-        let properties: Bytes = self.properties.try_into()?;
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>()
-                + mem::size_of::<u32>()
-                + id.len()
-                + start_node_id.len()
-                + end_node_id.len()
-                + typ.len()
-                + properties.len(),
-        );
-        bytes.put_u8(MARKER_REL);
-        bytes.put_u8(SIGNATURE_REL);
-        bytes.put(id);
-        bytes.put(start_node_id);
-        bytes.put(end_node_id);
-        bytes.put(typ);
-        bytes.put(properties);
-        Ok(bytes.freeze())
-    }
-}
-
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltUnboundedRelation {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltUnboundedRelation> {
-        let marker = input.borrow_mut().get_u8();
-        let tag = input.borrow_mut().get_u8();
-        match (marker, tag) {
-            (MARKER_UNBOUNDED_REL, SIGNATURE_UNBOUNDED_REL) => {
-                let id: BoltInteger = input.clone().try_into()?;
-                let typ: BoltString = input.clone().try_into()?;
-                let properties: BoltMap = input.clone().try_into()?;
-                Ok(BoltUnboundedRelation {
-                    id,
-                    typ,
-                    properties,
-                })
-            }
-            _ => Err(Error::InvalidTypeMarker(format!(
-                "invalid unbounded relation marker/tag ({}, {})",
-                marker, tag
-            ))),
-        }
-    }
-}
-
-impl TryInto<Bytes> for BoltUnboundedRelation {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let id: Bytes = self.id.try_into()?;
-        let typ: Bytes = self.typ.try_into()?;
-        let properties: Bytes = self.properties.try_into()?;
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>() + mem::size_of::<u32>() + id.len() + typ.len() + properties.len(),
-        );
-        bytes.put_u8(MARKER_UNBOUNDED_REL);
-        bytes.put_u8(SIGNATURE_UNBOUNDED_REL);
-        bytes.put(id);
-        bytes.put(typ);
-        bytes.put(properties);
-        Ok(bytes.freeze())
-    }
-}
-
 impl Into<BoltType> for BoltRelation {
     fn into(self) -> BoltType {
         BoltType::Relation(self)
@@ -179,6 +72,10 @@ impl Into<BoltType> for BoltUnboundedRelation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
+    use std::cell::RefCell;
+    use std::convert::TryInto;
+    use std::rc::Rc;
 
     #[test]
     fn should_serialize_a_relation() {

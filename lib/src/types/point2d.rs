@@ -1,15 +1,10 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
-use std::mem;
-use std::rc::Rc;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xB3;
 pub const SIGNATURE: u8 = 0x58;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct BoltPoint2D {
     pub sr_id: BoltInteger,
     pub x: BoltFloat,
@@ -17,55 +12,18 @@ pub struct BoltPoint2D {
 }
 
 impl BoltPoint2D {
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let input = input.borrow();
-        input.len() > 1 && input[0] == MARKER && input[1] == SIGNATURE
-    }
-}
-
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltPoint2D {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltPoint2D> {
-        let marker = input.borrow_mut().get_u8();
-        let tag = input.borrow_mut().get_u8();
-        match (marker, tag) {
-            (MARKER, SIGNATURE) => {
-                let sr_id: BoltInteger = input.clone().try_into()?;
-                let x: BoltFloat = input.clone().try_into()?;
-                let y: BoltFloat = input.clone().try_into()?;
-                Ok(BoltPoint2D { sr_id, x, y })
-            }
-            _ => Err(Error::InvalidTypeMarker(format!(
-                "invalid point2d marker/tag ({}, {})",
-                marker, tag
-            ))),
-        }
-    }
-}
-
-impl TryInto<Bytes> for BoltPoint2D {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let sr_id: Bytes = self.sr_id.try_into()?;
-        let x: Bytes = self.x.try_into()?;
-        let y: Bytes = self.y.try_into()?;
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>() + mem::size_of::<u32>() + sr_id.len() + x.len() + y.len(),
-        );
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        bytes.put(sr_id);
-        bytes.put(x);
-        bytes.put(y);
-        Ok(bytes.freeze())
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
+    use std::cell::RefCell;
+    use std::convert::TryInto;
+    use std::rc::Rc;
 
     #[test]
     fn should_serialize_2d_point() {

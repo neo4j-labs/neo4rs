@@ -1,5 +1,4 @@
 use crate::errors::*;
-use crate::types::*;
 use bytes::*;
 use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};

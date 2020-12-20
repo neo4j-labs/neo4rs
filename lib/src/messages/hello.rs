@@ -10,6 +10,12 @@ pub struct Hello {
 }
 
 impl Hello {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
+impl Hello {
     pub fn new(extra: BoltMap) -> Hello {
         Hello { extra }
     }

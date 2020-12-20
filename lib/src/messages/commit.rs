@@ -12,6 +12,12 @@ impl Commit {
     }
 }
 
+impl Commit {
+    fn marker() -> (u8, Option<u8>) {
+        (MARKER, Some(SIGNATURE))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
