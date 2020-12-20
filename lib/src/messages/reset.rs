@@ -1,11 +1,10 @@
-use crate::errors::*;
 use bytes::*;
-use std::convert::TryInto;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xB0;
 pub const SIGNATURE: u8 = 0x0F;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 pub struct Reset;
 
 impl Reset {
@@ -14,16 +13,10 @@ impl Reset {
     }
 }
 
-impl TryInto<Bytes> for Reset {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        Ok(Bytes::from_static(&[MARKER, SIGNATURE]))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_reset() {

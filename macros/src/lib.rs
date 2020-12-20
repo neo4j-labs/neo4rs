@@ -50,6 +50,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         use std::convert::{TryFrom, TryInto};
+        use bytes::*;
 
         impl std::convert::TryInto<bytes::Bytes> for #name {
             type Error = crate::errors::Error;
@@ -69,9 +70,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
         impl #name {
             pub fn can_parse(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
-                let marker: u8 = input.borrow()[0];
-                let signature: u8 = input.borrow()[1];
-                marker == MARKER && signature == SIGNATURE
+                input.borrow().len() >= 2 && input.borrow()[0] == MARKER && input.borrow()[1] == SIGNATURE
             }
         }
 
