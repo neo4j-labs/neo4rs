@@ -1,5 +1,4 @@
 use crate::types::*;
-use bytes::*;
 use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xB1;
@@ -19,6 +18,7 @@ impl Record {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
     use std::cell::RefCell;
     use std::convert::TryInto;
     use std::rc::Rc;
