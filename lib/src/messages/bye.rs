@@ -1,23 +1,13 @@
-use crate::errors::*;
 use bytes::*;
+use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 use std::mem;
 
 pub const MARKER: u8 = 0xB0;
 pub const SIGNATURE: u8 = 0x02;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 pub struct Bye;
-
-impl TryInto<Bytes> for Bye {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<u8>());
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        Ok(bytes.freeze())
-    }
-}
 
 #[cfg(test)]
 mod tests {
