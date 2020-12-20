@@ -17,6 +17,8 @@ bytes = "0.5"
 async-trait = "0.1.42"
 deadpool = "0.6.0"
 log = "0.4"
+syn = { version="1.0", features=["full", "extra-traits"]}
+quote = "1.0"
 
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4"] }
