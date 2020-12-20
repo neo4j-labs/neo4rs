@@ -1,14 +1,11 @@
-use crate::errors::*;
 use crate::types::*;
 use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
-use std::rc::Rc;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x70;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct Success {
     metadata: BoltMap,
 }
@@ -16,12 +13,6 @@ pub struct Success {
 impl Success {
     pub fn new(metadata: BoltMap) -> Success {
         Success { metadata }
-    }
-
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let marker: u8 = input.borrow()[0];
-        let signature: u8 = input.borrow()[1];
-        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
     }
 }
 
@@ -38,20 +29,12 @@ impl Success {
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for Success {
-    type Error = Error;
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<Success> {
-        let _marker = input.borrow_mut().get_u8();
-        let _signature = input.borrow_mut().get_u8();
-        Ok(Success {
-            metadata: input.try_into()?,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    use std::convert::{TryFrom, TryInto};
+    use std::rc::Rc;
 
     #[test]
     fn should_deserialize_success() {

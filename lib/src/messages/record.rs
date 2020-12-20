@@ -21,7 +21,7 @@ impl Record {
     pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
         let marker: u8 = input.borrow()[0];
         let signature: u8 = input.borrow()[1];
-        (MARKER..=(MARKER | 0x0F)).contains(&marker) && signature == SIGNATURE
+        marker == MARKER && signature == SIGNATURE
     }
 }
 

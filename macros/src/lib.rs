@@ -34,14 +34,23 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     });
 
-    let fields_put_bytes = fields.iter().map(|f| {
+    let fields_serialize = fields.iter().map(|f| {
         let name = &f.ident;
         quote! {
             bytes.put(#name)
         }
     });
 
+    let fields_deserialize = fields.iter().map(|f| {
+        let name = &f.ident;
+        quote! {
+            #name: input.try_into()?
+        }
+    });
+
     let expanded = quote! {
+        use std::convert::{TryFrom, TryInto};
+
         impl std::convert::TryInto<bytes::Bytes> for #name {
             type Error = crate::errors::Error;
 
@@ -52,11 +61,34 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let mut bytes = BytesMut::with_capacity(total_bytes);
                 bytes.put_u8(MARKER);
                 bytes.put_u8(SIGNATURE);
-                #(#fields_put_bytes;)*
+                #(#fields_serialize;)*
                 Ok(bytes.freeze())
             }
 
         }
+
+        impl #name {
+            pub fn can_parse(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
+                let marker: u8 = input.borrow()[0];
+                let signature: u8 = input.borrow()[1];
+                marker == MARKER && signature == SIGNATURE
+            }
+        }
+
+
+        impl std::convert::TryFrom<std::rc::Rc<std::cell::RefCell<bytes::Bytes>>> for #name {
+            type Error = crate::errors::Error;
+
+            fn try_from(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> crate::errors::Result<#name> {
+                let marker = input.borrow_mut().get_u8();
+                let signature = input.borrow_mut().get_u8();
+                Ok(#name {
+                    #(#fields_deserialize,)*
+                })
+            }
+        }
+
+
     };
     expanded.into()
 }
