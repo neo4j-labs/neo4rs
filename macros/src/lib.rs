@@ -47,7 +47,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
             fn try_into(self) -> crate::errors::Result<bytes::Bytes> {
                 #(#fields_bytes;)*
-                let mut total_bytes = mem::size_of::<u8>() + mem::size_of::<u8>();
+                let mut total_bytes = std::mem::size_of::<u8>() + std::mem::size_of::<u8>();
                 #(#fields_lengths;)*
                 let mut bytes = BytesMut::with_capacity(total_bytes);
                 bytes.put_u8(MARKER);

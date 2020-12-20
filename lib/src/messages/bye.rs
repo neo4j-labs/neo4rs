@@ -1,7 +1,5 @@
 use bytes::*;
 use neo4rs_macros::BoltStruct;
-use std::convert::TryInto;
-use std::mem;
 
 pub const MARKER: u8 = 0xB0;
 pub const SIGNATURE: u8 = 0x02;
@@ -12,6 +10,7 @@ pub struct Bye;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_bye() {
