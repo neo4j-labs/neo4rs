@@ -44,7 +44,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let fields_deserialize = fields.iter().map(|f| {
         let name = &f.ident;
         quote! {
-            #name: input.try_into()?
+            #name: input.clone().try_into()?
         }
     });
 

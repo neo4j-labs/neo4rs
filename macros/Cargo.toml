@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs-macros"
-version = "0.3.0-macros"
+version = "0.3.0"
 authors = ["John Pradeep Vincent <yehohanan7@gmail.com>"]
 edition = "2018"
 
