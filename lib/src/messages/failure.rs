@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::types::*;
 use bytes::*;
+use neo4rs_macros::BoltStruct;
 use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
@@ -8,7 +9,7 @@ use std::rc::Rc;
 pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x7F;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 pub struct Failure {
     metadata: BoltMap,
 }
