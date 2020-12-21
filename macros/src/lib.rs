@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
-use syn::{DeriveInput, Meta, MetaList};
+use syn::{DeriveInput, MetaList};
 
 #[proc_macro_derive(BoltStruct, attributes(signature))]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -9,20 +9,24 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let struct_name = &ast.ident;
 
     let meta = ast.attrs.get(0).unwrap().parse_meta().unwrap();
+
     let values: Vec<syn::LitInt> = match meta {
-        Meta::List(MetaList { nested, .. }) => {
+        syn::Meta::List(MetaList { nested, .. }) => {
             nested.into_iter().map(|nested_meta| match nested_meta {
-                syn::NestedMeta::Lit(syn::Lit::Int(i)) => i,
-                _ => panic!(concat!(stringify!(#name), ": invalid signature")),
+                syn::NestedMeta::Lit(syn::Lit::Int(value)) => value,
+                _ => panic!(concat!(
+                    stringify!(#struct_name),
+                    ": signature is not literal"
+                )),
             })
         }
-        _ => panic!(concat!(stringify!(#name), ": invalid signature")),
+        _ => panic!(concat!(stringify!(#struct_name), ": invalid signature")),
     }
     .collect();
 
     let (struct_marker, struct_signature) = if values.len() == 2 {
         let marker = values.get(0).unwrap();
-        let sig = Some(values.get(1).unwrap());
+        let sig = values.get(1).unwrap();
         (quote! { #marker}, quote! {Some(#sig)})
     } else {
         let marker = values.get(0).unwrap();

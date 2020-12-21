@@ -1,9 +1,6 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB4;
-pub const SIGNATURE: u8 = 0x59;
-
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB4, 0x59)]
 pub struct BoltPoint3D {

@@ -1,8 +1,6 @@
 use bytes::*;
 use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xC0;
-
 #[derive(Debug, PartialEq, Eq, Hash, Clone, BoltStruct)]
 #[signature(0xC0)]
 pub struct BoltNull;

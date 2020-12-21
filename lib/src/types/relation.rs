@@ -1,12 +1,6 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
-pub const MARKER_REL: u8 = 0xB5;
-pub const SIGNATURE_REL: u8 = 0x52;
-
-pub const MARKER_UNBOUNDED_REL: u8 = 0xB3;
-pub const SIGNATURE_UNBOUNDED_REL: u8 = 0x72;
-
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB5, 0x52)]
 pub struct BoltRelation {
