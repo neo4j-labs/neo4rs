@@ -121,7 +121,7 @@ neo4rs = "0.2.8"
 - [x] explicit transactions
 - [x] use buffered TCP streams
 - [x] improve error messages & logging
-- [ ] discard unconsumed streams in a txn
+- [ ] discard unconsumed intermediate streams in a txn
 - [ ] add support for older versions of the protocol
 - [ ] multi db support
 - [ ] support data types
