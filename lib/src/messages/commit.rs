@@ -4,17 +4,12 @@ pub const MARKER: u8 = 0xB0;
 pub const SIGNATURE: u8 = 0x12;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[signature(0xB0, 0x12)]
 pub struct Commit;
 
 impl Commit {
     pub fn new() -> Commit {
         Commit {}
-    }
-}
-
-impl Commit {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
     }
 }
 

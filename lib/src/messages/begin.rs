@@ -5,6 +5,7 @@ pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x11;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x11)]
 pub struct Begin {
     extra: BoltMap,
 }
@@ -12,12 +13,6 @@ pub struct Begin {
 impl Begin {
     pub fn new(extra: BoltMap) -> Begin {
         Begin { extra }
-    }
-}
-
-impl Begin {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
     }
 }
 

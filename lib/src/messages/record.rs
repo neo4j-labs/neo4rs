@@ -5,6 +5,7 @@ pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x71;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x71)]
 pub struct Record {
     pub data: BoltList,
 }

@@ -4,13 +4,8 @@ pub const MARKER: u8 = 0xB0;
 pub const SIGNATURE: u8 = 0x13;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[signature(0xB0, 0x13)]
 pub struct Rollback;
-
-impl Rollback {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
-    }
-}
 
 impl Rollback {
     pub fn new() -> Rollback {

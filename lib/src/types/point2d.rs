@@ -5,16 +5,11 @@ pub const MARKER: u8 = 0xB3;
 pub const SIGNATURE: u8 = 0x58;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB3, 0x58)]
 pub struct BoltPoint2D {
     pub sr_id: BoltInteger,
     pub x: BoltFloat,
     pub y: BoltFloat,
-}
-
-impl BoltPoint2D {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
-    }
 }
 
 #[cfg(test)]

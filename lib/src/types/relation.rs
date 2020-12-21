@@ -8,6 +8,7 @@ pub const MARKER_UNBOUNDED_REL: u8 = 0xB3;
 pub const SIGNATURE_UNBOUNDED_REL: u8 = 0x72;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB5, 0x52)]
 pub struct BoltRelation {
     pub id: BoltInteger,
     pub start_node_id: BoltInteger,
@@ -16,23 +17,12 @@ pub struct BoltRelation {
     pub properties: BoltMap,
 }
 
-impl BoltRelation {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER_REL, Some(SIGNATURE_REL))
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB3, 0x72)]
 pub struct BoltUnboundedRelation {
     pub id: BoltInteger,
     pub typ: BoltString,
     pub properties: BoltMap,
-}
-
-impl BoltUnboundedRelation {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER_UNBOUNDED_REL, Some(SIGNATURE_UNBOUNDED_REL))
-    }
 }
 
 impl BoltUnboundedRelation {

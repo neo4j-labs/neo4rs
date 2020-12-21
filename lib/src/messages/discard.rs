@@ -5,14 +5,9 @@ pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x2F;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x2F)]
 pub struct Discard {
     extra: BoltMap,
-}
-
-impl Discard {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
-    }
 }
 
 impl Default for Discard {

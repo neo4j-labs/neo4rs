@@ -5,14 +5,9 @@ pub const MARKER: u8 = 0xB1;
 pub const SIGNATURE: u8 = 0x3F;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x3F)]
 pub struct Pull {
     extra: BoltMap,
-}
-
-impl Pull {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
-    }
 }
 
 impl Default for Pull {

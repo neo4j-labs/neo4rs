@@ -5,16 +5,11 @@ pub const MARKER: u8 = 0xB3;
 pub const SIGNATURE: u8 = 0x50;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB3, 0x50)]
 pub struct BoltPath {
     pub nodes: BoltList,
     pub rels: BoltList,
     pub ids: BoltList,
-}
-
-impl BoltPath {
-    fn marker() -> (u8, Option<u8>) {
-        (MARKER, Some(SIGNATURE))
-    }
 }
 
 impl BoltPath {
