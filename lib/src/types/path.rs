@@ -1,26 +1,12 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
-use std::mem;
-use std::rc::Rc;
+use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB3;
-pub const SIGNATURE: u8 = 0x50;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB3, 0x50)]
 pub struct BoltPath {
     pub nodes: BoltList,
     pub rels: BoltList,
     pub ids: BoltList,
-}
-
-impl BoltPath {
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
-        let input = input.borrow();
-        input.len() > 1 && input[0] == MARKER && input[1] == SIGNATURE
-    }
 }
 
 impl BoltPath {
@@ -55,49 +41,13 @@ impl BoltPath {
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltPath {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltPath> {
-        let marker = input.borrow_mut().get_u8();
-        let tag = input.borrow_mut().get_u8();
-        match (marker, tag) {
-            (MARKER, SIGNATURE) => {
-                let nodes: BoltList = input.clone().try_into()?;
-                let rels: BoltList = input.clone().try_into()?;
-                let ids: BoltList = input.clone().try_into()?;
-                Ok(BoltPath { nodes, rels, ids })
-            }
-            _ => Err(Error::InvalidTypeMarker(format!(
-                "invalid path marker/tag ({}, {})",
-                marker, tag
-            ))),
-        }
-    }
-}
-
-impl TryInto<Bytes> for BoltPath {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let nodes: Bytes = self.nodes.try_into()?;
-        let rels: Bytes = self.rels.try_into()?;
-        let ids: Bytes = self.ids.try_into()?;
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>() + mem::size_of::<u32>() + nodes.len() + rels.len() + ids.len(),
-        );
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        bytes.put(nodes);
-        bytes.put(rels);
-        bytes.put(ids);
-        Ok(bytes.freeze())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
+    use std::cell::RefCell;
+    use std::convert::TryInto;
+    use std::rc::Rc;
 
     #[test]
     fn should_serialize_a_path() {

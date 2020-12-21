@@ -1,13 +1,8 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::convert::TryInto;
-use std::mem;
+use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB1;
-pub const SIGNATURE: u8 = 0x10;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x10)]
 pub struct Run {
     query: BoltString,
     parameters: BoltMap,
@@ -24,31 +19,10 @@ impl Run {
     }
 }
 
-impl TryInto<Bytes> for Run {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let query: Bytes = self.query.try_into()?;
-        let parameters: Bytes = self.parameters.try_into()?;
-        let extra: Bytes = self.extra.try_into()?;
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>()
-                + mem::size_of::<u8>()
-                + query.len()
-                + parameters.len()
-                + extra.len(),
-        );
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        bytes.put(query);
-        bytes.put(parameters);
-        bytes.put(extra);
-        Ok(bytes.freeze())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_run() {
@@ -62,8 +36,8 @@ mod tests {
         assert_eq!(
             bytes,
             Bytes::from_static(&[
-                MARKER,
-                SIGNATURE,
+                0xB1,
+                0x10,
                 string::TINY | 5,
                 b'q',
                 b'u',
@@ -89,8 +63,8 @@ mod tests {
         assert_eq!(
             bytes,
             Bytes::from_static(&[
-                MARKER,
-                SIGNATURE,
+                0xB1,
+                0x10,
                 string::TINY | 5,
                 b'q',
                 b'u',

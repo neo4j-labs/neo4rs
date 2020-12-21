@@ -1,13 +1,8 @@
-use crate::errors::*;
 use crate::types::*;
-use bytes::*;
-use std::convert::TryInto;
-use std::mem;
+use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB1;
-pub const SIGNATURE: u8 = 0x11;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[signature(0xB1, 0x11)]
 pub struct Begin {
     extra: BoltMap,
 }
@@ -18,22 +13,11 @@ impl Begin {
     }
 }
 
-impl TryInto<Bytes> for Begin {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        let extra: Bytes = self.extra.try_into()?;
-        let mut bytes =
-            BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<u8>() + extra.len());
-        bytes.put_u8(MARKER);
-        bytes.put_u8(SIGNATURE);
-        bytes.put(extra);
-        Ok(bytes.freeze())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::*;
+    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_begin() {
@@ -48,8 +32,8 @@ mod tests {
         assert_eq!(
             bytes,
             Bytes::from_static(&[
-                MARKER,
-                SIGNATURE,
+                0xB1,
+                0x11,
                 map::TINY | 1,
                 string::TINY | 10,
                 b't',
