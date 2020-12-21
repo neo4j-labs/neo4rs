@@ -1,9 +1,6 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB1;
-pub const SIGNATURE: u8 = 0x2F;
-
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x2F)]
 pub struct Discard {
@@ -38,7 +35,7 @@ mod tests {
         let discard = Discard::new(42, 1);
         let bytes: Bytes = discard.try_into().unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
-        assert_eq!(marker_signature, &[MARKER, SIGNATURE]);
+        assert_eq!(marker_signature, &[0xB1, 0x2F]);
         let extra: BoltMap = Rc::new(RefCell::new(Bytes::copy_from_slice(extra)))
             .try_into()
             .unwrap();
@@ -52,7 +49,7 @@ mod tests {
         let discard = Discard::default();
         let bytes: Bytes = discard.try_into().unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
-        assert_eq!(marker_signature, &[MARKER, SIGNATURE]);
+        assert_eq!(marker_signature, &[0xB1, 0x2F]);
         let extra: BoltMap = Rc::new(RefCell::new(Bytes::copy_from_slice(extra)))
             .try_into()
             .unwrap();

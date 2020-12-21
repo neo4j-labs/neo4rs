@@ -1,10 +1,10 @@
-use crate::errors::*;
 use bytes::*;
-use std::convert::TryInto;
+use neo4rs_macros::BoltStruct;
 
 pub const MARKER: u8 = 0xC0;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, BoltStruct)]
+#[signature(0xC0)]
 pub struct BoltNull;
 
 impl BoltNull {
@@ -13,16 +13,10 @@ impl BoltNull {
     }
 }
 
-impl TryInto<Bytes> for BoltNull {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
-        Ok(Bytes::copy_from_slice(&[MARKER]))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_null() {

@@ -8,10 +8,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let struct_name = &ast.ident;
 
-    if struct_name.to_string() == "Run".to_string() {
-        println!("{:#?}", ast);
-    }
-
     let meta = ast.attrs.get(0).unwrap().parse_meta().unwrap();
     let values: Vec<syn::LitInt> = match meta {
         Meta::List(MetaList { nested, .. }) => {
@@ -26,14 +22,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let (struct_marker, struct_signature) = if values.len() == 2 {
         let marker = values.get(0).unwrap();
-        let sig = values.get(1).unwrap();
+        let sig = Some(values.get(1).unwrap());
         (quote! { #marker}, quote! {Some(#sig)})
     } else {
         let marker = values.get(0).unwrap();
-        (quote! { #marker}, quote! {None})
+        (quote! { #marker}, quote! { None::<u8> })
     };
-
-    println!("{:#04X?}, {:#04X?}", struct_marker, struct_signature);
 
     let fields = if let syn::Data::Struct(structure) = ast.data {
         match structure.fields {

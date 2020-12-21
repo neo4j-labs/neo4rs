@@ -1,9 +1,6 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
-pub const MARKER: u8 = 0xB1;
-pub const SIGNATURE: u8 = 0x10;
-
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x10)]
 pub struct Run {
@@ -39,8 +36,8 @@ mod tests {
         assert_eq!(
             bytes,
             Bytes::from_static(&[
-                MARKER,
-                SIGNATURE,
+                0xB1,
+                0x10,
                 string::TINY | 5,
                 b'q',
                 b'u',
@@ -66,8 +63,8 @@ mod tests {
         assert_eq!(
             bytes,
             Bytes::from_static(&[
-                MARKER,
-                SIGNATURE,
+                0xB1,
+                0x10,
                 string::TINY | 5,
                 b'q',
                 b'u',
