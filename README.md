@@ -107,7 +107,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.2.8"
+neo4rs = "0.3.0"
 ```
 
 ---
@@ -121,6 +121,7 @@ neo4rs = "0.2.8"
 - [x] explicit transactions
 - [x] use buffered TCP streams
 - [x] improve error messages & logging
+- [ ] configureable pull size (instead of default -1)
 - [ ] discard unconsumed streams in a txn
 - [ ] add support for older versions of the protocol
 - [ ] multi db support
