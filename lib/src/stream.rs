@@ -25,8 +25,13 @@ enum State {
     Complete,
 }
 
+///An abstraction over a stream of rows.
 impl RowStream {
-    pub fn new(qid: i64, fields: BoltList, connection: Arc<Mutex<ManagedConnection>>) -> RowStream {
+    pub(crate) fn new(
+        qid: i64,
+        fields: BoltList,
+        connection: Arc<Mutex<ManagedConnection>>,
+    ) -> RowStream {
         RowStream {
             qid,
             fields,
@@ -36,6 +41,9 @@ impl RowStream {
         }
     }
 
+    ///A call to next() will return a row from an internal buffer if the buffer has any entries,
+    ///if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the userver (using the
+    ///fetch_size value configured)
     pub async fn next(&mut self) -> Result<Option<Row>> {
         let mut connection = self.connection.lock().await;
         loop {
