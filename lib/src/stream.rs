@@ -3,20 +3,25 @@ use crate::messages::*;
 use crate::pool::*;
 use crate::row::*;
 use crate::types::*;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+const FETCH_SIZE: i64 = 200;
 
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
     state: State,
+    rows: VecDeque<Row>,
     connection: Arc<Mutex<ManagedConnection>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum State {
     Ready,
-    Pulling,
+    Streaming,
+    Streamed,
     Complete,
 }
 
@@ -26,6 +31,7 @@ impl RowStream {
             qid,
             fields,
             connection,
+            rows: VecDeque::with_capacity(FETCH_SIZE as usize),
             state: State::Ready,
         }
     }
@@ -35,21 +41,21 @@ impl RowStream {
         loop {
             match self.state {
                 State::Ready => {
-                    connection.send(BoltRequest::pull(self.qid)).await?;
-                    self.state = State::Pulling;
+                    let pull = BoltRequest::pull(FETCH_SIZE, self.qid);
+                    connection.send(pull).await?;
+                    self.state = State::Streaming;
                 }
-                State::Pulling => match connection.recv().await {
+                State::Streaming => match connection.recv().await {
                     Ok(BoltResponse::SuccessMessage(s)) => {
                         if s.get("has_more").unwrap_or(false) {
-                            self.state = State::Ready;
+                            self.state = State::Streamed;
                         } else {
                             self.state = State::Complete;
-                            return Ok(None);
                         }
                     }
                     Ok(BoltResponse::RecordMessage(record)) => {
                         let row = Row::new(self.fields.clone(), record.data);
-                        return Ok(Some(row));
+                        self.rows.push_back(row);
                     }
                     msg => {
                         return Err(Error::UnexpectedMessage(format!(
@@ -58,7 +64,15 @@ impl RowStream {
                         )))
                     }
                 },
-                State::Complete => return Ok(None),
+                State::Streamed => {
+                    if !self.rows.is_empty() {
+                        return Ok(self.rows.pop_front());
+                    }
+                    self.state = State::Ready;
+                }
+                State::Complete => {
+                    return Ok(self.rows.pop_front());
+                }
             }
         }
     }

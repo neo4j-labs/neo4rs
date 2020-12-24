@@ -63,8 +63,8 @@ impl BoltRequest {
         BoltRequest::RunMessage(Run::new(query.into(), params))
     }
 
-    pub fn pull(qid: i64) -> BoltRequest {
-        BoltRequest::PullMessage(Pull::new(-1, qid))
+    pub fn pull(n: i64, qid: i64) -> BoltRequest {
+        BoltRequest::PullMessage(Pull::new(n, qid))
     }
 
     pub fn discard() -> BoltRequest {
