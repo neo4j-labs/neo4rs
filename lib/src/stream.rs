@@ -13,7 +13,7 @@ pub struct RowStream {
     qid: i64,
     fields: BoltList,
     state: State,
-    rows: VecDeque<Row>,
+    buffer: VecDeque<Row>,
     connection: Arc<Mutex<ManagedConnection>>,
 }
 
@@ -21,7 +21,7 @@ pub struct RowStream {
 enum State {
     Ready,
     Streaming,
-    Streamed,
+    Buffered,
     Complete,
 }
 
@@ -31,7 +31,7 @@ impl RowStream {
             qid,
             fields,
             connection,
-            rows: VecDeque::with_capacity(FETCH_SIZE as usize),
+            buffer: VecDeque::with_capacity(FETCH_SIZE as usize),
             state: State::Ready,
         }
     }
@@ -48,14 +48,14 @@ impl RowStream {
                 State::Streaming => match connection.recv().await {
                     Ok(BoltResponse::SuccessMessage(s)) => {
                         if s.get("has_more").unwrap_or(false) {
-                            self.state = State::Streamed;
+                            self.state = State::Buffered;
                         } else {
                             self.state = State::Complete;
                         }
                     }
                     Ok(BoltResponse::RecordMessage(record)) => {
                         let row = Row::new(self.fields.clone(), record.data);
-                        self.rows.push_back(row);
+                        self.buffer.push_back(row);
                     }
                     msg => {
                         return Err(Error::UnexpectedMessage(format!(
@@ -64,14 +64,14 @@ impl RowStream {
                         )))
                     }
                 },
-                State::Streamed => {
-                    if !self.rows.is_empty() {
-                        return Ok(self.rows.pop_front());
+                State::Buffered => {
+                    if !self.buffer.is_empty() {
+                        return Ok(self.buffer.pop_front());
                     }
                     self.state = State::Ready;
                 }
                 State::Complete => {
-                    return Ok(self.rows.pop_front());
+                    return Ok(self.buffer.pop_front());
                 }
             }
         }
