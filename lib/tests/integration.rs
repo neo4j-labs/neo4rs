@@ -1,4 +1,5 @@
 use neo4rs::*;
+use std::time::Duration;
 use uuid::Uuid;
 
 async fn graph() -> Graph {
@@ -212,6 +213,20 @@ async fn should_handle_raw_bytes() {
     let row = result.next().await.unwrap().unwrap();
     let b: Vec<u8> = row.get("output").unwrap();
     assert_eq!(b, &[11, 12]);
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn should_handle_duration() {
+    let graph = graph().await;
+    let duration = std::time::Duration::new(5, 0);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", duration))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let d: Duration = row.get("output").unwrap();
+    assert_eq!(d.as_secs(), 5);
     assert!(result.next().await.unwrap().is_none());
 }
 

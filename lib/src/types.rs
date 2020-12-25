@@ -1,5 +1,6 @@
 pub mod binary;
 pub mod boolean;
+pub mod duration;
 pub mod float;
 pub mod integer;
 pub mod list;
@@ -12,6 +13,7 @@ pub mod relation;
 pub mod string;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
+pub use duration::BoltDuration;
 pub use float::BoltFloat;
 pub use integer::BoltInteger;
 pub use list::BoltList;
@@ -47,6 +49,7 @@ pub enum BoltType {
     Point3D(BoltPoint3D),
     Bytes(BoltBytes),
     Path(BoltPath),
+    Duration(BoltDuration),
 }
 
 impl Display for BoltType {
@@ -67,6 +70,7 @@ impl Hash for BoltType {
             BoltType::Null(t) => t.hash(state),
             BoltType::Integer(t) => t.hash(state),
             BoltType::List(t) => t.hash(state),
+            BoltType::Duration(t) => t.hash(state),
             BoltType::Path(_) => panic!("path not hashed"),
             BoltType::Bytes(_) => panic!("bytes not hashed"),
             BoltType::Float(_) => panic!("float not hashed"),
@@ -98,6 +102,7 @@ impl TryInto<Bytes> for BoltType {
             BoltType::Relation(t) => t.try_into(),
             BoltType::UnboundedRelation(t) => t.try_into(),
             BoltType::Bytes(t) => t.try_into(),
+            BoltType::Duration(t) => t.try_into(),
         }
     }
 }
@@ -117,6 +122,9 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
             input if BoltPoint3D::can_parse(input.clone()) => BoltType::Point3D(input.try_into()?),
             input if BoltBytes::can_parse(input.clone()) => BoltType::Bytes(input.try_into()?),
             input if BoltPath::can_parse(input.clone()) => BoltType::Path(input.try_into()?),
+            input if BoltDuration::can_parse(input.clone()) => {
+                BoltType::Duration(input.try_into()?)
+            }
             input if BoltUnboundedRelation::can_parse(input.clone()) => {
                 BoltType::UnboundedRelation(input.try_into()?)
             }

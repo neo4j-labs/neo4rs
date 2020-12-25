@@ -107,7 +107,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.3.1"
+neo4rs = "0.3.2"
 ```
 
 ---
@@ -135,13 +135,13 @@ neo4rs = "0.3.1"
 	- [x] Point3D
 	- [x] UnboundedRelationship
 	- [x] Path
+	- [x] Duration
 	- [ ] Date
 	- [ ] Time
 	- [ ] LocalTime
 	- [ ] DateTime
 	- [ ] DateTimeZoneId
 	- [ ] LocalDateTime
-	- [ ] Duration
 
 ## License
 

@@ -47,6 +47,17 @@ impl TryFrom<BoltType> for Point2D {
     }
 }
 
+impl TryFrom<BoltType> for std::time::Duration {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<std::time::Duration> {
+        match input {
+            BoltType::Duration(d) => Ok(d.into()),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Vec<u8> {
     type Error = Error;
 
@@ -140,6 +151,12 @@ impl TryFrom<BoltType> for String {
             BoltType::String(t) => Ok(t.value),
             _ => Err(Error::ConverstionError),
         }
+    }
+}
+
+impl Into<BoltType> for std::time::Duration {
+    fn into(self) -> BoltType {
+        BoltType::Duration(self.into())
     }
 }
 
