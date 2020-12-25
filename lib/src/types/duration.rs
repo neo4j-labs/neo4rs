@@ -4,10 +4,10 @@ use neo4rs_macros::BoltStruct;
 #[derive(Debug, PartialEq, Clone, Hash, BoltStruct)]
 #[signature(0xB4, 0x45)]
 pub struct BoltDuration {
-    pub months: BoltInteger,
-    pub days: BoltInteger,
-    pub seconds: BoltInteger,
-    pub nanoseconds: BoltInteger,
+    months: BoltInteger,
+    days: BoltInteger,
+    seconds: BoltInteger,
+    nanoseconds: BoltInteger,
 }
 
 impl BoltDuration {
@@ -24,24 +24,15 @@ impl BoltDuration {
             nanoseconds,
         }
     }
-
-    pub fn as_secs(&self) -> u64 {
-        (self.days.value * 86400) as u64 + (self.seconds.value as u64)
-    }
-
-    pub fn subsec_nanos(&self) -> u32 {
-        self.nanoseconds.value as u32
-    }
 }
 
 impl Into<BoltDuration> for std::time::Duration {
     fn into(self) -> BoltDuration {
-        let days = self.as_secs() / 86400;
-        let seconds = self.as_secs() % 86400;
+        let seconds = self.as_secs();
         let nanos = self.subsec_nanos();
         BoltDuration::new(
             0.into(),
-            (days as i64).into(),
+            0.into(),
             (seconds as i64).into(),
             (nanos as i64).into(),
         )
@@ -50,9 +41,10 @@ impl Into<BoltDuration> for std::time::Duration {
 
 impl Into<std::time::Duration> for BoltDuration {
     fn into(self) -> std::time::Duration {
-        let seconds = self.as_secs();
-        let nanos = self.subsec_nanos();
-        std::time::Duration::new(seconds, nanos)
+        //TODO: clarify month issue
+        let seconds =
+            self.seconds.value + (self.days.value * 24 * 3600) + (self.months.value * 2_629_800);
+        std::time::Duration::new(seconds as u64, self.nanoseconds.value as u32)
     }
 }
 
