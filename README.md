@@ -7,11 +7,24 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 
 
 ```rust    
-    //Run a query
+
+    //Simple query
     let uri = "127.0.0.1:7687".to_owned();
     let user = "neo4j";
     let pass = "neo";
     let graph = Graph::new(&uri, user, pass).await.unwrap();
+    assert!(graph.run(query("RETURN 1")).await.is_ok());
+    
+    //Connect using configuration
+    let config = config()
+        .uri("127.0.0.1:7687")
+        .user("neo4j")
+        .password("neo")
+        .db("neo4j")
+        .fetch_size(500)
+        .build()
+        .unwrap();
+    let graph = Graph::connect(config).await.unwrap();
     assert!(graph.run(query("RETURN 1")).await.is_ok());
     
     //Concurrent queries
@@ -107,7 +120,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.3.3"
+neo4rs = "0.3.4"
 ```
 
 ---
@@ -122,9 +135,8 @@ neo4rs = "0.3.3"
 - [x] use buffered TCP streams
 - [x] improve error messages & logging
 - [x] fetch rows in blocks
+- [x] add support for older versions of the protocol
 - [ ] configureable fetch size
-- [ ] discard unconsumed streams in a txn
-- [ ] add support for older versions of the protocol
 - [ ] multi db support
 - [ ] support data types
 	- [x] Float

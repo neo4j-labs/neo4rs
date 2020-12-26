@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::errors::*;
 use crate::messages::*;
 use crate::pool::*;
@@ -25,8 +26,12 @@ impl Query {
         self
     }
 
-    pub async fn run(self, connection: Arc<Mutex<ManagedConnection>>) -> Result<()> {
-        let run = BoltRequest::run(&self.query, self.params.clone());
+    pub async fn run(
+        self,
+        config: &Config,
+        connection: Arc<Mutex<ManagedConnection>>,
+    ) -> Result<()> {
+        let run = BoltRequest::run(&config.db, &self.query, self.params.clone(), config);
         let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
@@ -45,8 +50,12 @@ impl Query {
         }
     }
 
-    pub async fn execute(self, connection: Arc<Mutex<ManagedConnection>>) -> Result<RowStream> {
-        let run = BoltRequest::run(&self.query, self.params);
+    pub async fn execute(
+        self,
+        config: &Config,
+        connection: Arc<Mutex<ManagedConnection>>,
+    ) -> Result<RowStream> {
+        let run = BoltRequest::run(&config.db, &self.query, self.params, config);
         match connection.lock().await.send_recv(run).await {
             Ok(BoltResponse::SuccessMessage(success)) => {
                 let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());

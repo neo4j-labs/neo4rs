@@ -10,6 +10,24 @@ async fn graph() -> Graph {
 }
 
 #[tokio::test]
+async fn should_execute_a_simple_query_with_config() {
+    let config = config()
+        .uri("127.0.0.1:7687")
+        .user("neo4j")
+        .password("neo")
+        .db("neo4j")
+        .fetch_size(500)
+        .build()
+        .unwrap();
+    let graph = Graph::connect(config).await.unwrap();
+    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let value: i64 = row.get("1").unwrap();
+    assert_eq!(1, value);
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn should_execute_a_simple_query() {
     let graph = graph().await;
     let mut result = graph.execute(query("RETURN 1")).await.unwrap();

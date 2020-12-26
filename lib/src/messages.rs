@@ -10,6 +10,7 @@ mod reset;
 mod rollback;
 mod run;
 mod success;
+use crate::config::Config;
 use crate::errors::*;
 use crate::types::*;
 use begin::Begin;
@@ -59,8 +60,8 @@ impl BoltRequest {
         BoltRequest::HelloMessage(Hello::new(data))
     }
 
-    pub fn run(query: &str, params: BoltMap) -> BoltRequest {
-        BoltRequest::RunMessage(Run::new(query.into(), params))
+    pub fn run(db: &str, query: &str, params: BoltMap, config: &Config) -> BoltRequest {
+        BoltRequest::RunMessage(Run::new(db.into(), query.into(), params))
     }
 
     pub fn pull(n: i64, qid: i64) -> BoltRequest {

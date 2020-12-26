@@ -10,11 +10,13 @@ pub struct Run {
 }
 
 impl Run {
-    pub fn new(query: BoltString, parameters: BoltMap) -> Run {
+    pub fn new(db: BoltString, query: BoltString, parameters: BoltMap) -> Run {
         Run {
             query,
             parameters,
-            extra: BoltMap::new(),
+            extra: vec![("db".into(), BoltType::String(db))]
+                .into_iter()
+                .collect(),
         }
     }
 }
@@ -27,6 +29,7 @@ mod tests {
     #[test]
     fn should_serialize_run() {
         let run = Run::new(
+            "test".into(),
             "query".into(),
             vec![("k".into(), "v".into())].into_iter().collect(),
         );
@@ -49,14 +52,22 @@ mod tests {
                 b'k',
                 string::TINY | 1,
                 b'v',
-                map::TINY | 0,
+                map::TINY | 1,
+                string::TINY | 2,
+                b'd',
+                b'b',
+                string::TINY | 4,
+                b't',
+                b'e',
+                b's',
+                b't',
             ])
         );
     }
 
     #[test]
     fn should_serialize_run_with_no_params() {
-        let run = Run::new("query".into(), BoltMap::new());
+        let run = Run::new("".into(), "query".into(), BoltMap::new());
 
         let bytes: Bytes = run.try_into().unwrap();
 
@@ -72,7 +83,11 @@ mod tests {
                 b'r',
                 b'y',
                 map::TINY | 0,
-                map::TINY | 0,
+                map::TINY | 1,
+                string::TINY | 2,
+                b'd',
+                b'b',
+                string::TINY | 0,
             ])
         );
     }

@@ -8,6 +8,7 @@ pub enum Error {
     MapTooBig,
     BytesTooBig,
     ListTooLong,
+    InvalidConfig,
     UnexpectedMessage(String),
     UnknownType(String),
     UnknownMessage(String),

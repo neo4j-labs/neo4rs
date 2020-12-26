@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::errors::*;
 use crate::messages::*;
 use crate::pool::*;
@@ -7,14 +8,16 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct Txn {
+    config: Config,
     connection: Arc<Mutex<ManagedConnection>>,
 }
 
 impl Txn {
-    pub async fn new(mut connection: ManagedConnection) -> Result<Self> {
+    pub async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
         let begin = BoltRequest::begin();
         match connection.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {
+                config,
                 connection: Arc::new(Mutex::new(connection)),
             }),
             msg => Err(Error::UnexpectedMessage(format!(
@@ -32,12 +35,11 @@ impl Txn {
     }
 
     pub async fn run(&self, q: Query) -> Result<()> {
-        q.run(self.connection.clone()).await
+        q.run(&self.config, self.connection.clone()).await
     }
 
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
-        //TODO: discard any previous incomplete streams
-        q.execute(self.connection.clone()).await
+        q.execute(&self.config, self.connection.clone()).await
     }
 
     pub async fn commit(self) -> Result<()> {
