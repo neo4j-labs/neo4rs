@@ -20,26 +20,33 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    ///the uri of the neo4j server
     pub fn uri(mut self, uri: &str) -> Self {
         self.uri = Some(uri.to_owned());
         self
     }
 
+    ///username for authentication
     pub fn user(mut self, user: &str) -> Self {
         self.user = Some(user.to_owned());
         self
     }
 
+    ///password for authentication
     pub fn password(mut self, password: &str) -> Self {
         self.password = Some(password.to_owned());
         self
     }
 
+    ///the name of the database, defaults to "neo4j" if not configured.
     pub fn db(mut self, db: &str) -> Self {
         self.db = Some(db.to_owned());
         self
     }
 
+    ///fetch_size indicates the number of rows to fetch from server in one request, it is
+    ///recommended to use a large fetch_size if you are working with large data sets.
+    ///default fetch_size is 200
     pub fn fetch_size(mut self, fetch_size: usize) -> Self {
         self.fetch_size = Some(fetch_size);
         self

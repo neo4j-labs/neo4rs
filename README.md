@@ -135,12 +135,12 @@ neo4rs = "0.3.6"
 - [x] use buffered TCP streams
 - [x] improve error messages & logging
 - [x] fetch rows in blocks
-- [x] add support for older versions of the protocol
 - [x] configureable fetch size
 - [x] multi db support
-- [ ] support data types
+- [x] support data types
 	- [x] Float
 	- [x] Bytes
+- [ ] add support for older versions of the protocol
 - [ ] support structures
 	- [x] Relationship
 	- [x] Point2D
