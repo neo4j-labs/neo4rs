@@ -11,6 +11,7 @@ pub struct RowStream {
     qid: i64,
     fields: BoltList,
     state: State,
+    fetch_size: usize,
     buffer: VecDeque<Row>,
     connection: Arc<Mutex<ManagedConnection>>,
 }
@@ -35,6 +36,7 @@ impl RowStream {
             qid,
             fields,
             connection,
+            fetch_size,
             state: State::Ready,
             buffer: VecDeque::with_capacity(fetch_size),
         }
@@ -48,7 +50,7 @@ impl RowStream {
         loop {
             match self.state {
                 State::Ready => {
-                    let pull = BoltRequest::pull(self.buffer.capacity(), self.qid);
+                    let pull = BoltRequest::pull(self.fetch_size, self.qid);
                     connection.send(pull).await?;
                     self.state = State::Streaming;
                 }
