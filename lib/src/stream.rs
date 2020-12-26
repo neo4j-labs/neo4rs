@@ -42,6 +42,9 @@ impl RowStream {
         }
     }
 
+    ///A call to next() will return a row from an internal buffer if the buffer has any entries,
+    ///if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the server (using the
+    ///fetch_size value configured)
     pub async fn next(&mut self) -> Result<Option<Row>> {
         let mut connection = self.connection.lock().await;
         loop {
