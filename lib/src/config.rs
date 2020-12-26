@@ -1,6 +1,6 @@
 pub use crate::errors::*;
 
-const DEFAULT_FETCH_SIZE: i64 = 200;
+const DEFAULT_FETCH_SIZE: usize = 200;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -8,15 +8,15 @@ pub struct Config {
     pub(crate) user: String,
     pub(crate) password: String,
     pub(crate) db: String,
-    pub(crate) fetch_size: i64,
+    pub(crate) fetch_size: usize,
 }
 
 pub struct ConfigBuilder {
-    pub(crate) uri: Option<String>,
-    pub(crate) user: Option<String>,
-    pub(crate) password: Option<String>,
-    pub(crate) db: Option<String>,
-    pub(crate) fetch_size: Option<i64>,
+    uri: Option<String>,
+    user: Option<String>,
+    password: Option<String>,
+    db: Option<String>,
+    fetch_size: Option<usize>,
 }
 
 impl ConfigBuilder {
@@ -40,8 +40,8 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn fetch_size(mut self, fetch_size: u32) -> Self {
-        self.fetch_size = Some(fetch_size as i64);
+    pub fn fetch_size(mut self, fetch_size: usize) -> Self {
+        self.fetch_size = Some(fetch_size);
         self
     }
 

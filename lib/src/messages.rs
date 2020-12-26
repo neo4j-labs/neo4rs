@@ -60,12 +60,12 @@ impl BoltRequest {
         BoltRequest::HelloMessage(Hello::new(data))
     }
 
-    pub fn run(db: &str, query: &str, params: BoltMap, config: &Config) -> BoltRequest {
+    pub fn run(db: &str, query: &str, params: BoltMap) -> BoltRequest {
         BoltRequest::RunMessage(Run::new(db.into(), query.into(), params))
     }
 
-    pub fn pull(n: i64, qid: i64) -> BoltRequest {
-        BoltRequest::PullMessage(Pull::new(n, qid))
+    pub fn pull(n: usize, qid: i64) -> BoltRequest {
+        BoltRequest::PullMessage(Pull::new(n as i64, qid))
     }
 
     pub fn discard() -> BoltRequest {

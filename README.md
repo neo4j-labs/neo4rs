@@ -120,7 +120,7 @@ neo4rs is available on [crates.io](https://crates.io/crates/neo4rs) and can be i
 
 ```toml
 [dependencies]
-neo4rs = "0.3.4"
+neo4rs = "0.3.5"
 ```
 
 ---
@@ -136,8 +136,8 @@ neo4rs = "0.3.4"
 - [x] improve error messages & logging
 - [x] fetch rows in blocks
 - [x] add support for older versions of the protocol
-- [ ] configureable fetch size
-- [ ] multi db support
+- [x] configureable fetch size
+- [x] multi db support
 - [ ] support data types
 	- [x] Float
 	- [x] Bytes

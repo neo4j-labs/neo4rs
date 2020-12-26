@@ -31,7 +31,7 @@ impl Query {
         config: &Config,
         connection: Arc<Mutex<ManagedConnection>>,
     ) -> Result<()> {
-        let run = BoltRequest::run(&config.db, &self.query, self.params.clone(), config);
+        let run = BoltRequest::run(&config.db, &self.query, self.params.clone());
         let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
             BoltResponse::SuccessMessage(_) => {
@@ -55,12 +55,17 @@ impl Query {
         config: &Config,
         connection: Arc<Mutex<ManagedConnection>>,
     ) -> Result<RowStream> {
-        let run = BoltRequest::run(&config.db, &self.query, self.params, config);
+        let run = BoltRequest::run(&config.db, &self.query, self.params);
         match connection.lock().await.send_recv(run).await {
             Ok(BoltResponse::SuccessMessage(success)) => {
                 let fields: BoltList = success.get("fields").unwrap_or(BoltList::new());
                 let qid: i64 = success.get("qid").unwrap_or(-1);
-                Ok(RowStream::new(qid, fields, connection.clone()))
+                Ok(RowStream::new(
+                    qid,
+                    fields,
+                    config.fetch_size,
+                    connection.clone(),
+                ))
             }
             msg => Err(Error::UnexpectedMessage(format!(
                 "unexpected response for RUN: {:?}",

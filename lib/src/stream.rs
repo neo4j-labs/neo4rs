@@ -7,8 +7,6 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-const FETCH_SIZE: i64 = 200;
-
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
@@ -30,14 +28,15 @@ impl RowStream {
     pub(crate) fn new(
         qid: i64,
         fields: BoltList,
+        fetch_size: usize,
         connection: Arc<Mutex<ManagedConnection>>,
     ) -> RowStream {
         RowStream {
             qid,
             fields,
             connection,
-            buffer: VecDeque::with_capacity(FETCH_SIZE as usize),
             state: State::Ready,
+            buffer: VecDeque::with_capacity(fetch_size),
         }
     }
 
@@ -49,7 +48,7 @@ impl RowStream {
         loop {
             match self.state {
                 State::Ready => {
-                    let pull = BoltRequest::pull(FETCH_SIZE, self.qid);
+                    let pull = BoltRequest::pull(self.buffer.capacity(), self.qid);
                     connection.send(pull).await?;
                     self.state = State::Streaming;
                 }
