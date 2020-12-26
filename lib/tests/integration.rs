@@ -277,6 +277,74 @@ async fn should_handle_paths() {
     assert!(result.next().await.unwrap().is_none());
 }
 
+#[tokio::test]
+async fn should_isolate_streams_within_txn() {
+    let config = config()
+        .uri("127.0.0.1:7687")
+        .user("neo4j")
+        .password("neo")
+        .fetch_size(1)
+        .build()
+        .unwrap();
+    let graph = Graph::connect(config).await.unwrap();
+    let name = Uuid::new_v4().to_string();
+    let txn = graph.start_txn().await.unwrap();
+
+    txn.run_queries(vec![
+        query("CREATE (p { name: $name })").param("name", name.clone()),
+        query("CREATE (p { name: $name })").param("name", name.clone()),
+    ])
+    .await
+    .unwrap();
+
+    let mut stream_one = txn
+        .execute(query("MATCH (p {name: $name}) RETURN p").param("name", name.clone()))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        stream_one
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<Node>("p")
+            .unwrap()
+            .get::<String>("name")
+            .unwrap(),
+        name.clone()
+    );
+
+    let mut stream_two = txn.execute(query("RETURN 1")).await.unwrap();
+    assert_eq!(
+        stream_two
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<i64>("1")
+            .unwrap(),
+        1
+    );
+
+    assert_eq!(
+        stream_one
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<Node>("p")
+            .unwrap()
+            .get::<String>("name")
+            .unwrap(),
+        name.clone()
+    );
+
+    assert!(stream_one.next().await.unwrap().is_none());
+    assert!(stream_two.next().await.unwrap().is_none());
+    txn.commit().await.unwrap();
+}
+
 async fn count_rows(mut s: RowStream) -> usize {
     let mut count = 0;
     while let Ok(Some(_)) = s.next().await {
