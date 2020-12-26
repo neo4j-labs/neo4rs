@@ -13,7 +13,7 @@ pub struct Txn {
 }
 
 impl Txn {
-    pub async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
+    pub(crate) async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
         let begin = BoltRequest::begin();
         match connection.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {

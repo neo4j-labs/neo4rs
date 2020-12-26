@@ -26,7 +26,7 @@ impl Query {
         self
     }
 
-    pub async fn run(
+    pub(crate) async fn run(
         self,
         config: &Config,
         connection: Arc<Mutex<ManagedConnection>>,
@@ -50,7 +50,7 @@ impl Query {
         }
     }
 
-    pub async fn execute(
+    pub(crate) async fn execute(
         self,
         config: &Config,
         connection: Arc<Mutex<ManagedConnection>>,
