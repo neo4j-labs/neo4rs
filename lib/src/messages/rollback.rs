@@ -13,14 +13,14 @@ impl Rollback {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
-    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_rollback() {
         let rollback = Rollback::new();
 
-        let bytes: Bytes = rollback.try_into().unwrap();
+        let bytes: Bytes = rollback.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(bytes, Bytes::from_static(&[0xB0, 0x13,]));
     }

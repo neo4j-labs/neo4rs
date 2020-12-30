@@ -13,14 +13,14 @@ impl Commit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
-    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_commit() {
         let commit = Commit::new();
 
-        let bytes: Bytes = commit.try_into().unwrap();
+        let bytes: Bytes = commit.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(bytes, Bytes::from_static(&[0xB0, 0x12,]));
     }

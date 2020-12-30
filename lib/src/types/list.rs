@@ -1,8 +1,8 @@
 use crate::errors::*;
 use crate::types::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::mem;
 use std::rc::Rc;
 
@@ -39,7 +39,7 @@ impl BoltList {
         self.value.get(index)
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let marker = input.borrow()[0];
         (TINY..=(TINY | 0x0F)).contains(&marker)
             || marker == SMALL
@@ -76,14 +76,13 @@ impl From<Vec<BoltType>> for BoltList {
     }
 }
 
-impl TryInto<Bytes> for BoltList {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltList {
+    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
         let mut values = BytesMut::new();
         let length = self.value.len();
 
         for elem in self.value {
-            values.put(TryInto::<Bytes>::try_into(elem)?);
+            values.put(elem.to_bytes(version)?);
         }
 
         let mut bytes =
@@ -109,18 +108,8 @@ impl TryInto<Bytes> for BoltList {
         bytes.put(values);
         Ok(bytes.freeze())
     }
-}
 
-impl Into<Vec<BoltType>> for BoltList {
-    fn into(self) -> Vec<BoltType> {
-        self.value
-    }
-}
-
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltList {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltList> {
+    pub fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltList> {
         let marker = input.borrow_mut().get_u8();
         let size = match marker {
             0x90..=0x9F => 0x0F & marker as usize,
@@ -137,10 +126,16 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltList {
 
         let mut list = BoltList::with_capacity(size);
         for _ in 0..size {
-            list.push(input.clone().try_into()?);
+            list.push(BoltType::parse(version, input.clone())?);
         }
 
         Ok(list)
+    }
+}
+
+impl Into<Vec<BoltType>> for BoltList {
+    fn into(self) -> Vec<BoltType> {
+        self.value
     }
 }
 
@@ -152,7 +147,7 @@ mod tests {
     fn should_serialize_empty_list() {
         let list = BoltList::new();
 
-        let b: Bytes = list.try_into().unwrap();
+        let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.bytes(), Bytes::from_static(&[TINY]));
     }
@@ -163,7 +158,7 @@ mod tests {
         list.push("a".into());
         list.push(1.into());
 
-        let b: Bytes = list.try_into().unwrap();
+        let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.bytes(), Bytes::from_static(&[0x92, 0x81, 0x61, 0x01]));
     }
@@ -172,7 +167,7 @@ mod tests {
     fn should_deserialize_list() {
         let b = Rc::new(RefCell::new(Bytes::from_static(&[0x92, 0x81, 0x61, 0x01])));
 
-        let bolt_list: BoltList = b.try_into().unwrap();
+        let bolt_list: BoltList = BoltList::parse(Version::V4_1, b).unwrap();
 
         assert_eq!(bolt_list.len(), 2);
         match bolt_list.get(0).unwrap() {

@@ -58,7 +58,6 @@ mod tests {
     use super::*;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -77,7 +76,7 @@ mod tests {
             properties,
         };
 
-        let bytes: Bytes = relation.try_into().unwrap();
+        let bytes: Bytes = relation.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,
@@ -95,7 +94,7 @@ mod tests {
             0x65, 0x84, 0x4D, 0x61, 0x72, 0x6B,
         ])));
 
-        let relation: BoltRelation = input.try_into().unwrap();
+        let relation: BoltRelation = BoltRelation::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(relation.id, BoltInteger::new(42));
         assert_eq!(relation.start_node_id, BoltInteger::new(1));
@@ -114,7 +113,7 @@ mod tests {
         let properties = vec![("name".into(), "Mark".into())].into_iter().collect();
         let relation = BoltUnboundedRelation::new(id, typ, properties);
 
-        let bytes: Bytes = relation.try_into().unwrap();
+        let bytes: Bytes = relation.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,
@@ -132,7 +131,8 @@ mod tests {
             0x4D, 0x61, 0x72, 0x6B,
         ])));
 
-        let relation: BoltUnboundedRelation = input.try_into().unwrap();
+        let relation: BoltUnboundedRelation =
+            BoltUnboundedRelation::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(relation.id, BoltInteger::new(42));
         assert_eq!(relation.typ, BoltString::new("rel"));

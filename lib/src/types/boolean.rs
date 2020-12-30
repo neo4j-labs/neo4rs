@@ -1,7 +1,7 @@
 use crate::errors::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 
 pub const FALSE: u8 = 0xC2;
@@ -17,27 +17,22 @@ impl BoltBoolean {
         BoltBoolean { value }
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let input = input.borrow()[0];
         input == TRUE || input == FALSE
     }
 }
 
-impl TryInto<Bytes> for BoltBoolean {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltBoolean {
+    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
         if self.value {
             Ok(Bytes::copy_from_slice(&[TRUE]))
         } else {
             Ok(Bytes::copy_from_slice(&[FALSE]))
         }
     }
-}
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltBoolean {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltBoolean> {
+    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltBoolean> {
         let value = input.borrow_mut().get_u8();
         match value {
             TRUE => Ok(BoltBoolean::new(true)),
@@ -54,22 +49,22 @@ mod tests {
     #[test]
     fn should_serialize_boolean() {
         let bolt_boolean = BoltBoolean::new(true);
-        let b: Bytes = bolt_boolean.try_into().unwrap();
+        let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[0xC3]);
 
         let bolt_boolean = BoltBoolean::new(false);
-        let b: Bytes = bolt_boolean.try_into().unwrap();
+        let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[0xC2]);
     }
 
     #[test]
     fn should_deserialize_boolean() {
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[TRUE])));
-        let bolt_boolean: BoltBoolean = b.try_into().unwrap();
+        let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_boolean.value, true);
 
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[FALSE])));
-        let bolt_boolean: BoltBoolean = b.try_into().unwrap();
+        let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_boolean.value, false);
     }
 }

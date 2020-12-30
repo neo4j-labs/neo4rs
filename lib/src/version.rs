@@ -4,13 +4,14 @@ use std::fmt::Debug;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
-    v4_1,
+    V4_1,
+    V4,
 }
 
 impl Version {
     pub fn supported_versions() -> Bytes {
         let mut bytes = BytesMut::with_capacity(16);
-        let versions: [u32; 4] = [0x0104, 0, 0, 0];
+        let versions: [u32; 4] = [0x0104, 0x0004, 0, 0];
         for version in versions.iter() {
             bytes.put_u32(*version);
         }
@@ -19,7 +20,8 @@ impl Version {
 
     pub fn parse(version_bytes: [u8; 4]) -> Version {
         match u32::from_be_bytes(version_bytes) {
-            260 => Version::v4_1,
+            260 => Version::V4_1,
+            4 => Version::V4,
             _ => panic!("unknown version {:?}", version_bytes),
         }
     }
@@ -31,6 +33,6 @@ mod tests {
 
     #[tokio::test]
     async fn should_parse_version() {
-        assert_eq!(Version::parse([0, 0, 1, 4]), Version::v4_1);
+        assert_eq!(Version::parse([0, 0, 1, 4]), Version::V4_1);
     }
 }

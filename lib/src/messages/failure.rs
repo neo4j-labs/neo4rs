@@ -22,9 +22,9 @@ impl Failure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -41,7 +41,7 @@ mod tests {
             0x65, 0x2E,
         ]);
 
-        let failure: Failure = Rc::new(RefCell::new(data)).try_into().unwrap();
+        let failure: Failure = Failure::parse(Version::V4_1, Rc::new(RefCell::new(data))).unwrap();
 
         assert_eq!(
             failure.get::<String>("code").unwrap(),

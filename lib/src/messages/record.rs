@@ -16,9 +16,9 @@ impl Record {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -27,7 +27,7 @@ mod tests {
             0xB1, 0x71, 0x92, 0x81, 0x61, 0x81, 0x62,
         ])));
 
-        let record: Record = bytes.try_into().unwrap();
+        let record: Record = Record::parse(Version::V4_1, bytes).unwrap();
 
         assert_eq!(record.data.len(), 2);
     }

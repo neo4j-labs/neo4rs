@@ -10,9 +10,9 @@ mod reset;
 mod rollback;
 mod run;
 mod success;
-use crate::config::Config;
 use crate::errors::*;
 use crate::types::*;
+use crate::version::Version;
 use begin::Begin;
 use bye::Bye;
 use bytes::*;
@@ -26,7 +26,6 @@ use reset::Reset;
 use rollback::Rollback;
 use run::Run;
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 use success::Success;
 
@@ -89,37 +88,34 @@ impl BoltRequest {
     }
 }
 
-impl TryInto<Bytes> for BoltRequest {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltRequest {
+    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
         let bytes: Bytes = match self {
-            BoltRequest::HelloMessage(hello) => hello.try_into()?,
-            BoltRequest::GoodByeMessage(bye) => bye.try_into()?,
-            BoltRequest::RunMessage(run) => run.try_into()?,
-            BoltRequest::PullMessage(pull) => pull.try_into()?,
-            BoltRequest::DiscardMessage(discard) => discard.try_into()?,
-            BoltRequest::BeginMessage(begin) => begin.try_into()?,
-            BoltRequest::CommitMessage(commit) => commit.try_into()?,
-            BoltRequest::RollbackMessage(rollback) => rollback.try_into()?,
-            BoltRequest::ResetMessage(reset) => reset.try_into()?,
+            BoltRequest::HelloMessage(hello) => hello.to_bytes(version)?,
+            BoltRequest::GoodByeMessage(bye) => bye.to_bytes(version)?,
+            BoltRequest::RunMessage(run) => run.to_bytes(version)?,
+            BoltRequest::PullMessage(pull) => pull.to_bytes(version)?,
+            BoltRequest::DiscardMessage(discard) => discard.to_bytes(version)?,
+            BoltRequest::BeginMessage(begin) => begin.to_bytes(version)?,
+            BoltRequest::CommitMessage(commit) => commit.to_bytes(version)?,
+            BoltRequest::RollbackMessage(rollback) => rollback.to_bytes(version)?,
+            BoltRequest::ResetMessage(reset) => reset.to_bytes(version)?,
         };
         Ok(bytes)
     }
 }
 
-impl TryFrom<Bytes> for BoltResponse {
-    type Error = Error;
-
-    fn try_from(response: Bytes) -> Result<BoltResponse> {
+impl BoltResponse {
+    pub fn parse(version: Version, response: Bytes) -> Result<BoltResponse> {
         match Rc::new(RefCell::new(response)) {
-            input if Success::can_parse(input.clone()) => {
-                Ok(BoltResponse::SuccessMessage(Success::try_from(input)?))
-            }
-            input if Failure::can_parse(input.clone()) => {
-                Ok(BoltResponse::FailureMessage(Failure::try_from(input)?))
-            }
-            input if Record::can_parse(input.clone()) => {
-                Ok(BoltResponse::RecordMessage(Record::try_from(input)?))
+            input if Success::can_parse(version, input.clone()) => Ok(
+                BoltResponse::SuccessMessage(Success::parse(version, input)?),
+            ),
+            input if Failure::can_parse(version, input.clone()) => Ok(
+                BoltResponse::FailureMessage(Failure::parse(version, input)?),
+            ),
+            input if Record::can_parse(version, input.clone()) => {
+                Ok(BoltResponse::RecordMessage(Record::parse(version, input)?))
             }
             msg => Err(Error::UnknownMessage(format!("unknown message {:?}", msg))),
         }

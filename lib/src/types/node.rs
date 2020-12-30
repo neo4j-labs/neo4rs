@@ -34,6 +34,7 @@ impl Into<BoltType> for BoltNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -45,7 +46,7 @@ mod tests {
             0x61, 0x6D, 0x65, 0x84, 0x4D, 0x61, 0x72, 0x6B,
         ])));
 
-        let node: BoltNode = input.try_into().unwrap();
+        let node: BoltNode = BoltNode::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(node.id, BoltInteger::new(19));
         assert_eq!(node.labels, vec!["Person".into()].into());
@@ -66,7 +67,7 @@ mod tests {
             properties,
         };
 
-        let bytes: Bytes = node.try_into().unwrap();
+        let bytes: Bytes = node.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

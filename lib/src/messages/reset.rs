@@ -13,14 +13,14 @@ impl Reset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
-    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_reset() {
         let reset = Reset::new();
 
-        let bytes: Bytes = reset.try_into().unwrap();
+        let bytes: Bytes = reset.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(bytes, Bytes::from_static(&[0xB0, 0x0F,]));
     }

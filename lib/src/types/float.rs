@@ -1,7 +1,7 @@
 use crate::errors::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::mem;
 use std::rc::Rc;
 
@@ -17,26 +17,20 @@ impl BoltFloat {
         BoltFloat { value }
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         input.borrow()[0] == MARKER
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltFloat {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltFloat> {
+impl BoltFloat {
+    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltFloat> {
         let mut input = input.borrow_mut();
         let _marker = input.get_u8();
         let value = input.get_f64();
         Ok(BoltFloat::new(value))
     }
-}
 
-impl TryInto<Bytes> for BoltFloat {
-    type Error = Error;
-
-    fn try_into(self) -> Result<Bytes> {
+    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<f64>());
         bytes.put_u8(MARKER);
         bytes.put_f64(self.value);
@@ -50,18 +44,31 @@ mod tests {
 
     #[test]
     fn should_serialize_float() {
-        let bolt_float = BoltFloat::new(1.23);
-        let b: Bytes = bolt_float.try_into().unwrap();
+        let b: Bytes = BoltFloat::new(1.23).to_bytes(Version::V4_1).unwrap();
         assert_eq!(
             b.bytes(),
             &[0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE]
         );
 
-        let bolt_folat = BoltFloat::new(-1.23);
-        let b: Bytes = bolt_folat.try_into().unwrap();
+        let b: Bytes = BoltFloat::new(-1.23).to_bytes(Version::V4_1).unwrap();
         assert_eq!(
             b.bytes(),
             &[0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,]
         );
+    }
+
+    #[test]
+    fn should_deserialize_float() {
+        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+            0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,
+        ])));
+        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, input).unwrap();
+        assert_eq!(bolt_float.value, 1.23);
+
+        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+            0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,
+        ])));
+        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, input).unwrap();
+        assert_eq!(bolt_float.value, -1.23);
     }
 }

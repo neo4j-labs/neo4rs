@@ -26,10 +26,10 @@ pub use relation::{BoltRelation, BoltUnboundedRelation};
 pub use string::BoltString;
 
 use crate::errors::*;
+use crate::version::Version;
 use bytes::Bytes;
 use core::hash::{Hash, Hasher};
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -84,52 +84,70 @@ impl Hash for BoltType {
     }
 }
 
-impl TryInto<Bytes> for BoltType {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltType {
+    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
         match self {
-            BoltType::Null(t) => t.try_into(),
-            BoltType::Boolean(t) => t.try_into(),
-            BoltType::Integer(t) => t.try_into(),
-            BoltType::Float(t) => t.try_into(),
-            BoltType::String(t) => t.try_into(),
-            BoltType::List(t) => t.try_into(),
-            BoltType::Point2D(t) => t.try_into(),
-            BoltType::Point3D(t) => t.try_into(),
-            BoltType::Map(t) => t.try_into(),
-            BoltType::Node(t) => t.try_into(),
-            BoltType::Path(t) => t.try_into(),
-            BoltType::Relation(t) => t.try_into(),
-            BoltType::UnboundedRelation(t) => t.try_into(),
-            BoltType::Bytes(t) => t.try_into(),
-            BoltType::Duration(t) => t.try_into(),
+            BoltType::Null(t) => t.to_bytes(version),
+            BoltType::Boolean(t) => t.to_bytes(version),
+            BoltType::Integer(t) => t.to_bytes(version),
+            BoltType::Float(t) => t.to_bytes(version),
+            BoltType::String(t) => t.to_bytes(version),
+            BoltType::List(t) => t.to_bytes(version),
+            BoltType::Point2D(t) => t.to_bytes(version),
+            BoltType::Point3D(t) => t.to_bytes(version),
+            BoltType::Map(t) => t.to_bytes(version),
+            BoltType::Node(t) => t.to_bytes(version),
+            BoltType::Path(t) => t.to_bytes(version),
+            BoltType::Relation(t) => t.to_bytes(version),
+            BoltType::UnboundedRelation(t) => t.to_bytes(version),
+            BoltType::Bytes(t) => t.to_bytes(version),
+            BoltType::Duration(t) => t.to_bytes(version),
         }
     }
-}
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltType {
-    type Error = Error;
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltType> {
+    fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltType> {
         let bolt_type = match input {
-            input if BoltInteger::can_parse(input.clone()) => BoltType::Integer(input.try_into()?),
-            input if BoltFloat::can_parse(input.clone()) => BoltType::Float(input.try_into()?),
-            input if BoltString::can_parse(input.clone()) => BoltType::String(input.try_into()?),
-            input if BoltList::can_parse(input.clone()) => BoltType::List(input.try_into()?),
-            input if BoltMap::can_parse(input.clone()) => BoltType::Map(input.try_into()?),
-            input if BoltNode::can_parse(input.clone()) => BoltType::Node(input.try_into()?),
-            input if BoltBoolean::can_parse(input.clone()) => BoltType::Boolean(input.try_into()?),
-            input if BoltPoint2D::can_parse(input.clone()) => BoltType::Point2D(input.try_into()?),
-            input if BoltPoint3D::can_parse(input.clone()) => BoltType::Point3D(input.try_into()?),
-            input if BoltBytes::can_parse(input.clone()) => BoltType::Bytes(input.try_into()?),
-            input if BoltPath::can_parse(input.clone()) => BoltType::Path(input.try_into()?),
-            input if BoltDuration::can_parse(input.clone()) => {
-                BoltType::Duration(input.try_into()?)
+            input if BoltInteger::can_parse(version, input.clone()) => {
+                BoltType::Integer(BoltInteger::parse(version, input)?)
             }
-            input if BoltUnboundedRelation::can_parse(input.clone()) => {
-                BoltType::UnboundedRelation(input.try_into()?)
+            input if BoltFloat::can_parse(version, input.clone()) => {
+                BoltType::Float(BoltFloat::parse(version, input)?)
             }
-            input if BoltRelation::can_parse(input.clone()) => {
-                BoltType::Relation(input.try_into()?)
+            input if BoltString::can_parse(version, input.clone()) => {
+                BoltType::String(BoltString::parse(version, input)?)
+            }
+            input if BoltList::can_parse(version, input.clone()) => {
+                BoltType::List(BoltList::parse(version, input)?)
+            }
+            input if BoltMap::can_parse(version, input.clone()) => {
+                BoltType::Map(BoltMap::parse(version, input)?)
+            }
+            input if BoltNode::can_parse(version, input.clone()) => {
+                BoltType::Node(BoltNode::parse(version, input)?)
+            }
+            input if BoltBoolean::can_parse(version, input.clone()) => {
+                BoltType::Boolean(BoltBoolean::parse(version, input)?)
+            }
+            input if BoltPoint2D::can_parse(version, input.clone()) => {
+                BoltType::Point2D(BoltPoint2D::parse(version, input)?)
+            }
+            input if BoltPoint3D::can_parse(version, input.clone()) => {
+                BoltType::Point3D(BoltPoint3D::parse(version, input)?)
+            }
+            input if BoltBytes::can_parse(version, input.clone()) => {
+                BoltType::Bytes(BoltBytes::parse(version, input)?)
+            }
+            input if BoltPath::can_parse(version, input.clone()) => {
+                BoltType::Path(BoltPath::parse(version, input)?)
+            }
+            input if BoltDuration::can_parse(version, input.clone()) => {
+                BoltType::Duration(BoltDuration::parse(version, input)?)
+            }
+            input if BoltUnboundedRelation::can_parse(version, input.clone()) => {
+                BoltType::UnboundedRelation(BoltUnboundedRelation::parse(version, input)?)
+            }
+            input if BoltRelation::can_parse(version, input.clone()) => {
+                BoltType::Relation(BoltRelation::parse(version, input)?)
             }
             _ => return Err(Error::UnknownType(format!("{:#04X?}", input.borrow()))),
         };
