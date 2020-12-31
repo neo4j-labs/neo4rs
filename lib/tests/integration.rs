@@ -250,6 +250,20 @@ async fn should_handle_duration() {
 }
 
 #[tokio::test]
+async fn should_handle_date() {
+    let graph = graph().await;
+    let date = chrono::NaiveDate::from_ymd(1985, 2, 5);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", date))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let d: chrono::NaiveDate = row.get("output").unwrap();
+    assert_eq!(d.to_string(), "1985-02-05");
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn should_handle_paths() {
     let graph = graph().await;
     let name = Uuid::new_v4().to_string();

@@ -77,6 +77,12 @@ impl Into<BoltInteger> for i64 {
     }
 }
 
+impl Into<i64> for BoltInteger {
+    fn into(self) -> i64 {
+        self.value
+    }
+}
+
 //TODO: use macros
 impl Into<BoltInteger> for i32 {
     fn into(self) -> BoltInteger {

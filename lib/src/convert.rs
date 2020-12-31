@@ -1,7 +1,7 @@
 use crate::errors::*;
 use crate::row::*;
 use crate::types::*;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 impl TryFrom<BoltType> for f64 {
     type Error = Error;
@@ -53,6 +53,17 @@ impl TryFrom<BoltType> for std::time::Duration {
     fn try_from(input: BoltType) -> Result<std::time::Duration> {
         match input {
             BoltType::Duration(d) => Ok(d.into()),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for chrono::NaiveDate {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<chrono::NaiveDate> {
+        match input {
+            BoltType::Date(d) => d.try_into(),
             _ => Err(Error::ConverstionError),
         }
     }
@@ -157,6 +168,12 @@ impl TryFrom<BoltType> for String {
 impl Into<BoltType> for std::time::Duration {
     fn into(self) -> BoltType {
         BoltType::Duration(self.into())
+    }
+}
+
+impl Into<BoltType> for chrono::NaiveDate {
+    fn into(self) -> BoltType {
+        BoltType::Date(self.into())
     }
 }
 
