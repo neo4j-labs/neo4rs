@@ -145,7 +145,7 @@ This driver is compatible with neo4j 4.x versions
 	- [x] UnboundedRelationship
 	- [x] Path
 	- [x] Duration
-	- [ ] Date
+	- [x] Date
 	- [ ] Time
 	- [ ] LocalTime
 	- [ ] DateTime

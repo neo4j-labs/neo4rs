@@ -1,0 +1,12 @@
+[package]
+name = "neo4rs-examples"
+version = "0.4.2"
+authors = ["John Vincent <yehohanan7@gmail.com>"]
+edition = "2018"
+description = "neo4rs examples"
+license = "MIT"
+repository = "https://github.com/yehohanan7/neo4rs"
+
+
+[dependencies]
+neo4rs = { version = "0.4.2", path = "../lib" }

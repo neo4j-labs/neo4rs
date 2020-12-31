@@ -3,4 +3,5 @@
 members = [
     "lib",
     "macros",
+    "examples",
 ]
