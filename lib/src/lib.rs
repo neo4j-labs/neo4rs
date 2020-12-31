@@ -1,4 +1,4 @@
-//! Neo4j driver imlemented using bolt 4.1 specification
+//! Neo4j driver compatible with neo4j 4.x versions
 //!
 //! #Example
 //! ```
