@@ -28,6 +28,7 @@ This driver is compatible with neo4j 4.x versions
         .password("neo")
         .db("neo4j")
         .fetch_size(500)
+	.max_connections(15)
         .build()
         .unwrap();
     let graph = Graph::connect(config).await.unwrap();

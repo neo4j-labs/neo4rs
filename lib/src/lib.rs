@@ -57,7 +57,7 @@ pub fn query(q: &str) -> Query {
 
 impl Graph {
     pub async fn connect(config: Config) -> Result<Self> {
-        let pool = create_pool(&config.uri, &config.user, &config.password).await;
+        let pool = create_pool(&config).await;
         Ok(Graph { config, pool })
     }
 

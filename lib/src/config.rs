@@ -1,12 +1,14 @@
 pub use crate::errors::*;
 
 const DEFAULT_FETCH_SIZE: usize = 200;
+const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub(crate) uri: String,
     pub(crate) user: String,
     pub(crate) password: String,
+    pub(crate) max_connections: usize,
     pub(crate) db: String,
     pub(crate) fetch_size: usize,
 }
@@ -17,6 +19,7 @@ pub struct ConfigBuilder {
     password: Option<String>,
     db: Option<String>,
     fetch_size: Option<usize>,
+    max_connections: Option<usize>,
 }
 
 impl ConfigBuilder {
@@ -52,6 +55,12 @@ impl ConfigBuilder {
         self
     }
 
+    ///maximum number of connections in the connection pool
+    pub fn max_connections(mut self, max_connections: usize) -> Self {
+        self.max_connections = Some(max_connections);
+        self
+    }
+
     pub fn build(self) -> Result<Config> {
         if self.uri.is_none()
             || self.user.is_none()
@@ -65,6 +74,7 @@ impl ConfigBuilder {
                 user: self.user.unwrap(),
                 password: self.password.unwrap(),
                 fetch_size: self.fetch_size.unwrap(),
+                max_connections: self.max_connections.unwrap(),
                 db: self.db.unwrap(),
             })
         }
@@ -77,6 +87,7 @@ pub fn config() -> ConfigBuilder {
         user: None,
         password: None,
         db: Some("".to_owned()),
+        max_connections: Some(DEFAULT_MAX_CONNECTIONS),
         fetch_size: Some(DEFAULT_FETCH_SIZE),
     }
 }

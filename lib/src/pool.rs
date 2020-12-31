@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::connection::Connection;
 use crate::errors::Error;
 use async_trait::async_trait;
@@ -34,9 +35,11 @@ impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
     }
 }
 
-pub async fn create_pool(uri: &str, user: &str, password: &str) -> ConnectionPool {
-    let max_size = 16;
-    let mgr = ConnectionManager::new(uri, user, password);
-    info!("creating connection pool with max size {}", max_size);
-    ConnectionPool::new(mgr, max_size)
+pub async fn create_pool(config: &Config) -> ConnectionPool {
+    let mgr = ConnectionManager::new(&config.uri, &config.user, &config.password);
+    info!(
+        "creating connection pool with max size {}",
+        config.max_connections
+    );
+    ConnectionPool::new(mgr, config.max_connections)
 }
