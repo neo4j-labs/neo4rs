@@ -7,6 +7,7 @@
 
 Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
 
+This driver is compatible with neo4j 4.x versions
 
 ## Getting Started
 
@@ -133,10 +134,10 @@ Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https:
 - [x] fetch rows in blocks
 - [x] configureable fetch size
 - [x] multi db support
+- [x] multi version support
 - [x] support data types
 	- [x] Float
 	- [x] Bytes
-- [ ] add support for older versions of the protocol
 - [ ] support structures
 	- [x] Relationship
 	- [x] Point2D
