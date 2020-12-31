@@ -1,8 +1,8 @@
 # Neo4rs  [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
 
-[ci-badge]: https://circleci.com/gh/yehohanan7/neo4rs.svg?circle-token=6537a33de9b96ea8f26a2732b9ca6ef95ab3762b
+[ci-badge]: https://circleci.com/gh/yehohanan7/neo4rs.svg?style=shield&circle-token=6537a33de9b96ea8f26a2732b9ca6ef95ab3762b
 [ci-url]: https://github.com/yehohanan7/neo4rs
-[crates-badge]: https://img.shields.io/crates/v/neo4rs.svg
+[crates-badge]: https://img.shields.io/crates/v/neo4rs.svg?style=shield
 [crates-url]: https://crates.io/crates/neo4rs
 
 Neo4rs is a native rust driver implemented using [bolt 4.1 specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
