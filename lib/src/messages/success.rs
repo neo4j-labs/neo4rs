@@ -29,8 +29,8 @@ impl Success {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -42,7 +42,7 @@ mod tests {
             0x33, 0x31,
         ]);
 
-        let success: Success = Rc::new(RefCell::new(data)).try_into().unwrap();
+        let success: Success = Success::parse(Version::V4_1, Rc::new(RefCell::new(data))).unwrap();
 
         assert_eq!(success.get::<String>("server").unwrap(), "Neo4j/4.1.4");
         assert_eq!(success.get::<String>("connection_id").unwrap(), "bolt-31");

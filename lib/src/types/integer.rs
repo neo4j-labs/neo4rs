@@ -1,7 +1,7 @@
 use crate::errors::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::mem;
 use std::rc::Rc;
 
@@ -20,7 +20,7 @@ impl BoltInteger {
         BoltInteger { value }
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let marker = input.borrow()[0];
         (-16..=127).contains(&(marker as i8))
             || marker == INT_8
@@ -30,10 +30,8 @@ impl BoltInteger {
     }
 }
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltInteger> {
+impl BoltInteger {
+    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltInteger> {
         let mut input = input.borrow_mut();
         let value: i64 = match input.get_u8() {
             marker if (-16..=127).contains(&(marker as i8)) => marker as i64,
@@ -46,12 +44,8 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltInteger {
 
         Ok(BoltInteger::new(value))
     }
-}
 
-impl TryInto<Bytes> for BoltInteger {
-    type Error = Error;
-
-    fn try_into(self) -> Result<Bytes> {
+    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<i64>());
         match self.value {
             -16..=127 => bytes.put_u8(self.value as u8),
@@ -97,23 +91,23 @@ mod tests {
     #[test]
     fn should_serialize_integer() {
         let bolt_int = BoltInteger::new(42);
-        let b: Bytes = bolt_int.try_into().unwrap();
+        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[0x2A]);
 
         let bolt_int = BoltInteger::new(-127);
-        let b: Bytes = bolt_int.try_into().unwrap();
+        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[INT_8, 0x81]);
 
         let bolt_int = BoltInteger::new(129);
-        let b: Bytes = bolt_int.try_into().unwrap();
+        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[INT_16, 0x00, 0x81]);
 
         let bolt_int = BoltInteger::new(32_768);
-        let b: Bytes = bolt_int.try_into().unwrap();
+        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[INT_32, 0x00, 0x00, 0x80, 0x00]);
 
         let bolt_int = BoltInteger::new(2_147_483_648);
-        let b: Bytes = bolt_int.try_into().unwrap();
+        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
         assert_eq!(
             b.bytes(),
             &[INT_64, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00]
@@ -123,27 +117,27 @@ mod tests {
     #[test]
     fn should_deserialize_integer() {
         let b = Rc::new(RefCell::new(Bytes::from_static(&[0x2A])));
-        let bolt_int: BoltInteger = b.try_into().unwrap();
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_int.value, 42);
 
         let b = Rc::new(RefCell::new(Bytes::from_static(&[INT_8, 0x81])));
-        let bolt_int: BoltInteger = b.try_into().unwrap();
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_int.value, -127);
 
         let b = Rc::new(RefCell::new(Bytes::from_static(&[INT_16, 0x00, 0x81])));
-        let bolt_int: BoltInteger = b.try_into().unwrap();
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_int.value, 129);
 
         let b = Rc::new(RefCell::new(Bytes::from_static(&[
             INT_32, 0x00, 0x00, 0x80, 0x00,
         ])));
-        let bolt_int: BoltInteger = b.try_into().unwrap();
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_int.value, 32_768);
 
         let b = Rc::new(RefCell::new(Bytes::from_static(&[
             INT_64, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
         ])));
-        let bolt_int: BoltInteger = b.try_into().unwrap();
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, b).unwrap();
         assert_eq!(bolt_int.value, 2_147_483_648);
     }
 }

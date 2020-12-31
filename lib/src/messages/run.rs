@@ -24,7 +24,7 @@ impl Run {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryInto;
+    use crate::version::Version;
 
     #[test]
     fn should_serialize_run() {
@@ -34,7 +34,7 @@ mod tests {
             vec![("k".into(), "v".into())].into_iter().collect(),
         );
 
-        let bytes: Bytes = run.try_into().unwrap();
+        let bytes: Bytes = run.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,
@@ -69,7 +69,7 @@ mod tests {
     fn should_serialize_run_with_no_params() {
         let run = Run::new("".into(), "query".into(), BoltMap::new());
 
-        let bytes: Bytes = run.try_into().unwrap();
+        let bytes: Bytes = run.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

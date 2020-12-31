@@ -44,9 +44,9 @@ impl BoltPath {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -73,7 +73,7 @@ mod tests {
             ids: vec![22.into(), 42.into()].into(),
         };
 
-        let bytes: Bytes = path.try_into().unwrap();
+        let bytes: Bytes = path.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,
@@ -99,7 +99,7 @@ mod tests {
             0x92, 0x16, 0x2A,
         ])));
 
-        let path: BoltPath = input.try_into().unwrap();
+        let path: BoltPath = BoltPath::parse(Version::V4_1, input).unwrap();
 
         let nodes = path.nodes();
         let rels = path.rels();

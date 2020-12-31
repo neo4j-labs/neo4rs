@@ -16,8 +16,8 @@ impl Hello {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
-    use std::convert::TryInto;
 
     #[test]
     fn should_serialize_hello() {
@@ -27,7 +27,7 @@ mod tests {
                 .collect(),
         );
 
-        let bytes: Bytes = hello.try_into().unwrap();
+        let bytes: Bytes = hello.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

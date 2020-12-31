@@ -14,12 +14,12 @@ impl BoltNull {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryInto;
+    use crate::version::Version;
 
     #[test]
     fn should_serialize_null() {
         let null = BoltNull::new();
-        let b: Bytes = null.try_into().unwrap();
+        let b: Bytes = null.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), &[0xC0]);
     }
 }

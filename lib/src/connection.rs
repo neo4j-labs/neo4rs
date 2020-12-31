@@ -2,7 +2,6 @@ use crate::errors::{Error, Result};
 use crate::messages::*;
 use crate::version::Version;
 use bytes::*;
-use std::convert::TryInto;
 use std::mem;
 use tokio::io::BufStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -17,6 +16,10 @@ pub struct Connection {
 }
 
 impl Connection {
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
         let mut stream = BufStream::new(TcpStream::connect(uri).await?);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
@@ -56,7 +59,7 @@ impl Connection {
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
         let end_marker: [u8; 2] = [0, 0];
-        let bytes: Bytes = message.try_into().unwrap();
+        let bytes: Bytes = message.to_bytes(self.version)?;
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
             self.stream.write_all(c).await?;
@@ -84,6 +87,6 @@ impl Connection {
             chunk_size = u16::from_be_bytes(data);
         }
 
-        Ok(bytes.freeze().try_into()?)
+        Ok(BoltResponse::parse(self.version, bytes.freeze())?)
     }
 }

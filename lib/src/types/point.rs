@@ -21,9 +21,9 @@ pub struct BoltPoint3D {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
@@ -34,7 +34,7 @@ mod tests {
 
         let point = BoltPoint2D { sr_id, x, y };
 
-        let bytes: Bytes = point.try_into().unwrap();
+        let bytes: Bytes = point.to_bytes(Version::V4_1).unwrap();
 
         println!("{:#04X?}", bytes.bytes());
 
@@ -54,7 +54,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ])));
 
-        let point: BoltPoint2D = input.try_into().unwrap();
+        let point: BoltPoint2D = BoltPoint2D::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(point.sr_id, BoltInteger::new(42));
         assert_eq!(point.x, BoltFloat::new(1.0));
@@ -70,7 +70,7 @@ mod tests {
 
         let point = BoltPoint3D { sr_id, x, y, z };
 
-        let bytes: Bytes = point.try_into().unwrap();
+        let bytes: Bytes = point.to_bytes(Version::V4_1).unwrap();
 
         println!("{:#04X?}", bytes.bytes());
 
@@ -92,7 +92,7 @@ mod tests {
             0x00, 0x00,
         ])));
 
-        let point: BoltPoint3D = input.try_into().unwrap();
+        let point: BoltPoint3D = BoltPoint3D::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(point.sr_id, BoltInteger::new(42));
         assert_eq!(point.x, BoltFloat::new(1.0));

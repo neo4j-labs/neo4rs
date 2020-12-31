@@ -1,9 +1,10 @@
 use crate::errors::*;
 use crate::types::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::iter::FromIterator;
 
 use std::mem;
@@ -53,7 +54,7 @@ impl BoltMap {
         }
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let marker = input.borrow()[0];
         (TINY..=(TINY | 0x0F)).contains(&marker)
             || marker == SMALL
@@ -75,14 +76,13 @@ impl FromIterator<(BoltString, BoltType)> for BoltMap {
     }
 }
 
-impl TryInto<Bytes> for BoltMap {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltMap {
+    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
         let mut key_value_bytes = BytesMut::new();
         let length = self.value.len();
         for (key, value) in self.value {
-            let key_bytes: Bytes = key.try_into()?;
-            let value_bytes: Bytes = value.try_into()?;
+            let key_bytes: Bytes = key.to_bytes(version)?;
+            let value_bytes: Bytes = value.to_bytes(version)?;
             key_value_bytes.put(key_bytes);
             key_value_bytes.put(value_bytes);
         }
@@ -111,12 +111,8 @@ impl TryInto<Bytes> for BoltMap {
         bytes.put(key_value_bytes);
         Ok(bytes.freeze())
     }
-}
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltMap {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltMap> {
+    pub fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltMap> {
         let marker = input.borrow_mut().get_u8();
         let size = match marker {
             0xA0..=0xAF => 0x0F & marker as usize,
@@ -133,8 +129,8 @@ impl TryFrom<Rc<RefCell<Bytes>>> for BoltMap {
 
         let mut map = BoltMap::new();
         for _ in 0..size {
-            let key: BoltString = input.clone().try_into()?;
-            let value: BoltType = input.clone().try_into()?;
+            let key: BoltString = BoltString::parse(version, input.clone())?;
+            let value: BoltType = BoltType::parse(version, input.clone())?;
             map.put(key, value);
         }
 
@@ -150,7 +146,7 @@ mod tests {
     fn should_serialize_empty_map() {
         let map = BoltMap::new();
 
-        let b: Bytes = map.try_into().unwrap();
+        let b: Bytes = map.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.bytes(), Bytes::from_static(&[TINY]));
     }
@@ -160,7 +156,7 @@ mod tests {
         let mut map = BoltMap::new();
         map.put("a".into(), "b".into());
 
-        let b: Bytes = map.try_into().unwrap();
+        let b: Bytes = map.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             b.bytes(),
@@ -174,7 +170,7 @@ mod tests {
             0xA1, 0x81, 0x61, 0x81, 0x62,
         ])));
 
-        let map: BoltMap = input.try_into().unwrap();
+        let map: BoltMap = BoltMap::parse(Version::V4_1, input).unwrap();
 
         assert_eq!(map.value.len(), 1);
     }
@@ -186,9 +182,10 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> = Rc::new(RefCell::new(map.clone().try_into().unwrap()));
+        let bytes: Rc<RefCell<Bytes>> =
+            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], SMALL);
-        let deserialized_map: BoltMap = bytes.try_into().unwrap();
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 
@@ -199,9 +196,10 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> = Rc::new(RefCell::new(map.clone().try_into().unwrap()));
+        let bytes: Rc<RefCell<Bytes>> =
+            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], MEDIUM);
-        let deserialized_map: BoltMap = bytes.try_into().unwrap();
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 
@@ -212,9 +210,10 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> = Rc::new(RefCell::new(map.clone().try_into().unwrap()));
+        let bytes: Rc<RefCell<Bytes>> =
+            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], LARGE);
-        let deserialized_map: BoltMap = bytes.try_into().unwrap();
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 }

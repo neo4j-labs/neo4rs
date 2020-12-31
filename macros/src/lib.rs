@@ -48,7 +48,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let serialize_fields = fields.iter().map(|f| {
         let name = &f.ident;
         quote! {
-            let #name: bytes::Bytes = self.#name.try_into()?
+            let #name: bytes::Bytes = self.#name.to_bytes(version)?
         }
     });
 
@@ -68,8 +68,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let deserialize_fields = fields.iter().map(|f| {
         let name = &f.ident;
+        let typ = &f.ty;
         quote! {
-            #name: input.clone().try_into()?
+            #name: #typ::parse(version, input.clone())?
         }
     });
 
@@ -77,10 +78,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
         use std::convert::*;
         use bytes::*;
 
-        impl std::convert::TryInto<bytes::Bytes> for #struct_name {
-            type Error = crate::errors::Error;
+        impl #struct_name {
 
-            fn try_into(self) -> crate::errors::Result<bytes::Bytes> {
+            pub fn to_bytes(self, version: crate::version::Version) -> crate::errors::Result<bytes::Bytes> {
                 #(#serialize_fields;)*
                 let mut total_bytes = std::mem::size_of::<u8>() + std::mem::size_of::<u8>();
                 #(#allocate_bytes;)*
@@ -96,7 +96,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
 
         impl #struct_name {
-            pub fn can_parse(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
+            pub fn can_parse(version: crate::version::Version, input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
                 match (#struct_marker, #struct_signature) {
                     (marker, Some(signature)) =>  {
                         input.borrow().len() >= 2 && input.borrow()[0] == marker && input.borrow()[1] == signature
@@ -109,10 +109,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl std::convert::TryFrom<std::rc::Rc<std::cell::RefCell<bytes::Bytes>>> for #struct_name {
-            type Error = crate::errors::Error;
+        impl #struct_name {
 
-            fn try_from(input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> crate::errors::Result<#struct_name> {
+            pub fn parse(version: crate::version::Version, input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> crate::errors::Result<#struct_name> {
 
                 match (#struct_marker, #struct_signature) {
                     (_, Some(_)) =>  {

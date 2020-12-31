@@ -1,8 +1,9 @@
 use crate::errors::*;
 use crate::types::*;
+use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::convert::{From, TryFrom, TryInto};
+use std::convert::From;
 use std::fmt::Display;
 use std::mem;
 use std::rc::Rc;
@@ -24,7 +25,7 @@ impl BoltString {
         }
     }
 
-    pub fn can_parse(input: Rc<RefCell<Bytes>>) -> bool {
+    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let marker = input.borrow()[0];
         (TINY..=(TINY | 0x0F)).contains(&marker)
             || marker == SMALL
@@ -51,9 +52,8 @@ impl From<String> for BoltString {
     }
 }
 
-impl TryInto<Bytes> for BoltString {
-    type Error = Error;
-    fn try_into(self) -> Result<Bytes> {
+impl BoltString {
+    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(
             mem::size_of::<u8>() + mem::size_of::<u32>() + self.value.len(),
         );
@@ -76,12 +76,8 @@ impl TryInto<Bytes> for BoltString {
         bytes.put_slice(self.value.as_bytes());
         Ok(bytes.freeze())
     }
-}
 
-impl TryFrom<Rc<RefCell<Bytes>>> for BoltString {
-    type Error = Error;
-
-    fn try_from(input: Rc<RefCell<Bytes>>) -> Result<BoltString> {
+    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltString> {
         let mut input = input.borrow_mut();
         let marker = input.get_u8();
         let length = match marker {
@@ -110,29 +106,28 @@ mod tests {
     #[test]
     fn should_serialize_empty_string() {
         let s = BoltString::new("");
-        let b: Bytes = s.try_into().unwrap();
+        let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), Bytes::from_static(&[TINY]));
     }
 
     #[test]
     fn should_deserialize_empty_string() {
-        let s: BoltString = Rc::new(RefCell::new(Bytes::from_static(&[TINY])))
-            .try_into()
-            .unwrap();
+        let input = Rc::new(RefCell::new(Bytes::from_static(&[TINY])));
+        let s: BoltString = BoltString::parse(Version::V4_1, input).unwrap();
         assert_eq!(s, "".into());
     }
 
     #[test]
     fn should_serialize_tiny_string() {
         let s = BoltString::new("a");
-        let b: Bytes = s.try_into().unwrap();
+        let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
         assert_eq!(b.bytes(), Bytes::from_static(&[0x81, 0x61]));
     }
 
     #[test]
     fn should_deserialize_tiny_string() {
         let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[0x81, 0x61])));
-        let result: BoltString = serialized_bytes.try_into().unwrap();
+        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -140,7 +135,7 @@ mod tests {
     fn should_serialize_small_string() {
         let s = BoltString::new(&"a".repeat(16));
 
-        let mut b: Bytes = s.try_into().unwrap();
+        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), SMALL);
         assert_eq!(b.get_u8(), 0x10);
@@ -153,7 +148,7 @@ mod tests {
     #[test]
     fn should_deserialize_small_string() {
         let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[SMALL, 0x01, 0x61])));
-        let result: BoltString = serialized_bytes.try_into().unwrap();
+        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -161,7 +156,7 @@ mod tests {
     fn should_serialize_medium_string() {
         let s = BoltString::new(&"a".repeat(256));
 
-        let mut b: Bytes = s.try_into().unwrap();
+        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), MEDIUM);
         assert_eq!(b.get_u16(), 0x100);
@@ -176,7 +171,7 @@ mod tests {
         let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[
             MEDIUM, 0x00, 0x01, 0x61,
         ])));
-        let result: BoltString = serialized_bytes.try_into().unwrap();
+        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -184,7 +179,7 @@ mod tests {
     fn should_serialize_large_string() {
         let s = BoltString::new(&"a".repeat(65_536));
 
-        let mut b: Bytes = s.try_into().unwrap();
+        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), LARGE);
         assert_eq!(b.get_u32(), 0x10000);
@@ -199,7 +194,7 @@ mod tests {
         let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[
             LARGE, 0x00, 0x00, 0x00, 0x01, 0x61,
         ])));
-        let result: BoltString = serialized_bytes.try_into().unwrap();
+        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 }

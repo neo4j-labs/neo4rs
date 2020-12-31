@@ -51,16 +51,16 @@ impl Into<std::time::Duration> for BoltDuration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::version::Version;
     use bytes::*;
     use std::cell::RefCell;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     #[test]
     fn should_serialize_a_duration() {
         let duration = BoltDuration::new(12.into(), 2.into(), 30.into(), 700.into());
 
-        let bytes: Bytes = duration.try_into().unwrap();
+        let bytes: Bytes = duration.to_bytes(Version::V4_1).unwrap();
 
         println!("{:#04X?}", bytes.bytes());
 
@@ -76,7 +76,7 @@ mod tests {
             0xB4, 0x45, 0x0C, 0x02, 0x1E, 0xC9, 0x02, 0xBC,
         ])));
 
-        let duration: BoltDuration = bytes.try_into().unwrap();
+        let duration: BoltDuration = BoltDuration::parse(Version::V4_1, bytes).unwrap();
 
         assert_eq!(duration.months.value, 12);
         assert_eq!(duration.days.value, 2);
