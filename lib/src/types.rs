@@ -27,7 +27,7 @@ pub use path::BoltPath;
 pub use point::{BoltPoint2D, BoltPoint3D};
 pub use relation::{BoltRelation, BoltUnboundedRelation};
 pub use string::BoltString;
-pub use time::BoltTime;
+pub use time::{BoltLocalTime, BoltTime};
 
 use crate::errors::*;
 use crate::version::Version;
@@ -56,6 +56,7 @@ pub enum BoltType {
     Duration(BoltDuration),
     Date(BoltDate),
     Time(BoltTime),
+    LocalTime(BoltLocalTime),
 }
 
 impl Display for BoltType {
@@ -79,6 +80,7 @@ impl Hash for BoltType {
             BoltType::Duration(t) => t.hash(state),
             BoltType::Date(t) => t.hash(state),
             BoltType::Time(t) => t.hash(state),
+            BoltType::LocalTime(t) => t.hash(state),
             BoltType::Path(_) => panic!("path not hashed"),
             BoltType::Bytes(_) => panic!("bytes not hashed"),
             BoltType::Float(_) => panic!("float not hashed"),
@@ -112,6 +114,7 @@ impl BoltType {
             BoltType::Duration(t) => t.to_bytes(version),
             BoltType::Date(t) => t.to_bytes(version),
             BoltType::Time(t) => t.to_bytes(version),
+            BoltType::LocalTime(t) => t.to_bytes(version),
         }
     }
 
@@ -158,6 +161,9 @@ impl BoltType {
             }
             input if BoltTime::can_parse(version, input.clone()) => {
                 BoltType::Time(BoltTime::parse(version, input)?)
+            }
+            input if BoltLocalTime::can_parse(version, input.clone()) => {
+                BoltType::LocalTime(BoltLocalTime::parse(version, input)?)
             }
             input if BoltUnboundedRelation::can_parse(version, input.clone()) => {
                 BoltType::UnboundedRelation(BoltUnboundedRelation::parse(version, input)?)

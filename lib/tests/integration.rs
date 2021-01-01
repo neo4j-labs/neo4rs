@@ -264,16 +264,66 @@ async fn should_handle_date() {
 }
 
 #[tokio::test]
-async fn should_handle_time() {
+async fn should_accept_time_as_param() {
     let graph = graph().await;
-    let date = chrono::NaiveTime::from_hms_nano(10, 15, 30, 200);
+    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
     let mut result = graph
-        .execute(query("RETURN $d as output").param("d", date))
+        .execute(query("RETURN $d as output").param("d", time))
         .await
         .unwrap();
     let row = result.next().await.unwrap().unwrap();
-    let t: chrono::NaiveTime = row.get("output").unwrap();
-    assert_eq!(t.to_string(), "10:15:30.000000200");
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    assert_eq!(t.0.to_string(), "11:15:30.000000200");
+    assert_eq!(t.1, None);
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn should_accept_time_with_offet_as_param() {
+    let graph = graph().await;
+    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
+    let offset = chrono::FixedOffset::east(3 * 3600);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", (time, offset)))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    assert_eq!(t.0.to_string(), "11:15:30.000000200");
+    assert_eq!(t.1, Some(offset));
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn should_handle_time() {
+    let graph = graph().await;
+    let mut result = graph
+        .execute(query(
+            " WITH time({hour:10, minute:15, second:30, nanosecond: 200}) AS t RETURN t",
+        ))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("t").unwrap();
+    assert_eq!(t.0.to_string(), "10:15:30.000000200");
+    assert_eq!(t.1, None);
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn should_handle_time_with_timezone() {
+    let graph = graph().await;
+    let mut result = graph
+        .execute(query(
+            " WITH time({hour:10, minute:15, second:33, nanosecond: 200, timezone: '+01:00'}) AS t RETURN t",
+        ))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("t").unwrap();
+    assert_eq!(t.0.to_string(), "10:15:33.000000200");
+    assert_eq!(t.1, Some(chrono::FixedOffset::east(1 * 3600)));
     assert!(result.next().await.unwrap().is_none());
 }
 

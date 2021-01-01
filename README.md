@@ -110,15 +110,29 @@ This driver is compatible with neo4j 4.x versions
     assert_eq!(d.as_secs(), 5259600);
     assert_eq!(d.subsec_nanos(), 7);
     
-    //Time is interpreted as UTC
+    //Time without timezone
     let date = chrono::NaiveTime::from_hms_nano(10, 15, 30, 200);
     let mut result = graph
         .execute(query("RETURN $d as output").param("d", date))
         .await
         .unwrap();
     let row = result.next().await.unwrap().unwrap();
-    let t: chrono::NaiveTime = row.get("output").unwrap();
-    assert_eq!(t.to_string(), "10:15:30.000000200");
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    assert_eq!(t.0.to_string(), "10:15:30.000000200");
+    assert_eq!(t.1, None);
+    
+    
+    //Time with timezone offset
+    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
+    let offset = chrono::FixedOffset::east(3 * 3600);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", (time, offset)))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    assert_eq!(t.0.to_string(), "11:15:30.000000200");
+    assert_eq!(t.1, Some(offset));
     
     
     //Work with points
@@ -180,7 +194,7 @@ This driver is compatible with neo4j 4.x versions
 	- [x] Duration
 	- [x] Date
 	- [x] Time
-	- [ ] LocalTime
+	- [x] LocalTime
 	- [ ] DateTime
 	- [ ] DateTimeZoneId
 	- [ ] LocalDateTime
