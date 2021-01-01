@@ -12,6 +12,7 @@ pub mod path;
 pub mod point;
 pub mod relation;
 pub mod string;
+pub mod time;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;
@@ -26,6 +27,7 @@ pub use path::BoltPath;
 pub use point::{BoltPoint2D, BoltPoint3D};
 pub use relation::{BoltRelation, BoltUnboundedRelation};
 pub use string::BoltString;
+pub use time::BoltTime;
 
 use crate::errors::*;
 use crate::version::Version;
@@ -53,6 +55,7 @@ pub enum BoltType {
     Path(BoltPath),
     Duration(BoltDuration),
     Date(BoltDate),
+    Time(BoltTime),
 }
 
 impl Display for BoltType {
@@ -75,6 +78,7 @@ impl Hash for BoltType {
             BoltType::List(t) => t.hash(state),
             BoltType::Duration(t) => t.hash(state),
             BoltType::Date(t) => t.hash(state),
+            BoltType::Time(t) => t.hash(state),
             BoltType::Path(_) => panic!("path not hashed"),
             BoltType::Bytes(_) => panic!("bytes not hashed"),
             BoltType::Float(_) => panic!("float not hashed"),
@@ -107,6 +111,7 @@ impl BoltType {
             BoltType::Bytes(t) => t.to_bytes(version),
             BoltType::Duration(t) => t.to_bytes(version),
             BoltType::Date(t) => t.to_bytes(version),
+            BoltType::Time(t) => t.to_bytes(version),
         }
     }
 
@@ -150,6 +155,9 @@ impl BoltType {
             }
             input if BoltDate::can_parse(version, input.clone()) => {
                 BoltType::Date(BoltDate::parse(version, input)?)
+            }
+            input if BoltTime::can_parse(version, input.clone()) => {
+                BoltType::Time(BoltTime::parse(version, input)?)
             }
             input if BoltUnboundedRelation::can_parse(version, input.clone()) => {
                 BoltType::UnboundedRelation(BoltUnboundedRelation::parse(version, input)?)

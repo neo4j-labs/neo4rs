@@ -89,6 +89,38 @@ This driver is compatible with neo4j 4.x versions
     let b: Vec<u8> = row.get("output").unwrap();
     assert_eq!(b, &[11, 12]);
     
+    //Date
+    let date = chrono::NaiveDate::from_ymd(1985, 2, 5);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", date))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let d: chrono::NaiveDate = row.get("output").unwrap();
+    assert_eq!(d.to_string(), "1985-02-05");
+    
+    //Duration
+    let duration = std::time::Duration::new(5259600, 7);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", duration))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let d: Duration = row.get("output").unwrap();
+    assert_eq!(d.as_secs(), 5259600);
+    assert_eq!(d.subsec_nanos(), 7);
+    
+    //Time is interpreted as UTC
+    let date = chrono::NaiveTime::from_hms_nano(10, 15, 30, 200);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", date))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let t: chrono::NaiveTime = row.get("output").unwrap();
+    assert_eq!(t.to_string(), "10:15:30.000000200");
+    
+    
     //Work with points
     let mut result = graph
         .execute(query(
@@ -147,7 +179,7 @@ This driver is compatible with neo4j 4.x versions
 	- [x] Path
 	- [x] Duration
 	- [x] Date
-	- [ ] Time
+	- [x] Time
 	- [ ] LocalTime
 	- [ ] DateTime
 	- [ ] DateTimeZoneId

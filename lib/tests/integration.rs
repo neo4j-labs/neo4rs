@@ -264,6 +264,20 @@ async fn should_handle_date() {
 }
 
 #[tokio::test]
+async fn should_handle_time() {
+    let graph = graph().await;
+    let date = chrono::NaiveTime::from_hms_nano(10, 15, 30, 200);
+    let mut result = graph
+        .execute(query("RETURN $d as output").param("d", date))
+        .await
+        .unwrap();
+    let row = result.next().await.unwrap().unwrap();
+    let t: chrono::NaiveTime = row.get("output").unwrap();
+    assert_eq!(t.to_string(), "10:15:30.000000200");
+    assert!(result.next().await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn should_handle_paths() {
     let graph = graph().await;
     let name = Uuid::new_v4().to_string();

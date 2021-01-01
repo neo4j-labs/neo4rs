@@ -3,6 +3,7 @@ use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
 use std::mem;
+use std::ops::{Add, Sub};
 use std::rc::Rc;
 
 pub const INT_8: u8 = 0xC8;
@@ -13,6 +14,22 @@ pub const INT_64: u8 = 0xCB;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct BoltInteger {
     pub value: i64,
+}
+
+impl Add for BoltInteger {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.value + rhs.value).into()
+    }
+}
+
+impl Sub for BoltInteger {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        (self.value - rhs.value).into()
+    }
 }
 
 impl BoltInteger {
