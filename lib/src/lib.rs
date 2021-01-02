@@ -453,12 +453,11 @@
 //!
 //! Working with date & time.
 //!
-//! Notice that when you parse a time out of the [`RowStream`], you should expect a tuple of type `(chrono::NaiveTime, Option<chrono::FixedOffset>)`,
-//! this is because some of the time type returned by the server may not have any timezone offset
-//! information.
+//! Notice that return type of a time value is a tuple `(chrono::NaiveTime, Option<chrono::FixedOffset>)`,
+//! this is because the time returned by the server may not have any timezone/offset information.
 //!
-//! Also, the [`chrono::NaiveTime`] doesn't have any offset attribute within it, so it is returned
-//! as as the second element in the tuple.
+//! Also, the [`chrono::NaiveTime`] doesn't have any offset attribute within it, hence it is returned
+//! as the second element in the tuple.
 //!
 //! ```
 //! use neo4rs::*;
