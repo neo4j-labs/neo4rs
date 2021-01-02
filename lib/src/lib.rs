@@ -46,10 +46,9 @@
 //!     }
 //! }
 //! ```
+//! ## Configurations
 //!
-//!
-//! If you want to customize the configurations, you could use the config builder to override the
-//! default configurations like the `fetch_size`, `max_connections` etc.
+//! Use the config builder to override the default configurations like the `fetch_size`, `max_connections` etc.
 //!
 //! ```
 //! use neo4rs::*;
@@ -75,6 +74,7 @@
 //! }
 //! ```
 //!
+//! ## Relationships
 //!
 //! Bounded Relationship between nodes are created using cypher queries and the same can be parsed
 //! from the [`RowStream`]
@@ -104,7 +104,6 @@
 //! ```
 //!
 //!
-//!
 //! Similar to bounded relation, an unbounded relation can also be created/parsed.
 //!
 //! ```
@@ -132,6 +131,7 @@
 //! ```
 //!
 //!
+//! ## Transactions
 //!
 //! You can explicitly start a transaction using [`Graph::start_txn`], the returned handle [`Txn`]
 //! can be used to [`Txn::commit`] or [`Txn::rollback`] the transaction.
@@ -259,8 +259,6 @@
 //! ```
 //!
 //!
-//!
-//!
 //! At anypoint within a transaction, you can rollback the txn.
 //! ```
 //! use neo4rs::*;
@@ -339,9 +337,10 @@
 //!
 //! ```
 //!
+//! ## Points
 //!
+//! A 2d or 3d point can be represented with the types  [`Point2D`] and [`Point3D`]
 //!
-//! An example to create and process point types:
 //!
 //! ```
 //! use neo4rs::*;
@@ -393,9 +392,8 @@
 //!
 //! ```
 //!
+//! ## Raw bytes
 //!
-//!
-//! Example usage of raw bytes in your query:
 //!
 //! ```
 //! use neo4rs::*;
@@ -420,9 +418,8 @@
 //!
 //! ```
 //!
+//! ## Durations
 //!
-//!
-//! Usage of duration types:
 //!
 //! ```
 //! use neo4rs::*;
@@ -449,9 +446,7 @@
 //!
 //! ```
 //!
-//!
-//!
-//! Working with date & time.
+//! ## Date & Time
 //!
 //! Notice that return type of a time value is a tuple `(chrono::NaiveTime, Option<chrono::FixedOffset>)`,
 //! this is because the time returned by the server may not have any timezone/offset information.
@@ -535,9 +530,7 @@
 //!
 //! ```
 //!
-//!
-//!
-//! Example usage of Path type:
+//! ## Path
 //!
 //! ```
 //! use neo4rs::*;
