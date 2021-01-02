@@ -1,13 +1,18 @@
 //! Neo4j driver compatible with neo4j 4.x versions
 //!
-//! Neo4rs uses bolt protocol <https://7687.org/> to interact with the neo4j server.
+//! * An implementation of the [bolt protocol][bolt] to interact with Neo4j server
+//! * async/await apis with [tokio executor][tokio]
+//! * Supports bolt 4.2 specification
+//! * tested with Neo4j versions: 4.0, 4.1, 4.2
 //!
-//! the implementation uses tokio to provide an async execution of queries and streaming of rows.
+//!
+//! [bolt]: https://7687.org/
+//! [tokio]: https://github.com/tokio-rs/tokio
 //!
 //!
 //! # Examples
 //!
-//! A simple example to create a node and consume the created node.
+//! A simple example to create a node and consume the created node from the row stream.
 //!
 //! Note that [`Graph::run`] just returns [`errors::Result`]`<()>`, while [`Graph::execute`]
 //! returns [`errors::Result`]`<`[`RowStream`]`>` from which you can stream the rows
