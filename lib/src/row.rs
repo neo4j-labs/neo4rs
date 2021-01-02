@@ -1,35 +1,44 @@
 use crate::types::*;
 use std::convert::TryInto;
 
+/// Represents a row returned as a result of executing a query.
+///
+/// A row is very similar to a `HashMap`, you can get the attributes using [`Row::get`] method.
 #[derive(Debug)]
 pub struct Row {
     attributes: BoltMap,
 }
 
+/// Snapshot of a node within a graph database
 #[derive(Debug)]
 pub struct Node {
     inner: BoltNode,
 }
 
+/// Alternating sequence of nodes and relationships
 #[derive(Debug)]
 pub struct Path {
     inner: BoltPath,
 }
 
+/// Snapshot of a relationship within a graph database
 #[derive(Debug)]
 pub struct Relation {
     inner: BoltRelation,
 }
 
+/// Relationship detail without start or end node information
 #[derive(Debug)]
 pub struct UnboundedRelation {
     inner: BoltUnboundedRelation,
 }
 
+/// Represents a single location in 2-dimensional space
 pub struct Point2D {
     inner: BoltPoint2D,
 }
 
+/// Represents a single location in 3-dimensional space
 pub struct Point3D {
     inner: BoltPoint3D,
 }
@@ -62,6 +71,7 @@ impl Point2D {
         Point2D { inner }
     }
 
+    /// Spatial refrerence system identifier, see <https://en.wikipedia.org/wiki/Spatial_reference_system#Identifier>
     pub fn sr_id(&self) -> i64 {
         self.inner.sr_id.value
     }
@@ -80,6 +90,7 @@ impl Point3D {
         Point3D { inner }
     }
 
+    /// Spatial refrerence system identifier, see <https://en.wikipedia.org/wiki/Spatial_reference_system#Identifier>
     pub fn sr_id(&self) -> i64 {
         self.inner.sr_id.value
     }
@@ -118,14 +129,17 @@ impl Node {
         Node { inner }
     }
 
+    /// Id of the node
     pub fn id(&self) -> i64 {
         self.inner.id.value
     }
 
+    /// various labels attached to this node
     pub fn labels(&self) -> Vec<String> {
         self.inner.labels.iter().map(|l| l.to_string()).collect()
     }
 
+    /// Get the attributes of the node
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
     }
