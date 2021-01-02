@@ -587,7 +587,7 @@ mod txn;
 mod types;
 mod version;
 
-pub use crate::config::{config, Config};
+pub use crate::config::{config, Config, ConfigBuilder};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;

@@ -81,6 +81,7 @@ impl ConfigBuilder {
     }
 }
 
+/// Creates a config builder with reasonable default values wherever appropriate.
 pub fn config() -> ConfigBuilder {
     ConfigBuilder {
         uri: None,

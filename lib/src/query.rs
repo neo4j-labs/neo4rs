@@ -13,6 +13,7 @@ pub struct Query {
     params: BoltMap,
 }
 
+/// Abstracts a cypher query that is sent to neo4j server.
 impl Query {
     pub fn new(query: String) -> Self {
         Query {

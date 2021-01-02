@@ -7,6 +7,11 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// An abstraction over a stream of rows, this is returned as a result of [`Graph::execute`] or
+/// [`Txn::execute`] operations
+///
+/// A stream will contain a connection from the connection pool which will be released to the pool
+/// when the stream is dropped.
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
@@ -24,7 +29,6 @@ enum State {
     Complete,
 }
 
-///An abstraction over a stream of rows.
 impl RowStream {
     pub(crate) fn new(
         qid: i64,
@@ -42,9 +46,9 @@ impl RowStream {
         }
     }
 
-    ///A call to next() will return a row from an internal buffer if the buffer has any entries,
-    ///if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the server (using the
-    ///fetch_size value configured)
+    /// A call to next() will return a row from an internal buffer if the buffer has any entries,
+    /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the server (using the
+    /// fetch_size value configured see [`ConfigBuilder::fetch_size`])
     pub async fn next(&mut self) -> Result<Option<Row>> {
         let mut connection = self.connection.lock().await;
         loop {
