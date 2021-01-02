@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs"
-version = "0.4.6"
+version = "0.4.7"
 authors = ["John Vincent <yehohanan7@gmail.com>"]
 edition = "2018"
 description = "neo4j driver in rust"
