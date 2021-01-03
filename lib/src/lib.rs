@@ -124,7 +124,7 @@
 //! Start a new transaction using [`Graph::start_txn`], which will return a handle [`Txn`] that can
 //! be used to [`Txn::commit`] or [`Txn::rollback`] the transaction.
 //!
-//! Note that the handle takes a connection from the connection pool, which will be dropped once
+//! Note that the handle takes a connection from the connection pool, which will be released once
 //! the Txn is dropped
 //!
 //!

@@ -17,7 +17,7 @@ futures = { version = "0.3.8" }
 tokio = { version = "1.0.1", features = ["full"] }
 bytes = "1.0.0"
 async-trait = "0.1.42"
-deadpool = "0.6.0"
+deadpool = "0.7.0"
 chrono = "0.4.19"
 log = "0.4"
 
