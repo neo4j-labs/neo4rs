@@ -1,4 +1,4 @@
-# Neo4rs  [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
+# Neo4rs [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
 
 [ci-badge]: https://circleci.com/gh/yehohanan7/neo4rs.svg?style=shield&circle-token=6537a33de9b96ea8f26a2732b9ca6ef95ab3762b
 [ci-url]: https://github.com/yehohanan7/neo4rs
