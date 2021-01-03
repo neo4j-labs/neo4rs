@@ -1,7 +1,7 @@
 //! Neo4j driver compatible with neo4j 4.x versions
 //!
 //! * An implementation of the [bolt protocol][bolt] to interact with Neo4j server
-//! * async/await apis with [tokio executor][tokio]
+//! * async/await apis using [tokio executor][tokio]
 //! * Supports bolt 4.2 specification
 //! * tested with Neo4j versions: 4.0, 4.1, 4.2
 //!
@@ -12,11 +12,53 @@
 //!
 //! # Examples
 //!
+//! ```
+//! use neo4rs::*;
+//! use std::sync::Arc;
+//! use std::sync::atomic::{AtomicU32, Ordering};
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let id = Uuid::new_v4().to_string();
+//!
+//!    let graph = Arc::new(Graph::new(&uri, user, pass).await.unwrap());
+//!    let mut result = graph.run(
+//!      query("CREATE (p:Person {id: $id})").param("id", id.clone())
+//!    ).await.unwrap();
+//!
+//!    let mut handles = Vec::new();
+//!    let mut count = Arc::new(AtomicU32::new(0));
+//!    for _ in 1..=42 {
+//!        let graph = graph.clone();
+//!        let id = id.clone();
+//!        let count = count.clone();
+//!        let handle = tokio::spawn(async move {
+//!            let mut result = graph.execute(
+//!              query("MATCH (p:Person {id: $id}) RETURN p").param("id", id)
+//!            ).await.unwrap();
+//!            while let Ok(Some(row)) = result.next().await {
+//!                count.fetch_add(1, Ordering::SeqCst);
+//!            }
+//!        });
+//!        handles.push(handle);
+//!    }
+//!
+//!    futures::future::join_all(handles).await;
+//!    assert_eq!(count.load(Ordering::Relaxed), 42);
+//! }
+//! ```
+//!
+//!
+//! ## Nodes
 //! A simple example to create a node and consume the created node from the row stream.
 //!
-//! Note that [`Graph::run`] just returns [`errors::Result`]`<()>`, while [`Graph::execute`]
-//! returns [`errors::Result`]`<`[`RowStream`]`>` from which you can stream the rows
-//!
+//! * [`Graph::run`] just returns [`errors::Result`]`<()>`, usually used for write only queries.
+//! * [`Graph::execute`] returns [`errors::Result`]`<`[`RowStream`]`>`
 //! ```
 //! use neo4rs::*;
 //! use futures::stream::*;
@@ -48,7 +90,10 @@
 //! ```
 //! ## Configurations
 //!
-//! Use the config builder to override the default configurations like the `fetch_size`, `max_connections` etc.
+//! Use the config builder to override the default configurations like
+//! * `fetch_size` - number of rows to fetch in batches (default is 200)
+//! * `max_connections` - maximum size of the connection pool (default is 16)
+//! * `db` - the database to connect to (default is `neo4j`)
 //!
 //! ```
 //! use neo4rs::*;
@@ -72,6 +117,186 @@
 //!    assert_eq!(1, value);
 //!    assert!(result.next().await.unwrap().is_none());
 //! }
+//! ```
+//!
+//! ## Transactions
+//!
+//! Start a new transaction using [`Graph::start_txn`], which will return a handle [`Txn`] that can
+//! be used to [`Txn::commit`] or [`Txn::rollback`] the transaction.
+//!
+//! Note that the handle takes a connection from the connection pool, which will be dropped once
+//! the Txn is dropped
+//!
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let txn = graph.start_txn().await.unwrap();
+//!    let id = Uuid::new_v4().to_string();
+//!    let result = txn.run_queries(vec![
+//!            query("CREATE (p:Person {id: $id})").param("id", id.clone()),
+//!            query("CREATE (p:Person {id: $id})").param("id", id.clone())
+//!     ]).await;
+//!
+//!    assert!(result.is_ok());
+//!    txn.commit().await.unwrap();
+//!    let mut result = graph
+//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    # assert!(result.next().await.unwrap().is_some());
+//!    # assert!(result.next().await.unwrap().is_some());
+//!    # assert!(result.next().await.unwrap().is_none());
+//! }
+//!
+//! ```
+//!
+//! ### Streams within a transaction
+//!
+//! Each [`RowStream`] returned by various execute within the same transaction are well isolated,
+//! so you can consume the stream anytime within the transaction using [`RowStream::next`]
+//!
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let config = config()
+//!        .uri("127.0.0.1:7687")
+//!        .user("neo4j")
+//!        .password("neo")
+//!        .fetch_size(1)
+//!        .build()
+//!        .unwrap();
+//!    let graph = Graph::connect(config).await.unwrap();
+//!    let name = Uuid::new_v4().to_string();
+//!    let txn = graph.start_txn().await.unwrap();
+//!
+//!    txn.run_queries(vec![
+//!        query("CREATE (p { name: $name })").param("name", name.clone()),
+//!        query("CREATE (p { name: $name })").param("name", name.clone()),
+//!    ])
+//!    .await
+//!    .unwrap();
+//!
+//!
+//!    //start stream_one
+//!    let mut stream_one = txn
+//!        .execute(query("MATCH (p {name: $name}) RETURN p").param("name", name.clone()))
+//!        .await
+//!        .unwrap();
+//!    let row = stream_one.next().await.unwrap().unwrap();
+//!    assert_eq!(row.get::<Node>("p").unwrap().get::<String>("name").unwrap(), name.clone());
+//!
+//!    //start stream_two
+//!    let mut stream_two = txn.execute(query("RETURN 1")).await.unwrap();
+//!    let row = stream_two.next().await.unwrap().unwrap();
+//!    assert_eq!(row.get::<i64>("1").unwrap(), 1);
+//!
+//!    //stream_one is still active here
+//!    let row = stream_one.next().await.unwrap().unwrap();
+//!    assert_eq!(row.get::<Node>("p").unwrap().get::<String>("name").unwrap(), name.clone());
+//!
+//!    //stream_one completes
+//!    assert!(stream_one.next().await.unwrap().is_none());
+//!    //stream_two completes
+//!    assert!(stream_two.next().await.unwrap().is_none());
+//!    txn.commit().await.unwrap();
+//! }
+//!
+//! ```
+//!
+//!
+//! ### Rollback a transaction
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!
+//!    let txn = graph.start_txn().await.unwrap();
+//!    let id = Uuid::new_v4().to_string();
+//!    // create a node
+//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    // rollback the changes
+//!    txn.rollback().await.unwrap();
+//!
+//!    // changes not updated in the database
+//!    let mut result = graph
+//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    assert!(result.next().await.unwrap().is_none());
+//! }
+//!
+//! ```
+//!
+//! ### Txn vs Graph
+//!
+//! Everytime you execute a query using [`Graph::run`] or [`Graph::execute`], a new connection is
+//! taken from the pool and released immediately.
+//!
+//! However, when you execute a query on a transaction using [`Txn::run`] or [`Txn::execute`] the
+//! same connection will be reused, the underlying connection will be released to the pool in a
+//! clean state only after you commit/rollback the transaction and the [`Txn`] handle is dropped.
+//!
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let txn = graph.start_txn().await.unwrap();
+//!    let id = Uuid::new_v4().to_string();
+//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    // graph.execute(..) will not see the changes done above as the txn is not committed yet
+//!    let mut result = graph
+//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    assert!(result.next().await.unwrap().is_none());
+//!    txn.commit().await.unwrap();
+//!
+//!    //changes are now seen as the transaction is committed.
+//!    let mut result = graph
+//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
+//!        .await
+//!        .unwrap();
+//!    assert!(result.next().await.unwrap().is_some());
+//!    assert!(result.next().await.unwrap().is_some());
+//!    assert!(result.next().await.unwrap().is_none());
+//! }
+//!
 //! ```
 //!
 //! ## Relationships
@@ -131,211 +356,6 @@
 //! ```
 //!
 //!
-//! ## Transactions
-//!
-//! You can explicitly start a transaction using [`Graph::start_txn`], the returned handle [`Txn`]
-//! can be used to [`Txn::commit`] or [`Txn::rollback`] the transaction.
-//!
-//! Note that the handle takes a connection from the connection pool, which will be reserved for
-//! the transaction till the lifetime of the handle.
-//!
-//!
-//! Below example runs multiple queries in the same transaction.
-//!
-//! ```
-//! use neo4rs::*;
-//! use futures::stream::*;
-//! use uuid::Uuid;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let uri = "127.0.0.1:7687";
-//!    let user = "neo4j";
-//!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let txn = graph.start_txn().await.unwrap();
-//!    let id = Uuid::new_v4().to_string();
-//!    assert!(txn
-//!        .run_queries(vec![
-//!            query("CREATE (p:Person {id: $id})").param("id", id.clone()),
-//!            query("CREATE (p:Person {id: $id})").param("id", id.clone())
-//!        ])
-//!        .await
-//!        .is_ok());
-//!    txn.commit().await.unwrap();
-//!    let mut result = graph
-//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!
-//!    assert!(result.next().await.unwrap().is_some());
-//!    assert!(result.next().await.unwrap().is_some());
-//!    assert!(result.next().await.unwrap().is_none());
-//! }
-//!
-//! ```
-//!
-//!
-//!
-//!
-//! Just like [`Graph::run`] and [`Graph::execute`], [`Txn::run`] returns a unit type while [`Txn::execute`] returns a [`RowStream`]
-//!
-//! if you are executing multiple queries, each [`RowStream`] returned is isolated from the other
-//! and you can call [`RowStream::next`] at anytime within a transaction.
-//!
-//! ```
-//! use neo4rs::*;
-//! use futures::stream::*;
-//! use uuid::Uuid;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let config = config()
-//!        .uri("127.0.0.1:7687")
-//!        .user("neo4j")
-//!        .password("neo")
-//!        .fetch_size(1)
-//!        .build()
-//!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
-//!    let name = Uuid::new_v4().to_string();
-//!    let txn = graph.start_txn().await.unwrap();
-//!
-//!    txn.run_queries(vec![
-//!        query("CREATE (p { name: $name })").param("name", name.clone()),
-//!        query("CREATE (p { name: $name })").param("name", name.clone()),
-//!    ])
-//!    .await
-//!    .unwrap();
-//!
-//!    let mut stream_one = txn
-//!        .execute(query("MATCH (p {name: $name}) RETURN p").param("name", name.clone()))
-//!        .await
-//!        .unwrap();
-//!
-//!    assert_eq!(
-//!        stream_one
-//!            .next()
-//!            .await
-//!            .unwrap()
-//!            .unwrap()
-//!            .get::<Node>("p")
-//!            .unwrap()
-//!            .get::<String>("name")
-//!            .unwrap(),
-//!        name.clone()
-//!    );
-//!
-//!    let mut stream_two = txn.execute(query("RETURN 1")).await.unwrap();
-//!    assert_eq!(
-//!        stream_two
-//!            .next()
-//!            .await
-//!            .unwrap()
-//!            .unwrap()
-//!            .get::<i64>("1")
-//!            .unwrap(),
-//!        1
-//!    );
-//!
-//!    assert_eq!(
-//!        stream_one
-//!            .next()
-//!            .await
-//!            .unwrap()
-//!            .unwrap()
-//!            .get::<Node>("p")
-//!            .unwrap()
-//!            .get::<String>("name")
-//!            .unwrap(),
-//!        name.clone()
-//!    );
-//!
-//!    assert!(stream_one.next().await.unwrap().is_none());
-//!    assert!(stream_two.next().await.unwrap().is_none());
-//!    txn.commit().await.unwrap();
-//! }
-//!
-//! ```
-//!
-//!
-//! At anypoint within a transaction, you can rollback the txn.
-//! ```
-//! use neo4rs::*;
-//! use futures::stream::*;
-//! use uuid::Uuid;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let uri = "127.0.0.1:7687";
-//!    let user = "neo4j";
-//!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!
-//!    let txn = graph.start_txn().await.unwrap();
-//!    let id = Uuid::new_v4().to_string();
-//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    txn.rollback().await.unwrap();
-//!    let mut result = graph
-//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    assert!(result.next().await.unwrap().is_none());
-//! }
-//!
-//! ```
-//!
-//!
-//!
-//!
-//! All changes done within a transaction is not visible to you if you use [`Graph::run`] or
-//! [`Graph::execute`] from within the transaction, if you need to query the intermediate state
-//! within the transaction, then you should use [`Txn::execute`]
-//!
-//! ```
-//! use neo4rs::*;
-//! use futures::stream::*;
-//! use uuid::Uuid;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let uri = "127.0.0.1:7687";
-//!    let user = "neo4j";
-//!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let txn = graph.start_txn().await.unwrap();
-//!    let id = Uuid::new_v4().to_string();
-//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    //the result returned here will not have the nodes created above, if you want see the
-//!    //changes, then use txn.execute(...) instead.
-//!    let mut result = graph
-//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    assert!(result.next().await.unwrap().is_none());
-//!    txn.commit().await.unwrap();
-//!
-//!    //changes are now seen as the transaction is committed.
-//!    let mut result = graph
-//!        .execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone()))
-//!        .await
-//!        .unwrap();
-//!    assert!(result.next().await.unwrap().is_some());
-//!    assert!(result.next().await.unwrap().is_some());
-//!    assert!(result.next().await.unwrap().is_none());
-//! }
-//!
-//! ```
 //!
 //! ## Points
 //!
@@ -445,14 +465,7 @@
 //! }
 //!
 //! ```
-//!
-//! ## Date & Time
-//!
-//! Notice that return type of a time value is a tuple `(chrono::NaiveTime, Option<chrono::FixedOffset>)`,
-//! this is because the time returned by the server may not have any timezone/offset information.
-//!
-//! Also, the [`chrono::NaiveTime`] doesn't have any offset attribute within it, hence it is returned
-//! as the second element in the tuple.
+//! ## Date
 //!
 //! ```
 //! use neo4rs::*;
@@ -474,18 +487,42 @@
 //!    let d: chrono::NaiveDate = row.get("output").unwrap();
 //!    assert_eq!(d.to_string(), "1985-02-05");
 //!    assert!(result.next().await.unwrap().is_none());
+//! }
+//! ```
+//!
+//!
+//! ## Time
+//!
+//! Neo4rs uses [chrono][chrono] crate for time abstractions.
+//!
+//! [chrono]: https://crates.io/crates/chrono
+//!
+//!
+//! ### Time as param
+//!
+//! Pass a time (without offset) as a parameter to the query:
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
 //!
 //!    //send time without offset as param
 //!    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
-//!    let mut result = graph
-//!        .execute(query("RETURN $d as output").param("d", time))
-//!        .await
-//!        .unwrap();
+//!    let mut result = graph.execute(query("RETURN $d as output").param("d", time)).await.unwrap();
 //!    let row = result.next().await.unwrap().unwrap();
 //!    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
 //!    assert_eq!(t.0.to_string(), "11:15:30.000000200");
 //!    assert_eq!(t.1, None);
 //!    assert!(result.next().await.unwrap().is_none());
+//!
 //!
 //!    //send time with offset as param
 //!    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
@@ -499,6 +536,23 @@
 //!    assert_eq!(t.0.to_string(), "11:15:30.000000200");
 //!    assert_eq!(t.1, Some(offset));
 //!    assert!(result.next().await.unwrap().is_none());
+//! }
+//! ```
+//!
+//!
+//! ### Parsing time from result
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
 //!
 //!    //Parse time without offset
 //!    let mut result = graph
@@ -525,7 +579,6 @@
 //!    assert_eq!(t.0.to_string(), "10:15:33.000000200");
 //!    assert_eq!(t.1, Some(chrono::FixedOffset::east(1 * 3600)));
 //!    assert!(result.next().await.unwrap().is_none());
-//!
 //! }
 //!
 //! ```
@@ -544,21 +597,13 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
 //!    let name = Uuid::new_v4().to_string();
-//!    graph
-//!        .run(
-//!            query("CREATE (p:Person { name: $name })-[r:WORKS_AT]->(n:Company { name: 'Neo'})")
-//!                .param("name", name.clone()),
-//!        )
-//!        .await
-//!        .unwrap();
+//!    graph.run(
+//!      query("CREATE (p:Person { name: $name })-[r:WORKS_AT]->(n:Company { name: 'Neo'})").param("name", name.clone()),
+//!    ).await.unwrap();
 //!
-//!    let mut result = graph
-//!        .execute(
-//!            query("MATCH p = (person:Person { name: $name })-[r:WORKS_AT]->(c:Company) RETURN p")
-//!                .param("name", name),
-//!        )
-//!        .await
-//!        .unwrap();
+//!    let mut result = graph.execute(
+//!       query("MATCH p = (person:Person { name: $name })-[r:WORKS_AT]->(c:Company) RETURN p").param("name", name),
+//!    ).await.unwrap();
 //!
 //!    let row = result.next().await.unwrap().unwrap();
 //!    let path: Path = row.get("p").unwrap();
