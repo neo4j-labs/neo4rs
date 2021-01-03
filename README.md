@@ -7,7 +7,7 @@
 [docs-badge]: https://img.shields.io/badge/docs-latest-blue.svg?style=shield
 [docs-url]: https://docs.rs/neo4rs
 
-Neo4rs is a native rust driver implemented using [bolt specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
+Neo4rs is a Neo4j rust driver implemented using [bolt specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
 
 This driver is compatible with neo4j 4.x versions
 
