@@ -81,6 +81,7 @@ impl Hash for BoltType {
             BoltType::Date(t) => t.hash(state),
             BoltType::Time(t) => t.hash(state),
             BoltType::LocalTime(t) => t.hash(state),
+            //The below types cannot be hashed
             BoltType::Path(_) => panic!("path not hashed"),
             BoltType::Bytes(_) => panic!("bytes not hashed"),
             BoltType::Float(_) => panic!("float not hashed"),

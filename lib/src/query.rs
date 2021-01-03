@@ -7,13 +7,13 @@ use crate::types::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// Abstracts a cypher query that is sent to neo4j server.
 #[derive(Clone)]
 pub struct Query {
     query: String,
     params: BoltMap,
 }
 
-/// Abstracts a cypher query that is sent to neo4j server.
 impl Query {
     pub fn new(query: String) -> Self {
         Query {
