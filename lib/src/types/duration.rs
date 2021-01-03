@@ -62,8 +62,6 @@ mod tests {
 
         let bytes: Bytes = duration.to_bytes(Version::V4_1).unwrap();
 
-        println!("{:#04X?}", bytes.bytes());
-
         assert_eq!(
             bytes,
             Bytes::from_static(&[0xB4, 0x45, 0x0C, 0x02, 0x1E, 0xC9, 0x02, 0xBC,])

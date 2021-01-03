@@ -149,7 +149,7 @@ mod tests {
 
         let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
 
-        assert_eq!(b.bytes(), Bytes::from_static(&[TINY]));
+        assert_eq!(&b[..], Bytes::from_static(&[TINY]));
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests {
 
         let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
 
-        assert_eq!(b.bytes(), Bytes::from_static(&[0x92, 0x81, 0x61, 0x01]));
+        assert_eq!(&b[..], Bytes::from_static(&[0x92, 0x81, 0x61, 0x01]));
     }
 
     #[test]

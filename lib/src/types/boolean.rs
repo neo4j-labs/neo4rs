@@ -50,11 +50,11 @@ mod tests {
     fn should_serialize_boolean() {
         let bolt_boolean = BoltBoolean::new(true);
         let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
-        assert_eq!(b.bytes(), &[0xC3]);
+        assert_eq!(&b[..], &[0xC3]);
 
         let bolt_boolean = BoltBoolean::new(false);
         let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
-        assert_eq!(b.bytes(), &[0xC2]);
+        assert_eq!(&b[..], &[0xC2]);
     }
 
     #[test]

@@ -107,7 +107,7 @@ mod tests {
     fn should_serialize_empty_string() {
         let s = BoltString::new("");
         let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
-        assert_eq!(b.bytes(), Bytes::from_static(&[TINY]));
+        assert_eq!(&b[..], Bytes::from_static(&[TINY]));
     }
 
     #[test]
@@ -121,7 +121,7 @@ mod tests {
     fn should_serialize_tiny_string() {
         let s = BoltString::new("a");
         let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
-        assert_eq!(b.bytes(), Bytes::from_static(&[0x81, 0x61]));
+        assert_eq!(&b[..], Bytes::from_static(&[0x81, 0x61]));
     }
 
     #[test]

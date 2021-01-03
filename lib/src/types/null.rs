@@ -20,6 +20,6 @@ mod tests {
     fn should_serialize_null() {
         let null = BoltNull::new();
         let b: Bytes = null.to_bytes(Version::V4_1).unwrap();
-        assert_eq!(b.bytes(), &[0xC0]);
+        assert_eq!(&b[..], &[0xC0]);
     }
 }

@@ -83,7 +83,7 @@ mod tests {
         let serialized: Bytes = bolt_bytes.to_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
-            serialized.bytes(),
+            &serialized[..],
             Bytes::from_static(&[SMALL, 0x05, b'h', b'e', b'l', b'l', b'o'])
         );
 

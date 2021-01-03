@@ -46,13 +46,13 @@ mod tests {
     fn should_serialize_float() {
         let b: Bytes = BoltFloat::new(1.23).to_bytes(Version::V4_1).unwrap();
         assert_eq!(
-            b.bytes(),
+            &b[..],
             &[0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE]
         );
 
         let b: Bytes = BoltFloat::new(-1.23).to_bytes(Version::V4_1).unwrap();
         assert_eq!(
-            b.bytes(),
+            &b[..],
             &[0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,]
         );
     }
