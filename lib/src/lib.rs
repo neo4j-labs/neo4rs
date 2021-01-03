@@ -42,7 +42,7 @@
 //!              query("MATCH (p:Person {id: $id}) RETURN p").param("id", id)
 //!            ).await.unwrap();
 //!            while let Ok(Some(row)) = result.next().await {
-//!                count.fetch_add(1, Ordering::SeqCst);
+//!                count.fetch_add(1, Ordering::Relaxed);
 //!            }
 //!        });
 //!        handles.push(handle);
