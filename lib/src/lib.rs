@@ -1,7 +1,7 @@
 //! Neo4j driver compatible with neo4j 4.x versions
 //!
 //! * An implementation of the [bolt protocol][bolt] to interact with Neo4j server
-//! * async/await apis using [tokio executor][tokio]
+//! * async/await apis using [tokio][tokio]
 //! * Supports bolt 4.2 specification
 //! * tested with Neo4j versions: 4.0, 4.1, 4.2
 //!
