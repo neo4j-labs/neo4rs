@@ -52,6 +52,12 @@ impl From<String> for BoltString {
     }
 }
 
+impl Into<String> for BoltString {
+    fn into(self) -> String {
+        self.value
+    }
+}
+
 impl BoltString {
     pub fn to_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(

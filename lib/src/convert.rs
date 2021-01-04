@@ -69,6 +69,28 @@ impl TryFrom<BoltType> for chrono::NaiveDate {
     }
 }
 
+impl TryFrom<BoltType> for chrono::DateTime<chrono::FixedOffset> {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<chrono::DateTime<chrono::FixedOffset>> {
+        match input {
+            BoltType::DateTime(d) => d.try_into(),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for chrono::NaiveDateTime {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<chrono::NaiveDateTime> {
+        match input {
+            BoltType::LocalDateTime(d) => d.try_into(),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for (chrono::NaiveTime, Option<chrono::FixedOffset>) {
     type Error = Error;
 
@@ -83,6 +105,17 @@ impl TryFrom<BoltType> for (chrono::NaiveTime, Option<chrono::FixedOffset>) {
                 }
             }
             BoltType::LocalTime(d) => Ok((d.into(), None)),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
+impl TryFrom<BoltType> for (chrono::NaiveDateTime, String) {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<(chrono::NaiveDateTime, String)> {
+        match input {
+            BoltType::DateTimeZoneId(date_time_zone_id) => date_time_zone_id.try_into(),
             _ => Err(Error::ConverstionError),
         }
     }
@@ -202,9 +235,27 @@ impl Into<BoltType> for chrono::NaiveTime {
     }
 }
 
+impl Into<BoltType> for chrono::NaiveDateTime {
+    fn into(self) -> BoltType {
+        BoltType::LocalDateTime(self.into())
+    }
+}
+
+impl Into<BoltType> for chrono::DateTime<chrono::FixedOffset> {
+    fn into(self) -> BoltType {
+        BoltType::DateTime(self.into())
+    }
+}
+
 impl Into<BoltType> for (chrono::NaiveTime, chrono::FixedOffset) {
     fn into(self) -> BoltType {
         BoltType::Time(self.into())
+    }
+}
+
+impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
+    fn into(self) -> BoltType {
+        BoltType::DateTimeZoneId(self.into())
     }
 }
 

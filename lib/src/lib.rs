@@ -467,6 +467,10 @@
 //! ```
 //! ## Date
 //!
+//! See [NaiveDate][naive_date] for date abstraction, it captures the date without time component.
+//!
+//! [naive_date]: https://docs.rs/chrono/0.4.19/chrono/naive/struct.NaiveDate.html
+//!
 //! ```
 //! use neo4rs::*;
 //! use futures::stream::*;
@@ -493,14 +497,17 @@
 //!
 //! ## Time
 //!
-//! Neo4rs uses [chrono][chrono] crate for time abstractions.
+//! * [NaiveTime][naive_time] captures only the time of the day
+//! * `tuple`([NaiveTime][naive_time], `Option`<[FixedOffset][fixed_offset]>) captures the time of the day along with the
+//! offset
 //!
-//! [chrono]: https://crates.io/crates/chrono
+//! [naive_time]: https://docs.rs/chrono/0.4.19/chrono/naive/struct.NaiveTime.html
+//! [fixed_offset]: https://docs.rs/chrono/0.4.19/chrono/offset/struct.FixedOffset.html
 //!
 //!
 //! ### Time as param
 //!
-//! Pass a time (without offset) as a parameter to the query:
+//! Pass a time as a parameter to the query:
 //!
 //! ```
 //! use neo4rs::*;
@@ -582,6 +589,133 @@
 //! }
 //!
 //! ```
+//!
+//!
+//! ## DateTime
+//!
+//!
+//! * [DateTime][date_time] captures the date and time with offset
+//! * [NaiveDateTime][naive_date_time] captures the date time without offset
+//! * `tuple`([NaiveDateTime][naive_date_time], String)  captures the date/time and the time zone id
+//!
+//! [date_time]: https://docs.rs/chrono/0.4.19/chrono/struct.DateTime.html
+//! [naive_date_time]: https://docs.rs/chrono/0.4.19/chrono/struct.NaiveDateTime.html
+//!
+//!
+//! ### DateTime as param
+//!
+//! Pass a DateTime as parameter to the query:
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!
+//!    //send datetime as parameter in the query
+//!    let datetime = chrono::DateTime::parse_from_rfc2822("Tue, 01 Jul 2003 10:52:37 +0200").unwrap();
+//!
+//!    let mut result = graph
+//!        .execute(query("RETURN $d as output").param("d", datetime))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let t: chrono::DateTime<chrono::FixedOffset> = row.get("output").unwrap();
+//!    assert_eq!(t.to_string(), "2003-07-01 10:52:37 +02:00");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//!    //send NaiveDateTime as parameter in the query
+//!    let localdatetime = chrono::NaiveDateTime::parse_from_str("2015-07-01 08:55:59.123", "%Y-%m-%d %H:%M:%S%.f").unwrap();
+//!
+//!    let mut result = graph
+//!        .execute(query("RETURN $d as output").param("d", localdatetime))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let t: chrono::NaiveDateTime = row.get("output").unwrap();
+//!    assert_eq!(t.to_string(), "2015-07-01 08:55:59.123");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//!    //send NaiveDateTime with timezone id as parameter in the query
+//!    let datetime = chrono::NaiveDateTime::parse_from_str("2015-07-03 08:55:59.555", "%Y-%m-%d %H:%M:%S%.f").unwrap();
+//!    let timezone =  "Europe/Paris";
+//!
+//!    let mut result = graph
+//!        .execute(query("RETURN $d as output").param("d", (datetime, timezone)))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let (time, zone): (chrono::NaiveDateTime, String) = row.get("output").unwrap();
+//!    assert_eq!(time.to_string(), "2015-07-03 08:55:59.555");
+//!    assert_eq!(zone, "Europe/Paris");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//! }
+//! ```
+//!
+//! ### Parsing DateTime from result
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//! use uuid::Uuid;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!
+//!    //Parse NaiveDateTime from result
+//!    let mut result = graph
+//!        .execute(query(
+//!            "WITH localdatetime('2015-06-24T12:50:35.556') AS t RETURN t",
+//!        ))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let t: chrono::NaiveDateTime = row.get("t").unwrap();
+//!    assert_eq!(t.to_string(), "2015-06-24 12:50:35.556");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//!    //Parse DateTime from result
+//!    let mut result = graph
+//!        .execute(query(
+//!            "WITH datetime('2015-06-24T12:50:35.777+0100') AS t RETURN t",
+//!        ))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let t: chrono::DateTime<chrono::FixedOffset> = row.get("t").unwrap();
+//!    assert_eq!(t.to_string(), "2015-06-24 12:50:35.777 +01:00");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//!
+//!    //Parse NaiveDateTime with zone id from result
+//!    let mut result = graph
+//!        .execute(query(
+//!            "WITH datetime({ year:1984, month:11, day:11, hour:12, minute:31, second:14, nanosecond: 645876123, timezone:'Europe/Stockholm' }) AS d return d",
+//!        ))
+//!        .await
+//!        .unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let (datetime, zone_id): (chrono::NaiveDateTime, String) = row.get("d").unwrap();
+//!    assert_eq!(datetime.to_string(), "1984-11-11 12:31:14.645876123");
+//!    assert_eq!(zone_id, "Europe/Stockholm");
+//!    assert!(result.next().await.unwrap().is_none());
+//!
+//! }
+//!
+//! ```
+//!
+//!
 //!
 //! ## Path
 //!

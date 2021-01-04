@@ -1,6 +1,7 @@
 pub mod binary;
 pub mod boolean;
 pub mod date;
+pub mod date_time;
 pub mod duration;
 pub mod float;
 pub mod integer;
@@ -16,6 +17,7 @@ pub mod time;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;
+pub use date_time::{BoltDateTime, BoltDateTimeZoneId, BoltLocalDateTime};
 pub use duration::BoltDuration;
 pub use float::BoltFloat;
 pub use integer::BoltInteger;
@@ -57,6 +59,9 @@ pub enum BoltType {
     Date(BoltDate),
     Time(BoltTime),
     LocalTime(BoltLocalTime),
+    DateTime(BoltDateTime),
+    LocalDateTime(BoltLocalDateTime),
+    DateTimeZoneId(BoltDateTimeZoneId),
 }
 
 impl Display for BoltType {
@@ -81,6 +86,9 @@ impl Hash for BoltType {
             BoltType::Date(t) => t.hash(state),
             BoltType::Time(t) => t.hash(state),
             BoltType::LocalTime(t) => t.hash(state),
+            BoltType::DateTime(t) => t.hash(state),
+            BoltType::LocalDateTime(t) => t.hash(state),
+            BoltType::DateTimeZoneId(t) => t.hash(state),
             //The below types cannot be hashed
             BoltType::Path(_) => panic!("path not hashed"),
             BoltType::Bytes(_) => panic!("bytes not hashed"),
@@ -116,6 +124,9 @@ impl BoltType {
             BoltType::Date(t) => t.to_bytes(version),
             BoltType::Time(t) => t.to_bytes(version),
             BoltType::LocalTime(t) => t.to_bytes(version),
+            BoltType::DateTime(t) => t.to_bytes(version),
+            BoltType::LocalDateTime(t) => t.to_bytes(version),
+            BoltType::DateTimeZoneId(t) => t.to_bytes(version),
         }
     }
 
@@ -165,6 +176,15 @@ impl BoltType {
             }
             input if BoltLocalTime::can_parse(version, input.clone()) => {
                 BoltType::LocalTime(BoltLocalTime::parse(version, input)?)
+            }
+            input if BoltDateTime::can_parse(version, input.clone()) => {
+                BoltType::DateTime(BoltDateTime::parse(version, input)?)
+            }
+            input if BoltLocalDateTime::can_parse(version, input.clone()) => {
+                BoltType::LocalDateTime(BoltLocalDateTime::parse(version, input)?)
+            }
+            input if BoltDateTimeZoneId::can_parse(version, input.clone()) => {
+                BoltType::DateTimeZoneId(BoltDateTimeZoneId::parse(version, input)?)
             }
             input if BoltUnboundedRelation::can_parse(version, input.clone()) => {
                 BoltType::UnboundedRelation(BoltUnboundedRelation::parse(version, input)?)

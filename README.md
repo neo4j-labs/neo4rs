@@ -49,39 +49,6 @@ This driver is compatible with neo4j 4.x versions
 ```
 
 
-
----
-
-# Roadmap
-- [x] bolt protocol
-- [x] stream abstraction
-- [x] query.run() vs query.execute() abstraction
-- [x] respect "has_more" flag returned for PULL
-- [x] connection pooling
-- [x] explicit transactions
-- [x] use buffered TCP streams
-- [x] improve error messages & logging
-- [x] fetch rows in blocks
-- [x] configureable fetch size
-- [x] multi db support
-- [x] multi version support
-- [x] support data types
-	- [x] Float
-	- [x] Bytes
-- [ ] support structures
-	- [x] Relationship
-	- [x] Point2D
-	- [x] Point3D
-	- [x] UnboundedRelationship
-	- [x] Path
-	- [x] Duration
-	- [x] Date
-	- [x] Time
-	- [x] LocalTime
-	- [ ] DateTime
-	- [ ] DateTimeZoneId
-	- [ ] LocalDateTime
-
 ## License
 
 Neo4rs is licensed under either of the following, at your option:
