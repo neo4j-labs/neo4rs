@@ -53,6 +53,36 @@
 //! }
 //! ```
 //!
+//! ## Configurations
+//!
+//! Use the config builder to override the default configurations like
+//! * `fetch_size` - number of rows to fetch in batches (default is 200)
+//! * `max_connections` - maximum size of the connection pool (default is 16)
+//! * `db` - the database to connect to (default is `neo4j`)
+//!
+//! ```
+//! use neo4rs::*;
+//! use futures::stream::*;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let config = config()
+//!        .uri("127.0.0.1:7687")
+//!        .user("neo4j")
+//!        .password("neo")
+//!        .db("neo4j")
+//!        .fetch_size(500)
+//!        .max_connections(10)
+//!        .build()
+//!        .unwrap();
+//!    let graph = Graph::connect(config).await.unwrap();
+//!    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
+//!    let row = result.next().await.unwrap().unwrap();
+//!    let value: i64 = row.get("1").unwrap();
+//!    assert_eq!(1, value);
+//!    assert!(result.next().await.unwrap().is_none());
+//! }
+//! ```
 //!
 //! ## Nodes
 //! A simple example to create a node and consume the created node from the row stream.
@@ -86,36 +116,6 @@
 //!         assert_eq!(labels, vec!["Person"]);
 //!         assert!(id > 0);
 //!     }
-//! }
-//! ```
-//! ## Configurations
-//!
-//! Use the config builder to override the default configurations like
-//! * `fetch_size` - number of rows to fetch in batches (default is 200)
-//! * `max_connections` - maximum size of the connection pool (default is 16)
-//! * `db` - the database to connect to (default is `neo4j`)
-//!
-//! ```
-//! use neo4rs::*;
-//! use futures::stream::*;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let config = config()
-//!        .uri("127.0.0.1:7687")
-//!        .user("neo4j")
-//!        .password("neo")
-//!        .db("neo4j")
-//!        .fetch_size(500)
-//!        .max_connections(10)
-//!        .build()
-//!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
-//!    let mut result = graph.execute(query("RETURN 1")).await.unwrap();
-//!    let row = result.next().await.unwrap().unwrap();
-//!    let value: i64 = row.get("1").unwrap();
-//!    assert_eq!(1, value);
-//!    assert!(result.next().await.unwrap().is_none());
 //! }
 //! ```
 //!
