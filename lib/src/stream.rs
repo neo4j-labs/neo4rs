@@ -70,12 +70,7 @@ impl RowStream {
                         let row = Row::new(self.fields.clone(), record.data);
                         self.buffer.push_back(row);
                     }
-                    msg => {
-                        return Err(Error::UnexpectedMessage(format!(
-                            "unexpected response for PULL: {:?}",
-                            msg
-                        )))
-                    }
+                    msg => return Err(unexpected(msg, "PULL")),
                 },
                 State::Buffered => {
                     if !self.buffer.is_empty() {

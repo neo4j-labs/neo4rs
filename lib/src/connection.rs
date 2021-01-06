@@ -1,4 +1,4 @@
-use crate::errors::{Error, Result};
+use crate::errors::{unexpected, Error, Result};
 use crate::messages::*;
 use crate::version::Version;
 use bytes::*;
@@ -35,20 +35,15 @@ impl Connection {
             BoltResponse::FailureMessage(msg) => {
                 Err(Error::AuthenticationError(msg.get("message").unwrap()))
             }
-            msg => Err(Error::UnexpectedMessage(format!(
-                "unexpected response for HELLO: {:?}",
-                msg
-            ))),
+
+            msg => Err(unexpected(msg, "HELLO")),
         }
     }
 
     pub async fn reset(&mut self) -> Result<()> {
         match self.send_recv(BoltRequest::reset()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
-            msg => Err(Error::UnexpectedMessage(format!(
-                "unexpected response for RESET: {:?}",
-                msg
-            ))),
+            msg => Err(unexpected(msg, "RESET")),
         }
     }
 

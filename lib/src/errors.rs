@@ -34,3 +34,10 @@ impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {
         }
     }
 }
+
+pub fn unexpected<T: std::fmt::Debug>(response: T, request: &str) -> Error {
+    Error::UnexpectedMessage(format!(
+        "unexpected response for {}: {:?}",
+        request, response
+    ))
+}

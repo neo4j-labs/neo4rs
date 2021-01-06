@@ -38,16 +38,10 @@ impl Query {
             BoltResponse::SuccessMessage(_) => {
                 match connection.send_recv(BoltRequest::discard()).await? {
                     BoltResponse::SuccessMessage(_) => Ok(()),
-                    msg => Err(Error::UnexpectedMessage(format!(
-                        "unexpected response for DISCARD: {:?}",
-                        msg
-                    ))),
+                    msg => Err(unexpected(msg, "DISCARD")),
                 }
             }
-            msg => Err(Error::UnexpectedMessage(format!(
-                "unexpected response for RUN: {:?}",
-                msg
-            ))),
+            msg => Err(unexpected(msg, "RUN")),
         }
     }
 
@@ -68,10 +62,7 @@ impl Query {
                     connection.clone(),
                 ))
             }
-            msg => Err(Error::UnexpectedMessage(format!(
-                "unexpected response for RUN: {:?}",
-                msg
-            ))),
+            msg => Err(unexpected(msg, "RUN")),
         }
     }
 }
