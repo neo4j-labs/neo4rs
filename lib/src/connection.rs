@@ -68,20 +68,27 @@ impl Connection {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
-            let mut data = [0, 0];
-            self.stream.read_exact(&mut data).await?;
-            chunk_size = u16::from_be_bytes(data);
+            chunk_size = self.read_u16().await?;
         }
 
         while chunk_size > 0 {
-            let mut buf = vec![0; chunk_size as usize];
-            self.stream.read_exact(&mut buf).await?;
-            bytes.put_slice(&buf);
-            let mut data = [0, 0];
-            self.stream.read_exact(&mut data).await?;
-            chunk_size = u16::from_be_bytes(data);
+            let chunk = self.read(chunk_size).await?;
+            bytes.put_slice(&chunk);
+            chunk_size = self.read_u16().await?;
         }
 
         Ok(BoltResponse::parse(self.version, bytes.freeze())?)
+    }
+
+    async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
+        let mut buf = vec![0; size as usize];
+        self.stream.read_exact(&mut buf).await?;
+        Ok(buf)
+    }
+
+    async fn read_u16(&mut self) -> Result<u16> {
+        let mut data = [0, 0];
+        self.stream.read_exact(&mut data).await?;
+        Ok(u16::from_be_bytes(data))
     }
 }
