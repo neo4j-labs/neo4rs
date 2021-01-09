@@ -55,14 +55,12 @@ impl Path {
 
     pub fn nodes(&self) -> Vec<Node> {
         let nodes = self.inner.nodes();
-        nodes.into_iter().map(|n| Node::new(n)).collect()
+        nodes.into_iter().map(Node::new).collect()
     }
 
     pub fn rels(&self) -> Vec<UnboundedRelation> {
         let rels = self.inner.rels();
-        rels.into_iter()
-            .map(|r| UnboundedRelation::new(r))
-            .collect()
+        rels.into_iter().map(UnboundedRelation::new).collect()
     }
 }
 

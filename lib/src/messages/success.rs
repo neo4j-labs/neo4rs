@@ -8,21 +8,8 @@ pub struct Success {
 }
 
 impl Success {
-    pub fn new(metadata: BoltMap) -> Success {
-        Success { metadata }
-    }
-}
-
-impl Success {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.metadata.get(key)
-    }
-
-    pub fn fields(&self) -> Vec<String> {
-        match self.metadata.get("fields").unwrap() {
-            BoltType::List(list) => list.into(),
-            _ => vec![],
-        }
     }
 }
 

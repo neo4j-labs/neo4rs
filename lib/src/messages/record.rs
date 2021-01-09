@@ -7,12 +7,6 @@ pub struct Record {
     pub data: BoltList,
 }
 
-impl Record {
-    pub fn new(data: BoltList) -> Record {
-        Record { data }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

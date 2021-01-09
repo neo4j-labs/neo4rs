@@ -8,12 +8,6 @@ pub struct Failure {
 }
 
 impl Failure {
-    pub fn new(metadata: BoltMap) -> Failure {
-        Failure { metadata }
-    }
-}
-
-impl Failure {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.metadata.get(key)
     }

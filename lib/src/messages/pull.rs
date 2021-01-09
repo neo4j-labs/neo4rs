@@ -9,7 +9,7 @@ pub struct Pull {
 
 impl Default for Pull {
     fn default() -> Self {
-        Pull::new(-1 as i64, -1 as i64)
+        Pull::new(-1 as i64, -1)
     }
 }
 

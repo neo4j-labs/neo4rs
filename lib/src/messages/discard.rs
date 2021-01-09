@@ -9,7 +9,7 @@ pub struct Discard {
 
 impl Default for Discard {
     fn default() -> Self {
-        Discard::new(-1 as i64, -1 as i64)
+        Discard::new(-1 as i64, -1)
     }
 }
 
