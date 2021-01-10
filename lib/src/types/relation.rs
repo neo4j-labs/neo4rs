@@ -76,7 +76,7 @@ mod tests {
             properties,
         };
 
-        let bytes: Bytes = relation.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = relation.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,
@@ -113,7 +113,7 @@ mod tests {
         let properties = vec![("name".into(), "Mark".into())].into_iter().collect();
         let relation = BoltUnboundedRelation::new(id, typ, properties);
 
-        let bytes: Bytes = relation.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = relation.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

@@ -60,7 +60,7 @@ mod tests {
     fn should_serialize_a_duration() {
         let duration = BoltDuration::new(12.into(), 2.into(), 30.into(), 700.into());
 
-        let bytes: Bytes = duration.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = duration.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

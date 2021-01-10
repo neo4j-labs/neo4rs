@@ -73,7 +73,7 @@ mod tests {
             ids: vec![22.into(), 42.into()].into(),
         };
 
-        let bytes: Bytes = path.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = path.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

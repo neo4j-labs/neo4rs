@@ -89,17 +89,17 @@ impl BoltRequest {
 }
 
 impl BoltRequest {
-    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let bytes: Bytes = match self {
-            BoltRequest::HelloMessage(hello) => hello.to_bytes(version)?,
-            BoltRequest::GoodByeMessage(bye) => bye.to_bytes(version)?,
-            BoltRequest::RunMessage(run) => run.to_bytes(version)?,
-            BoltRequest::PullMessage(pull) => pull.to_bytes(version)?,
-            BoltRequest::DiscardMessage(discard) => discard.to_bytes(version)?,
-            BoltRequest::BeginMessage(begin) => begin.to_bytes(version)?,
-            BoltRequest::CommitMessage(commit) => commit.to_bytes(version)?,
-            BoltRequest::RollbackMessage(rollback) => rollback.to_bytes(version)?,
-            BoltRequest::ResetMessage(reset) => reset.to_bytes(version)?,
+            BoltRequest::HelloMessage(hello) => hello.into_bytes(version)?,
+            BoltRequest::GoodByeMessage(bye) => bye.into_bytes(version)?,
+            BoltRequest::RunMessage(run) => run.into_bytes(version)?,
+            BoltRequest::PullMessage(pull) => pull.into_bytes(version)?,
+            BoltRequest::DiscardMessage(discard) => discard.into_bytes(version)?,
+            BoltRequest::BeginMessage(begin) => begin.into_bytes(version)?,
+            BoltRequest::CommitMessage(commit) => commit.into_bytes(version)?,
+            BoltRequest::RollbackMessage(rollback) => rollback.into_bytes(version)?,
+            BoltRequest::ResetMessage(reset) => reset.into_bytes(version)?,
         };
         Ok(bytes)
     }

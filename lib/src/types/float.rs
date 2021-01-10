@@ -30,7 +30,7 @@ impl BoltFloat {
         Ok(BoltFloat::new(value))
     }
 
-    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<f64>());
         bytes.put_u8(MARKER);
         bytes.put_f64(self.value);
@@ -44,13 +44,13 @@ mod tests {
 
     #[test]
     fn should_serialize_float() {
-        let b: Bytes = BoltFloat::new(1.23).to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = BoltFloat::new(1.23).into_bytes(Version::V4_1).unwrap();
         assert_eq!(
             &b[..],
             &[0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE]
         );
 
-        let b: Bytes = BoltFloat::new(-1.23).to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = BoltFloat::new(-1.23).into_bytes(Version::V4_1).unwrap();
         assert_eq!(
             &b[..],
             &[0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,]

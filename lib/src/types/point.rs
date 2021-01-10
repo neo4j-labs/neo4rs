@@ -34,7 +34,7 @@ mod tests {
 
         let point = BoltPoint2D { sr_id, x, y };
 
-        let bytes: Bytes = point.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = point.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             &bytes[..],
@@ -68,7 +68,7 @@ mod tests {
 
         let point = BoltPoint3D { sr_id, x, y, z };
 
-        let bytes: Bytes = point.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = point.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             &bytes[..],

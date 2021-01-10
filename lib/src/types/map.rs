@@ -77,12 +77,12 @@ impl FromIterator<(BoltString, BoltType)> for BoltMap {
 }
 
 impl BoltMap {
-    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let mut key_value_bytes = BytesMut::new();
         let length = self.value.len();
         for (key, value) in self.value {
-            let key_bytes: Bytes = key.to_bytes(version)?;
-            let value_bytes: Bytes = value.to_bytes(version)?;
+            let key_bytes: Bytes = key.into_bytes(version)?;
+            let value_bytes: Bytes = value.into_bytes(version)?;
             key_value_bytes.put(key_bytes);
             key_value_bytes.put(value_bytes);
         }
@@ -146,7 +146,7 @@ mod tests {
     fn should_serialize_empty_map() {
         let map = BoltMap::new();
 
-        let b: Bytes = map.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = map.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(&b[..], Bytes::from_static(&[TINY]));
     }
@@ -156,7 +156,7 @@ mod tests {
         let mut map = BoltMap::new();
         map.put("a".into(), "b".into());
 
-        let b: Bytes = map.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = map.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(&b[..], Bytes::from_static(&[0xA1, 0x81, 0x61, 0x81, 0x62]));
     }
@@ -180,7 +180,7 @@ mod tests {
         }
 
         let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
+            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], SMALL);
         let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
@@ -194,7 +194,7 @@ mod tests {
         }
 
         let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
+            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], MEDIUM);
         let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
@@ -208,7 +208,7 @@ mod tests {
         }
 
         let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().to_bytes(Version::V4_1).unwrap()));
+            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
         assert_eq!(bytes.borrow()[0], LARGE);
         let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);

@@ -73,7 +73,7 @@ mod tests {
         let time: BoltTime = (time, offset).into();
 
         assert_eq!(
-            time.to_bytes(Version::V4_1).unwrap(),
+            time.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[
                 0xB2, 0x54, 0xCB, 0x00, 0x00, 0x17, 0x5D, 0x2F, 0xB8, 0x3A, 0x64, 0xC9, 0x1C, 0x20,
             ])
@@ -102,7 +102,7 @@ mod tests {
         let time: BoltLocalTime = naive_time.into();
 
         assert_eq!(
-            time.to_bytes(Version::V4_1).unwrap(),
+            time.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[
                 0xB1, 0x74, 0xCB, 0x00, 0x00, 0x17, 0x5D, 0x2F, 0xB8, 0x3A, 0x64,
             ])

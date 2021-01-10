@@ -77,12 +77,12 @@ impl From<Vec<BoltType>> for BoltList {
 }
 
 impl BoltList {
-    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let mut values = BytesMut::new();
         let length = self.value.len();
 
         for elem in self.value {
-            values.put(elem.to_bytes(version)?);
+            values.put(elem.into_bytes(version)?);
         }
 
         let mut bytes =
@@ -147,7 +147,7 @@ mod tests {
     fn should_serialize_empty_list() {
         let list = BoltList::new();
 
-        let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = list.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(&b[..], Bytes::from_static(&[TINY]));
     }
@@ -158,7 +158,7 @@ mod tests {
         list.push("a".into());
         list.push(1.into());
 
-        let b: Bytes = list.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = list.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(&b[..], Bytes::from_static(&[0x92, 0x81, 0x61, 0x01]));
     }

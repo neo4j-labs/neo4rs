@@ -67,7 +67,7 @@ mod tests {
             properties,
         };
 
-        let bytes: Bytes = node.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = node.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

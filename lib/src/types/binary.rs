@@ -30,7 +30,7 @@ impl BoltBytes {
 }
 
 impl BoltBytes {
-    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(
             mem::size_of::<u8>() + mem::size_of::<u32>() + self.value.len(),
         );
@@ -80,7 +80,7 @@ mod tests {
     fn should_serialize_small_bytes() {
         let bolt_bytes = BoltBytes::new(Bytes::from_static("hello".as_bytes()));
 
-        let serialized: Bytes = bolt_bytes.to_bytes(Version::V4_1).unwrap();
+        let serialized: Bytes = bolt_bytes.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             &serialized[..],
@@ -100,7 +100,7 @@ mod tests {
     fn should_serialize_medium_bytes() {
         let raw_bytes = Bytes::copy_from_slice(&vec![0; 256]);
         let bolt_bytes = BoltBytes::new(raw_bytes.clone());
-        let serialized: Bytes = bolt_bytes.to_bytes(Version::V4_1).unwrap();
+        let serialized: Bytes = bolt_bytes.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(serialized[0], MEDIUM);
         assert_eq!(u16::from_be_bytes([serialized[1], serialized[2]]), 256);
@@ -114,7 +114,7 @@ mod tests {
     fn should_serialize_large_bytes() {
         let raw_bytes = Bytes::copy_from_slice(&vec![0; 65_537]);
         let bolt_bytes = BoltBytes::new(raw_bytes.clone());
-        let serialized: Bytes = bolt_bytes.to_bytes(Version::V4_1).unwrap();
+        let serialized: Bytes = bolt_bytes.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(serialized[0], LARGE);
         assert_eq!(

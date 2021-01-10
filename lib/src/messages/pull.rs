@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn should_serialize_pull_message() {
         let pull = Pull::new(42, 1);
-        let bytes: Bytes = pull.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = pull.into_bytes(Version::V4_1).unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
         assert_eq!(marker_signature, &[0xB1, 0x3F]);
         let extra: BoltMap = BoltMap::parse(
@@ -49,7 +49,7 @@ mod tests {
     #[test]
     fn should_serialize_pull_with_default_value() {
         let pull = Pull::default();
-        let bytes: Bytes = pull.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = pull.into_bytes(Version::V4_1).unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
         assert_eq!(marker_signature, &[0xB1, 0x3F]);
         let extra: BoltMap = BoltMap::parse(

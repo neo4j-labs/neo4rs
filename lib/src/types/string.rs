@@ -59,7 +59,7 @@ impl Into<String> for BoltString {
 }
 
 impl BoltString {
-    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(
             mem::size_of::<u8>() + mem::size_of::<u32>() + self.value.len(),
         );
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn should_serialize_empty_string() {
         let s = BoltString::new("");
-        let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = s.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], Bytes::from_static(&[TINY]));
     }
 
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn should_serialize_tiny_string() {
         let s = BoltString::new("a");
-        let b: Bytes = s.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = s.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], Bytes::from_static(&[0x81, 0x61]));
     }
 
@@ -141,7 +141,7 @@ mod tests {
     fn should_serialize_small_string() {
         let s = BoltString::new(&"a".repeat(16));
 
-        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
+        let mut b: Bytes = s.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), SMALL);
         assert_eq!(b.get_u8(), 0x10);
@@ -162,7 +162,7 @@ mod tests {
     fn should_serialize_medium_string() {
         let s = BoltString::new(&"a".repeat(256));
 
-        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
+        let mut b: Bytes = s.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), MEDIUM);
         assert_eq!(b.get_u16(), 0x100);
@@ -185,7 +185,7 @@ mod tests {
     fn should_serialize_large_string() {
         let s = BoltString::new(&"a".repeat(65_536));
 
-        let mut b: Bytes = s.to_bytes(Version::V4_1).unwrap();
+        let mut b: Bytes = s.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(b.get_u8(), LARGE);
         assert_eq!(b.get_u32(), 0x10000);

@@ -27,7 +27,7 @@ mod tests {
                 .collect(),
         );
 
-        let bytes: Bytes = begin.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = begin.into_bytes(Version::V4_1).unwrap();
 
         assert_eq!(
             bytes,

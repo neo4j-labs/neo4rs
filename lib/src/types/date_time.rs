@@ -114,7 +114,7 @@ mod tests {
             .into();
 
         assert_eq!(
-            date.to_bytes(Version::V4_1).unwrap(),
+            date.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[
                 0xB3, 0x46, 0xCA, 0x55, 0x8A, 0xA7, 0x9B, 0x00, 0xC9, 0x0E, 0x10,
             ])
@@ -142,7 +142,7 @@ mod tests {
                 .unwrap()
                 .into();
         assert_eq!(
-            date.to_bytes(Version::V4_1).unwrap(),
+            date.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[
                 0xB2, 0x64, 0xCA, 0x55, 0x93, 0xAC, 0x0F, 0xCA, 0x42, 0xEF, 0x9E, 0xC0,
             ])
@@ -172,7 +172,7 @@ mod tests {
         let date: BoltDateTimeZoneId = (datetime, "Europe/Paris").into();
 
         assert_eq!(
-            date.to_bytes(Version::V4_1).unwrap(),
+            date.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[
                 0xB3, 0x66, 0xCA, 0x55, 0x93, 0xAC, 0x0F, 0xCA, 0x42, 0xEF, 0x9E, 0xC0, 0x8C, 0x45,
                 0x75, 0x72, 0x6F, 0x70, 0x65, 0x2F, 0x50, 0x61, 0x72, 0x69, 0x73,

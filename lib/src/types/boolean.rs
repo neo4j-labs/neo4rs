@@ -24,7 +24,7 @@ impl BoltBoolean {
 }
 
 impl BoltBoolean {
-    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
         if self.value {
             Ok(Bytes::copy_from_slice(&[TRUE]))
         } else {
@@ -49,11 +49,11 @@ mod tests {
     #[test]
     fn should_serialize_boolean() {
         let bolt_boolean = BoltBoolean::new(true);
-        let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_boolean.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[0xC3]);
 
         let bolt_boolean = BoltBoolean::new(false);
-        let b: Bytes = bolt_boolean.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_boolean.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[0xC2]);
     }
 

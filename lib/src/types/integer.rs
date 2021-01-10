@@ -62,7 +62,7 @@ impl BoltInteger {
         Ok(BoltInteger::new(value))
     }
 
-    pub fn to_bytes(self, _: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
         let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<i64>());
         match self.value {
             -16..=127 => bytes.put_u8(self.value as u8),
@@ -114,23 +114,23 @@ mod tests {
     #[test]
     fn should_serialize_integer() {
         let bolt_int = BoltInteger::new(42);
-        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[0x2A]);
 
         let bolt_int = BoltInteger::new(-127);
-        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[INT_8, 0x81]);
 
         let bolt_int = BoltInteger::new(129);
-        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[INT_16, 0x00, 0x81]);
 
         let bolt_int = BoltInteger::new(32_768);
-        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[INT_32, 0x00, 0x00, 0x80, 0x00]);
 
         let bolt_int = BoltInteger::new(2_147_483_648);
-        let b: Bytes = bolt_int.to_bytes(Version::V4_1).unwrap();
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(
             &b[..],
             &[INT_64, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00]

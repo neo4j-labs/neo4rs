@@ -42,7 +42,7 @@ mod tests {
     fn should_serialize_a_date() {
         let date: BoltDate = NaiveDate::from_ymd(2010, 1, 1).into();
         assert_eq!(
-            date.to_bytes(Version::V4_1).unwrap(),
+            date.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[0xB1, 0x44, 0xC9, 0x39, 0x12])
         );
     }

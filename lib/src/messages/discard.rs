@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn should_serialize_discard_message() {
         let discard = Discard::new(42, 1);
-        let bytes: Bytes = discard.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = discard.into_bytes(Version::V4_1).unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
         assert_eq!(marker_signature, &[0xB1, 0x2F]);
         let extra: BoltMap = BoltMap::parse(
@@ -49,7 +49,7 @@ mod tests {
     #[test]
     fn should_serialize_discard_with_default_value() {
         let discard = Discard::default();
-        let bytes: Bytes = discard.to_bytes(Version::V4_1).unwrap();
+        let bytes: Bytes = discard.into_bytes(Version::V4_1).unwrap();
         let (marker_signature, extra) = bytes.split_at(2);
         assert_eq!(marker_signature, &[0xB1, 0x2F]);
         let extra: BoltMap = BoltMap::parse(

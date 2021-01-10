@@ -54,7 +54,7 @@ impl Connection {
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
         let end_marker: [u8; 2] = [0, 0];
-        let bytes: Bytes = message.to_bytes(self.version)?;
+        let bytes: Bytes = message.into_bytes(self.version)?;
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
             self.stream.write_all(c).await?;

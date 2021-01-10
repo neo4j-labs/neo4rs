@@ -104,29 +104,29 @@ impl Hash for BoltType {
 }
 
 impl BoltType {
-    pub fn to_bytes(self, version: Version) -> Result<Bytes> {
+    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         match self {
-            BoltType::Null(t) => t.to_bytes(version),
-            BoltType::Boolean(t) => t.to_bytes(version),
-            BoltType::Integer(t) => t.to_bytes(version),
-            BoltType::Float(t) => t.to_bytes(version),
-            BoltType::String(t) => t.to_bytes(version),
-            BoltType::List(t) => t.to_bytes(version),
-            BoltType::Point2D(t) => t.to_bytes(version),
-            BoltType::Point3D(t) => t.to_bytes(version),
-            BoltType::Map(t) => t.to_bytes(version),
-            BoltType::Node(t) => t.to_bytes(version),
-            BoltType::Path(t) => t.to_bytes(version),
-            BoltType::Relation(t) => t.to_bytes(version),
-            BoltType::UnboundedRelation(t) => t.to_bytes(version),
-            BoltType::Bytes(t) => t.to_bytes(version),
-            BoltType::Duration(t) => t.to_bytes(version),
-            BoltType::Date(t) => t.to_bytes(version),
-            BoltType::Time(t) => t.to_bytes(version),
-            BoltType::LocalTime(t) => t.to_bytes(version),
-            BoltType::DateTime(t) => t.to_bytes(version),
-            BoltType::LocalDateTime(t) => t.to_bytes(version),
-            BoltType::DateTimeZoneId(t) => t.to_bytes(version),
+            BoltType::Null(t) => t.into_bytes(version),
+            BoltType::Boolean(t) => t.into_bytes(version),
+            BoltType::Integer(t) => t.into_bytes(version),
+            BoltType::Float(t) => t.into_bytes(version),
+            BoltType::String(t) => t.into_bytes(version),
+            BoltType::List(t) => t.into_bytes(version),
+            BoltType::Point2D(t) => t.into_bytes(version),
+            BoltType::Point3D(t) => t.into_bytes(version),
+            BoltType::Map(t) => t.into_bytes(version),
+            BoltType::Node(t) => t.into_bytes(version),
+            BoltType::Path(t) => t.into_bytes(version),
+            BoltType::Relation(t) => t.into_bytes(version),
+            BoltType::UnboundedRelation(t) => t.into_bytes(version),
+            BoltType::Bytes(t) => t.into_bytes(version),
+            BoltType::Duration(t) => t.into_bytes(version),
+            BoltType::Date(t) => t.into_bytes(version),
+            BoltType::Time(t) => t.into_bytes(version),
+            BoltType::LocalTime(t) => t.into_bytes(version),
+            BoltType::DateTime(t) => t.into_bytes(version),
+            BoltType::LocalDateTime(t) => t.into_bytes(version),
+            BoltType::DateTimeZoneId(t) => t.into_bytes(version),
         }
     }
 

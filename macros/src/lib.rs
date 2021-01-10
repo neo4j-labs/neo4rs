@@ -48,7 +48,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let serialize_fields = fields.iter().map(|f| {
         let name = &f.ident;
         quote! {
-            let #name: bytes::Bytes = self.#name.to_bytes(version)?
+            let #name: bytes::Bytes = self.#name.into_bytes(version)?
         }
     });
 
@@ -80,7 +80,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
         impl #struct_name {
 
-            pub fn to_bytes(self, version: crate::version::Version) -> crate::errors::Result<bytes::Bytes> {
+            pub fn into_bytes(self, version: crate::version::Version) -> crate::errors::Result<bytes::Bytes> {
                 #(#serialize_fields;)*
                 let mut total_bytes = std::mem::size_of::<u8>() + std::mem::size_of::<u8>();
                 #(#allocate_bytes;)*
