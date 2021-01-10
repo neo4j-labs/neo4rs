@@ -68,9 +68,12 @@ impl ConfigBuilder {
             || self.user.is_none()
             || self.password.is_none()
             || self.fetch_size.is_none()
+            || self.max_connections.is_none()
+            || self.db.is_none()
         {
             Err(Error::InvalidConfig)
         } else {
+            //The config attributes are validated before unwrapping
             Ok(Config {
                 uri: self.uri.unwrap(),
                 user: self.user.unwrap(),
@@ -92,5 +95,66 @@ pub fn config() -> ConfigBuilder {
         db: Some("".to_owned()),
         max_connections: Some(DEFAULT_MAX_CONNECTIONS),
         fetch_size: Some(DEFAULT_FETCH_SIZE),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn should_build_config() {
+        let config = config()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .db("some_db")
+            .fetch_size(10)
+            .max_connections(5)
+            .build()
+            .unwrap();
+        assert_eq!(config.uri, "127.0.0.1:7687");
+        assert_eq!(config.user, "some_user");
+        assert_eq!(config.password, "some_password");
+        assert_eq!(config.db, "some_db");
+        assert_eq!(config.fetch_size, 10);
+        assert_eq!(config.max_connections, 5);
+    }
+
+    #[tokio::test]
+    async fn should_build_with_defaults() {
+        let config = config()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .build()
+            .unwrap();
+        assert_eq!(config.uri, "127.0.0.1:7687");
+        assert_eq!(config.user, "some_user");
+        assert_eq!(config.password, "some_password");
+        assert_eq!(config.db, "");
+        assert_eq!(config.fetch_size, 200);
+        assert_eq!(config.max_connections, 16);
+    }
+
+    #[tokio::test]
+    async fn should_reject_invalid_config() {
+        assert!(config()
+            .user("some_user")
+            .password("some_password")
+            .build()
+            .is_err());
+
+        assert!(config()
+            .uri("127.0.0.1:7687")
+            .password("some_password")
+            .build()
+            .is_err());
+
+        assert!(config()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .build()
+            .is_err());
     }
 }
