@@ -9,6 +9,7 @@ pub enum Error {
     BytesTooBig,
     ListTooLong,
     InvalidConfig,
+    UnsupportedVersion(String),
     UnexpectedMessage(String),
     UnknownType(String),
     UnknownMessage(String),

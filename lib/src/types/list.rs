@@ -178,12 +178,12 @@ mod tests {
         assert_eq!(bolt_list.len(), 2);
         match bolt_list.get(0).unwrap() {
             BoltType::String(s) => assert_eq!(s.value, "a"),
-            _ => panic!("error deserialiisation of string in list"),
+            _ => unreachable!("error deserialiisation of string in list"),
         }
 
         match bolt_list.get(1).unwrap() {
             BoltType::Integer(s) => assert_eq!(s.value, 1),
-            _ => panic!("error deserialiisation integer in list"),
+            _ => unreachable!("error deserialiisation integer in list"),
         }
     }
 }

@@ -23,7 +23,7 @@ impl Connection {
         stream.flush().await?;
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
-        let version = Version::parse(response);
+        let version = Version::parse(response)?;
         let mut connection = Connection { version, stream };
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
         match connection.send_recv(hello).await? {
