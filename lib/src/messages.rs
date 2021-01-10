@@ -14,7 +14,6 @@ use crate::errors::*;
 use crate::types::*;
 use crate::version::Version;
 use begin::Begin;
-use bye::Bye;
 use bytes::*;
 use commit::Commit;
 use discard::Discard;
@@ -40,7 +39,6 @@ pub enum BoltResponse {
 pub enum BoltRequest {
     HelloMessage(Hello),
     RunMessage(Run),
-    GoodByeMessage(Bye),
     PullMessage(Pull),
     DiscardMessage(Discard),
     BeginMessage(Begin),
@@ -92,7 +90,6 @@ impl BoltRequest {
     pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let bytes: Bytes = match self {
             BoltRequest::HelloMessage(hello) => hello.into_bytes(version)?,
-            BoltRequest::GoodByeMessage(bye) => bye.into_bytes(version)?,
             BoltRequest::RunMessage(run) => run.into_bytes(version)?,
             BoltRequest::PullMessage(pull) => pull.into_bytes(version)?,
             BoltRequest::DiscardMessage(discard) => discard.into_bytes(version)?,

@@ -1,5 +1,4 @@
 use crate::errors::*;
-use crate::types::*;
 use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;

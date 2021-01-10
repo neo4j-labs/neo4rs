@@ -16,6 +16,12 @@ pub struct BoltList {
     pub value: Vec<BoltType>,
 }
 
+impl Default for BoltList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BoltList {
     pub fn new() -> Self {
         BoltList { value: Vec::new() }
