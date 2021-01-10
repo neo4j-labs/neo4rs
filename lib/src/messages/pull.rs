@@ -15,7 +15,7 @@ impl Default for Pull {
 
 impl Pull {
     pub fn new(n: i64, qid: i64) -> Pull {
-        let mut extra = BoltMap::new();
+        let mut extra = BoltMap::default();
         extra.put("n".into(), n.into());
         extra.put("qid".into(), qid.into());
         Pull { extra }

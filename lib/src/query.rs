@@ -18,7 +18,7 @@ impl Query {
     pub fn new(query: String) -> Self {
         Query {
             query,
-            params: BoltMap::new(),
+            params: BoltMap::default(),
         }
     }
 

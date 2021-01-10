@@ -20,13 +20,15 @@ pub struct BoltMap {
     pub value: HashMap<BoltString, BoltType>,
 }
 
-impl BoltMap {
-    pub fn new() -> Self {
+impl Default for BoltMap {
+    fn default() -> Self {
         BoltMap {
             value: HashMap::new(),
         }
     }
+}
 
+impl BoltMap {
     pub fn with_capacity(capacity: usize) -> Self {
         BoltMap {
             value: HashMap::with_capacity(capacity),
@@ -68,7 +70,7 @@ impl FromIterator<(BoltString, BoltType)> for BoltMap {
     where
         T: IntoIterator<Item = (BoltString, BoltType)>,
     {
-        let mut bolt_map = BoltMap::new();
+        let mut bolt_map = BoltMap::default();
         for (s, t) in iter.into_iter() {
             bolt_map.put(s, t);
         }
@@ -127,7 +129,7 @@ impl BoltMap {
             }
         };
 
-        let mut map = BoltMap::new();
+        let mut map = BoltMap::default();
         for _ in 0..size {
             let key: BoltString = BoltString::parse(version, input.clone())?;
             let value: BoltType = BoltType::parse(version, input.clone())?;
@@ -144,7 +146,7 @@ mod tests {
 
     #[test]
     fn should_serialize_empty_map() {
-        let map = BoltMap::new();
+        let map = BoltMap::default();
 
         let b: Bytes = map.into_bytes(Version::V4_1).unwrap();
 
@@ -153,7 +155,7 @@ mod tests {
 
     #[test]
     fn should_serialize_map_of_strings() {
-        let mut map = BoltMap::new();
+        let mut map = BoltMap::default();
         map.put("a".into(), "b".into());
 
         let b: Bytes = map.into_bytes(Version::V4_1).unwrap();
@@ -174,7 +176,7 @@ mod tests {
 
     #[test]
     fn should_deserialize_small_map() {
-        let mut map = BoltMap::new();
+        let mut map = BoltMap::default();
         for i in 0..=16 {
             map.put(i.to_string().into(), i.to_string().into());
         }
@@ -188,7 +190,7 @@ mod tests {
 
     #[test]
     fn should_deserialize_medium_map() {
-        let mut map = BoltMap::new();
+        let mut map = BoltMap::default();
         for i in 0..=256 {
             map.put(i.to_string().into(), i.to_string().into());
         }
@@ -202,7 +204,7 @@ mod tests {
 
     #[test]
     fn should_deserialize_large_map() {
-        let mut map = BoltMap::new();
+        let mut map = BoltMap::default();
         for i in 0..=65_536 {
             map.put(i.to_string().into(), i.to_string().into());
         }

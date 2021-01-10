@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn should_serialize_run_with_no_params() {
-        let run = Run::new("".into(), "query".into(), BoltMap::new());
+        let run = Run::new("".into(), "query".into(), BoltMap::default());
 
         let bytes: Bytes = run.into_bytes(Version::V4_1).unwrap();
 

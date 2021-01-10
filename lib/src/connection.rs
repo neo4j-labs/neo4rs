@@ -16,10 +16,6 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn version(&self) -> Version {
-        self.version
-    }
-
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
         let mut stream = BufStream::new(TcpStream::connect(uri).await?);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;

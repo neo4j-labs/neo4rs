@@ -15,7 +15,7 @@ impl Default for Discard {
 
 impl Discard {
     pub fn new(n: i64, qid: i64) -> Discard {
-        let mut extra = BoltMap::new();
+        let mut extra = BoltMap::default();
         extra.put("n".into(), n.into());
         extra.put("qid".into(), qid.into());
         Discard { extra }
