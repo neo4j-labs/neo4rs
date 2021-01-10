@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub const FALSE: u8 = 0xC2;
 pub const TRUE: u8 = 0xC3;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoltBoolean {
     pub value: bool,
 }

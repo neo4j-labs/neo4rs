@@ -1,7 +1,7 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
-#[derive(Debug, PartialEq, Clone, Hash, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB4, 0x45)]
 pub struct BoltDuration {
     months: BoltInteger,

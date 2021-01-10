@@ -34,7 +34,6 @@ pub use time::{BoltLocalTime, BoltTime};
 use crate::errors::*;
 use crate::version::Version;
 use bytes::Bytes;
-use core::hash::{Hash, Hasher};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -71,35 +70,6 @@ impl Display for BoltType {
             _ => "to_string not implemented".to_owned(),
         };
         write!(f, "{}", value)
-    }
-}
-
-impl Hash for BoltType {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            BoltType::String(t) => t.hash(state),
-            BoltType::Boolean(t) => t.hash(state),
-            BoltType::Null(t) => t.hash(state),
-            BoltType::Integer(t) => t.hash(state),
-            BoltType::List(t) => t.hash(state),
-            BoltType::Duration(t) => t.hash(state),
-            BoltType::Date(t) => t.hash(state),
-            BoltType::Time(t) => t.hash(state),
-            BoltType::LocalTime(t) => t.hash(state),
-            BoltType::DateTime(t) => t.hash(state),
-            BoltType::LocalDateTime(t) => t.hash(state),
-            BoltType::DateTimeZoneId(t) => t.hash(state),
-            //The below types cannot be hashed
-            BoltType::Path(_) => panic!("path not hashed"),
-            BoltType::Bytes(_) => panic!("bytes not hashed"),
-            BoltType::Float(_) => panic!("float not hashed"),
-            BoltType::Point2D(_) => panic!("point2d not hashed"),
-            BoltType::Point3D(_) => panic!("point3d not hashed"),
-            BoltType::Node(_) => panic!("node not hashed"),
-            BoltType::Map(_) => panic!("map not hashed"),
-            BoltType::Relation(_) => panic!("relation not hashed"),
-            BoltType::UnboundedRelation(_) => panic!("relation not hashed"),
-        }
     }
 }
 
