@@ -114,7 +114,7 @@ impl BoltResponse {
             input if Record::can_parse(version, input.clone()) => {
                 Ok(BoltResponse::RecordMessage(Record::parse(version, input)?))
             }
-            msg => Err(Error::UnknownMessage(format!("unknown message {:?}", msg))),
+            msg => Err(Error::UnknownMessage(format!("{:?}", msg))),
         }
     }
 }

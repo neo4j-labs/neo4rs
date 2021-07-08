@@ -26,7 +26,7 @@ impl TryInto<NaiveDate> for BoltDate {
         let days = Duration::days(self.days.value);
         epoch
             .checked_add_signed(days)
-            .ok_or(Error::ConverstionError)
+            .ok_or(Error::DateConvertError(self.clone()))
     }
 }
 

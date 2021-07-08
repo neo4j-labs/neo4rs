@@ -71,7 +71,7 @@ impl ConfigBuilder {
             || self.max_connections.is_none()
             || self.db.is_none()
         {
-            Err(Error::InvalidConfig)
+            Err(Error::InvalidConfig("a config field was None".into()))
         } else {
             //The config attributes are validated before unwrapping
             Ok(Config {
