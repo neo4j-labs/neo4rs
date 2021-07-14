@@ -123,6 +123,9 @@ impl BoltType {
             input if BoltBoolean::can_parse(version, input.clone()) => {
                 BoltType::Boolean(BoltBoolean::parse(version, input)?)
             }
+            input if BoltNull::can_parse(version, input.clone()) => {
+                BoltType::Null(BoltNull::parse(version, input)?)
+            }
             input if BoltPoint2D::can_parse(version, input.clone()) => {
                 BoltType::Point2D(BoltPoint2D::parse(version, input)?)
             }
