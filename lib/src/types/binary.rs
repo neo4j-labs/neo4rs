@@ -61,10 +61,10 @@ impl BoltBytes {
             MEDIUM => input.borrow_mut().get_u16() as usize,
             LARGE => input.borrow_mut().get_u32() as usize,
             _ => {
-                return Err(Error::InvalidTypeMarker(format!(
-                    "invalid bytes marker {}",
-                    marker
-                )))
+                return Err(Error::InvalidTypeMarker {
+                    type_name: "bytes",
+                    marker,
+                })
             }
         };
 

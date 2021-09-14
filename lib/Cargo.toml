@@ -14,14 +14,15 @@ categories = ["database", "network-programming", "asynchronous"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-neo4rs-macros = { version = "0.2.1", path = "../macros" }
-futures = { version = "0.3.8" }
-tokio = { version = "1.0.1", features = ["full"] }
-bytes = "1.0.0"
 async-trait = "0.1.42"
-deadpool = "0.7.0"
+bytes = "1.0.0"
 chrono = "0.4.19"
+deadpool = "0.7.0"
+futures = { version = "0.3.8" }
 log = "0.4"
+neo4rs-macros = { version = "0.2.1", path = "../macros" }
+thiserror = "1.0.26"
+tokio = { version = "1.0.1", features = ["full"] }
 
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4"] }

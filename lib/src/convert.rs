@@ -9,7 +9,7 @@ impl TryFrom<BoltType> for f64 {
     fn try_from(input: BoltType) -> Result<f64> {
         match input {
             BoltType::Float(t) => Ok(t.value),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -20,7 +20,7 @@ impl TryFrom<BoltType> for i64 {
     fn try_from(input: BoltType) -> Result<i64> {
         match input {
             BoltType::Integer(t) => Ok(t.value),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -31,7 +31,7 @@ impl TryFrom<BoltType> for bool {
     fn try_from(input: BoltType) -> Result<bool> {
         match input {
             BoltType::Boolean(t) => Ok(t.value),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -42,7 +42,7 @@ impl TryFrom<BoltType> for Point2D {
     fn try_from(input: BoltType) -> Result<Point2D> {
         match input {
             BoltType::Point2D(p) => Ok(Point2D::new(p)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -53,7 +53,7 @@ impl TryFrom<BoltType> for std::time::Duration {
     fn try_from(input: BoltType) -> Result<std::time::Duration> {
         match input {
             BoltType::Duration(d) => Ok(d.into()),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -64,7 +64,7 @@ impl TryFrom<BoltType> for chrono::NaiveDate {
     fn try_from(input: BoltType) -> Result<chrono::NaiveDate> {
         match input {
             BoltType::Date(d) => d.try_into(),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -75,7 +75,7 @@ impl TryFrom<BoltType> for chrono::DateTime<chrono::FixedOffset> {
     fn try_from(input: BoltType) -> Result<chrono::DateTime<chrono::FixedOffset>> {
         match input {
             BoltType::DateTime(d) => d.try_into(),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -86,7 +86,7 @@ impl TryFrom<BoltType> for chrono::NaiveDateTime {
     fn try_from(input: BoltType) -> Result<chrono::NaiveDateTime> {
         match input {
             BoltType::LocalDateTime(d) => d.try_into(),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -105,7 +105,7 @@ impl TryFrom<BoltType> for (chrono::NaiveTime, Option<chrono::FixedOffset>) {
                 }
             }
             BoltType::LocalTime(d) => Ok((d.into(), None)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -116,7 +116,7 @@ impl TryFrom<BoltType> for (chrono::NaiveDateTime, String) {
     fn try_from(input: BoltType) -> Result<(chrono::NaiveDateTime, String)> {
         match input {
             BoltType::DateTimeZoneId(date_time_zone_id) => date_time_zone_id.try_into(),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -127,7 +127,7 @@ impl TryFrom<BoltType> for Vec<u8> {
     fn try_from(input: BoltType) -> Result<Vec<u8>> {
         match input {
             BoltType::Bytes(b) => Ok(b.value.to_vec()),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -138,7 +138,7 @@ impl TryFrom<BoltType> for Point3D {
     fn try_from(input: BoltType) -> Result<Point3D> {
         match input {
             BoltType::Point3D(p) => Ok(Point3D::new(p)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -149,7 +149,7 @@ impl TryFrom<BoltType> for Node {
     fn try_from(input: BoltType) -> Result<Node> {
         match input {
             BoltType::Node(n) => Ok(Node::new(n)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -160,7 +160,7 @@ impl TryFrom<BoltType> for Path {
     fn try_from(input: BoltType) -> Result<Path> {
         match input {
             BoltType::Path(n) => Ok(Path::new(n)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -171,7 +171,7 @@ impl TryFrom<BoltType> for Relation {
     fn try_from(input: BoltType) -> Result<Relation> {
         match input {
             BoltType::Relation(r) => Ok(Relation::new(r)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -182,7 +182,7 @@ impl TryFrom<BoltType> for UnboundedRelation {
     fn try_from(input: BoltType) -> Result<UnboundedRelation> {
         match input {
             BoltType::UnboundedRelation(r) => Ok(UnboundedRelation::new(r)),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -192,7 +192,7 @@ impl TryFrom<BoltType> for BoltList {
     fn try_from(input: BoltType) -> Result<BoltList> {
         match input {
             BoltType::List(l) => Ok(l),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -202,7 +202,7 @@ impl TryFrom<BoltType> for BoltString {
     fn try_from(input: BoltType) -> Result<BoltString> {
         match input {
             BoltType::String(s) => Ok(s),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
@@ -212,7 +212,7 @@ impl TryFrom<BoltType> for String {
     fn try_from(input: BoltType) -> Result<String> {
         match input {
             BoltType::String(t) => Ok(t.value),
-            _ => Err(Error::ConverstionError),
+            _ => Err(Error::ConvertError(input)),
         }
     }
 }
