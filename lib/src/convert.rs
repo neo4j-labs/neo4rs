@@ -3,6 +3,22 @@ use crate::row::*;
 use crate::types::*;
 use std::convert::{TryFrom, TryInto};
 
+impl<A: TryFrom<BoltType>> TryFrom<BoltType> for Vec<A> {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Vec<A>> {
+        match input {
+            BoltType::List(l) => Ok(l.value
+                                    .to_vec()
+                                    .iter()
+                                    .flat_map(|x| A::try_from(x.clone()))
+                                    .collect()
+                                    ),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for f64 {
     type Error = Error;
 
@@ -259,9 +275,25 @@ impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
     }
 }
 
+impl<A: Into<BoltType> + Clone> Into<BoltType> for Vec<A> {
+    fn into(self) -> BoltType {
+        BoltType::List(BoltList {
+            value: self
+                .iter()
+                .map(|v| v.clone().into())
+                .collect()})
+    }
+}
+
 impl Into<BoltType> for Vec<u8> {
     fn into(self) -> BoltType {
         BoltType::Bytes(BoltBytes::new(self.into()))
+    }
+}
+
+impl Into<BoltType> for f64 {
+    fn into(self) -> BoltType {
+        BoltType::Float(BoltFloat::new(self))
     }
 }
 
