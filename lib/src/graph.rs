@@ -55,4 +55,9 @@ impl Graph {
         let connection = Arc::new(Mutex::new(self.pool.get().await?));
         q.execute(&self.config, connection).await
     }
+
+    /// Returns the [`Config`] object used for the connection
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
 }
