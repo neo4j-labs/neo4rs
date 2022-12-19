@@ -91,15 +91,15 @@ impl BoltString {
             MEDIUM => input.get_u16() as usize,
             LARGE => input.get_u32() as usize,
             _ => {
-                return Err(Error::InvalidTypeMarker(format!(
-                    "invalid string marker {}",
-                    marker
-                )))
+                return Err(Error::InvalidTypeMarker {
+                    type_name: "string",
+                    marker,
+                })
             }
         };
         let byte_array = input.split_to(length).to_vec();
         let string_value = std::string::String::from_utf8(byte_array)
-            .map_err(|e| Error::DeserializationError(e.to_string()))?;
+            .map_err(Error::DeserializationError)?;
         Ok(string_value.into())
     }
 }

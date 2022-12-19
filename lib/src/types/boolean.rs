@@ -37,7 +37,10 @@ impl BoltBoolean {
         match value {
             TRUE => Ok(BoltBoolean::new(true)),
             FALSE => Ok(BoltBoolean::new(false)),
-            _ => Err(Error::InvalidTypeMarker("invalid boolean marker".into())),
+            marker => Err(Error::InvalidTypeMarker {
+                type_name: "boolean",
+                marker,
+            }),
         }
     }
 }
