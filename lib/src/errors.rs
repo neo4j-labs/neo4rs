@@ -33,10 +33,7 @@ pub enum Error {
     UnsupportedVersion(u32),
 
     #[error("an unexpected response was received for `{request}`: {response}")]
-    UnexpectedMessage {
-        request: String,
-        response: String
-    },
+    UnexpectedMessage { request: String, response: String },
 
     #[error("attempted to parse unknown type: `{0}`")]
     UnknownType(String),
@@ -54,10 +51,7 @@ pub enum Error {
     AuthenticationError(String),
 
     #[error("invalid {type_name} marker: {marker}")]
-    InvalidTypeMarker {
-        type_name: &'static str,
-        marker: u8,
-    },
+    InvalidTypeMarker { type_name: &'static str, marker: u8 },
 
     #[error("deserialization error")]
     DeserializationError(#[from] FromUtf8Error),
@@ -73,5 +67,8 @@ impl From<PoolError<Error>> for Error {
 }
 
 pub fn unexpected<T: std::fmt::Debug>(response: T, request: &str) -> Error {
-    Error::UnexpectedMessage { request: request.into(), response: format!("{:?}", response) }
+    Error::UnexpectedMessage {
+        request: request.into(),
+        response: format!("{:?}", response),
+    }
 }

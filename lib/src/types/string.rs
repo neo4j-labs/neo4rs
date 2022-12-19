@@ -51,9 +51,9 @@ impl From<String> for BoltString {
     }
 }
 
-impl Into<String> for BoltString {
-    fn into(self) -> String {
-        self.value
+impl From<BoltString> for String {
+    fn from(val: BoltString) -> Self {
+        val.value
     }
 }
 
@@ -98,8 +98,8 @@ impl BoltString {
             }
         };
         let byte_array = input.split_to(length).to_vec();
-        let string_value = std::string::String::from_utf8(byte_array)
-            .map_err(Error::DeserializationError)?;
+        let string_value =
+            std::string::String::from_utf8(byte_array).map_err(Error::DeserializationError)?;
         Ok(string_value.into())
     }
 }

@@ -28,6 +28,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use success::Success;
 
+#[allow(clippy::enum_variant_names)] // Chaning the names would be a breaking change
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
     SuccessMessage(Success),
@@ -35,6 +36,7 @@ pub enum BoltResponse {
     RecordMessage(Record),
 }
 
+#[allow(clippy::enum_variant_names)] // Chaning the names would be a breaking change
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltRequest {
     HelloMessage(Hello),

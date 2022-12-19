@@ -66,9 +66,9 @@ impl IntoIterator for BoltList {
     }
 }
 
-impl Into<Vec<String>> for BoltList {
-    fn into(self) -> Vec<String> {
-        self.value.into_iter().map(|x| x.to_string()).collect()
+impl From<BoltList> for Vec<String> {
+    fn from(val: BoltList) -> Self {
+        val.value.into_iter().map(|x| x.to_string()).collect()
     }
 }
 
@@ -139,9 +139,9 @@ impl BoltList {
     }
 }
 
-impl Into<Vec<BoltType>> for BoltList {
-    fn into(self) -> Vec<BoltType> {
-        self.value
+impl From<BoltList> for Vec<BoltType> {
+    fn from(val: BoltList) -> Self {
+        val.value
     }
 }
 

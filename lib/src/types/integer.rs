@@ -55,7 +55,7 @@ impl BoltInteger {
             INT_8 => input.get_i8() as i64,
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
-            INT_64 => input.get_i64() as i64,
+            INT_64 => input.get_i64(),
             marker => {
                 return Err(Error::InvalidTypeMarker {
                     type_name: "integer",
@@ -86,29 +86,29 @@ impl BoltInteger {
             2_147_483_648..=9_223_372_036_854_775_807
             | -9_223_372_036_854_775_808..=-2_147_483_649 => {
                 bytes.put_u8(INT_64);
-                bytes.put_i64(self.value as i64);
+                bytes.put_i64(self.value);
             }
         }
         Ok(bytes.freeze())
     }
 }
 
-impl Into<BoltInteger> for i64 {
-    fn into(self) -> BoltInteger {
-        BoltInteger::new(self)
+impl From<i64> for BoltInteger {
+    fn from(val: i64) -> Self {
+        BoltInteger::new(val)
     }
 }
 
-impl Into<i64> for BoltInteger {
-    fn into(self) -> i64 {
-        self.value
+impl From<BoltInteger> for i64 {
+    fn from(val: BoltInteger) -> Self {
+        val.value
     }
 }
 
 //TODO: use macros
-impl Into<BoltInteger> for i32 {
-    fn into(self) -> BoltInteger {
-        BoltInteger::new(self as i64)
+impl From<i32> for BoltInteger {
+    fn from(val: i32) -> Self {
+        BoltInteger::new(val as i64)
     }
 }
 

@@ -217,68 +217,68 @@ impl TryFrom<BoltType> for String {
     }
 }
 
-impl Into<BoltType> for std::time::Duration {
-    fn into(self) -> BoltType {
-        BoltType::Duration(self.into())
+impl From<std::time::Duration> for BoltType {
+    fn from(val: std::time::Duration) -> Self {
+        BoltType::Duration(val.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveDate {
-    fn into(self) -> BoltType {
-        BoltType::Date(self.into())
+impl From<chrono::NaiveDate> for BoltType {
+    fn from(val: chrono::NaiveDate) -> Self {
+        BoltType::Date(val.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveTime {
-    fn into(self) -> BoltType {
-        BoltType::LocalTime(self.into())
+impl From<chrono::NaiveTime> for BoltType {
+    fn from(val: chrono::NaiveTime) -> Self {
+        BoltType::LocalTime(val.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveDateTime {
-    fn into(self) -> BoltType {
-        BoltType::LocalDateTime(self.into())
+impl From<chrono::NaiveDateTime> for BoltType {
+    fn from(val: chrono::NaiveDateTime) -> Self {
+        BoltType::LocalDateTime(val.into())
     }
 }
 
-impl Into<BoltType> for chrono::DateTime<chrono::FixedOffset> {
-    fn into(self) -> BoltType {
-        BoltType::DateTime(self.into())
+impl From<chrono::DateTime<chrono::FixedOffset>> for BoltType {
+    fn from(val: chrono::DateTime<chrono::FixedOffset>) -> Self {
+        BoltType::DateTime(val.into())
     }
 }
 
-impl Into<BoltType> for (chrono::NaiveTime, chrono::FixedOffset) {
-    fn into(self) -> BoltType {
-        BoltType::Time(self.into())
+impl From<(chrono::NaiveTime, chrono::FixedOffset)> for BoltType {
+    fn from(val: (chrono::NaiveTime, chrono::FixedOffset)) -> Self {
+        BoltType::Time(val.into())
     }
 }
 
-impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
-    fn into(self) -> BoltType {
-        BoltType::DateTimeZoneId(self.into())
+impl From<(chrono::NaiveDateTime, &str)> for BoltType {
+    fn from(val: (chrono::NaiveDateTime, &str)) -> Self {
+        BoltType::DateTimeZoneId(val.into())
     }
 }
 
-impl Into<BoltType> for Vec<u8> {
-    fn into(self) -> BoltType {
-        BoltType::Bytes(BoltBytes::new(self.into()))
+impl From<Vec<u8>> for BoltType {
+    fn from(val: Vec<u8>) -> Self {
+        BoltType::Bytes(BoltBytes::new(val.into()))
     }
 }
 
-impl Into<BoltType> for i64 {
-    fn into(self) -> BoltType {
-        BoltType::Integer(BoltInteger::new(self))
+impl From<i64> for BoltType {
+    fn from(val: i64) -> Self {
+        BoltType::Integer(BoltInteger::new(val))
     }
 }
 
-impl Into<BoltType> for String {
-    fn into(self) -> BoltType {
-        BoltType::String(self.into())
+impl From<String> for BoltType {
+    fn from(val: String) -> Self {
+        BoltType::String(val.into())
     }
 }
 
-impl Into<BoltType> for &str {
-    fn into(self) -> BoltType {
-        BoltType::String(self.into())
+impl From<&str> for BoltType {
+    fn from(val: &str) -> Self {
+        BoltType::String(val.into())
     }
 }

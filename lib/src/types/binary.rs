@@ -9,7 +9,7 @@ pub const SMALL: u8 = 0xCC;
 pub const MEDIUM: u8 = 0xCD;
 pub const LARGE: u8 = 0xCE;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoltBytes {
     pub value: Bytes,
 }

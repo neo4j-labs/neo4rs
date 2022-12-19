@@ -41,15 +41,15 @@ impl BoltUnboundedRelation {
     }
 }
 
-impl Into<BoltType> for BoltRelation {
-    fn into(self) -> BoltType {
-        BoltType::Relation(self)
+impl From<BoltRelation> for BoltType {
+    fn from(val: BoltRelation) -> Self {
+        BoltType::Relation(val)
     }
 }
 
-impl Into<BoltType> for BoltUnboundedRelation {
-    fn into(self) -> BoltType {
-        BoltType::UnboundedRelation(self)
+impl From<BoltUnboundedRelation> for BoltType {
+    fn from(val: BoltUnboundedRelation) -> Self {
+        BoltType::UnboundedRelation(val)
     }
 }
 

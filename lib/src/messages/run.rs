@@ -82,12 +82,12 @@ mod tests {
                 b'e',
                 b'r',
                 b'y',
-                map::TINY | 0,
+                map::TINY,
                 map::TINY | 1,
                 string::TINY | 2,
                 b'd',
                 b'b',
-                string::TINY | 0,
+                string::TINY,
             ])
         );
     }

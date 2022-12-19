@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x46)]
 pub struct BoltDateTime {
     seconds: BoltInteger,
@@ -12,14 +12,14 @@ pub struct BoltDateTime {
     tz_offset_seconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB2, 0x64)]
 pub struct BoltLocalDateTime {
     seconds: BoltInteger,
     nanoseconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x66)]
 pub struct BoltDateTimeZoneId {
     seconds: BoltInteger,
@@ -27,14 +27,14 @@ pub struct BoltDateTimeZoneId {
     tz_id: BoltString,
 }
 
-impl Into<BoltDateTimeZoneId> for (NaiveDateTime, &str) {
-    fn into(self) -> BoltDateTimeZoneId {
-        let seconds = self.0.timestamp().into();
-        let nanoseconds = (self.0.timestamp_subsec_nanos() as i64).into();
+impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
+    fn from(val: (NaiveDateTime, &str)) -> Self {
+        let seconds = val.0.timestamp().into();
+        let nanoseconds = (val.0.timestamp_subsec_nanos() as i64).into();
         BoltDateTimeZoneId {
             seconds,
             nanoseconds,
-            tz_id: self.1.into(),
+            tz_id: val.1.into(),
         }
     }
 }
@@ -44,15 +44,16 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
 
     fn try_into(self) -> Result<(NaiveDateTime, String)> {
         let datetime =
-            NaiveDateTime::from_timestamp(self.seconds.value, self.nanoseconds.value as u32);
+            NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+                .ok_or_else(|| Error::ConvertError(BoltType::DateTimeZoneId(self.clone())))?;
         Ok((datetime, self.tz_id.into()))
     }
 }
 
-impl Into<BoltLocalDateTime> for NaiveDateTime {
-    fn into(self) -> BoltLocalDateTime {
-        let seconds = self.timestamp().into();
-        let nanoseconds = (self.nanosecond() as i64).into();
+impl From<NaiveDateTime> for BoltLocalDateTime {
+    fn from(val: NaiveDateTime) -> Self {
+        let seconds = val.timestamp().into();
+        let nanoseconds = (val.nanosecond() as i64).into();
 
         BoltLocalDateTime {
             seconds,
@@ -65,18 +66,16 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDateTime> {
-        Ok(NaiveDateTime::from_timestamp(
-            self.seconds.value,
-            self.nanoseconds.value as u32,
-        ))
+        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+            .ok_or_else(|| Error::ConvertError(BoltType::LocalDateTime(self.clone())))
     }
 }
 
-impl Into<BoltDateTime> for DateTime<FixedOffset> {
-    fn into(self) -> BoltDateTime {
-        let seconds = (self.timestamp() + self.offset().fix().local_minus_utc() as i64).into();
-        let nanoseconds = (self.nanosecond() as i64).into();
-        let tz_offset_seconds = self.offset().fix().local_minus_utc().into();
+impl From<DateTime<FixedOffset>> for BoltDateTime {
+    fn from(val: DateTime<FixedOffset>) -> Self {
+        let seconds = (val.timestamp() + val.offset().fix().local_minus_utc() as i64).into();
+        let nanoseconds = (val.nanosecond() as i64).into();
+        let tz_offset_seconds = val.offset().fix().local_minus_utc().into();
 
         BoltDateTime {
             seconds,
@@ -91,10 +90,12 @@ impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
 
     fn try_into(self) -> Result<DateTime<FixedOffset>> {
         let seconds = self.seconds.value - self.tz_offset_seconds.value;
-        let datetime = NaiveDateTime::from_timestamp(seconds, self.nanoseconds.value as u32);
+        let datetime = NaiveDateTime::from_timestamp_opt(seconds, self.nanoseconds.value as u32)
+            .ok_or_else(|| Error::ConvertError(BoltType::DateTime(self.clone())))?;
         Ok(DateTime::from_utc(
             datetime,
-            FixedOffset::east(self.tz_offset_seconds.value as i32),
+            FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
+                .ok_or_else(|| Error::ConvertError(BoltType::DateTime(self.clone())))?,
         ))
     }
 }

@@ -25,9 +25,9 @@ impl BoltNode {
     }
 }
 
-impl Into<BoltType> for BoltNode {
-    fn into(self) -> BoltType {
-        BoltType::Node(self)
+impl From<BoltNode> for BoltType {
+    fn from(val: BoltNode) -> Self {
+        BoltType::Node(val)
     }
 }
 
