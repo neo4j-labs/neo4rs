@@ -2,7 +2,7 @@ use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
-#[signature(0xB1, 0x10)]
+#[signature(0xB3, 0x10)]
 pub struct Run {
     query: BoltString,
     parameters: BoltMap,
