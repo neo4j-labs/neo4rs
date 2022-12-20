@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::Error;
 use crate::types::*;
 use chrono::{Duration, NaiveDate};
@@ -10,10 +12,10 @@ pub struct BoltDate {
     days: BoltInteger,
 }
 
-impl From<NaiveDate> for BoltDate {
-    fn from(val: NaiveDate) -> Self {
+impl Into<BoltDate> for NaiveDate {
+    fn into(self) -> BoltDate {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        let days = (val - epoch).num_days().into();
+        let days = (self - epoch).num_days().into();
         BoltDate { days }
     }
 }

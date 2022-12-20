@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
@@ -51,9 +53,9 @@ impl From<String> for BoltString {
     }
 }
 
-impl From<BoltString> for String {
-    fn from(val: BoltString) -> Self {
-        val.value
+impl Into<String> for BoltString {
+    fn into(self) -> String {
+        self.value
     }
 }
 

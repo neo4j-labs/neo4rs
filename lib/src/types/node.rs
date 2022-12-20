@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
@@ -25,9 +27,9 @@ impl BoltNode {
     }
 }
 
-impl From<BoltNode> for BoltType {
-    fn from(val: BoltNode) -> Self {
-        BoltType::Node(val)
+impl Into<BoltType> for BoltNode {
+    fn into(self) -> BoltType {
+        BoltType::Node(self)
     }
 }
 

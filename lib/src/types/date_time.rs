@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::Error;
 use crate::types::*;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike};
@@ -27,14 +29,14 @@ pub struct BoltDateTimeZoneId {
     tz_id: BoltString,
 }
 
-impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
-    fn from(val: (NaiveDateTime, &str)) -> Self {
-        let seconds = val.0.timestamp().into();
-        let nanoseconds = (val.0.timestamp_subsec_nanos() as i64).into();
+impl Into<BoltDateTimeZoneId> for (NaiveDateTime, &str) {
+    fn into(self) -> BoltDateTimeZoneId {
+        let seconds = self.0.timestamp().into();
+        let nanoseconds = (self.0.timestamp_subsec_nanos() as i64).into();
         BoltDateTimeZoneId {
             seconds,
             nanoseconds,
-            tz_id: val.1.into(),
+            tz_id: self.1.into(),
         }
     }
 }
@@ -50,10 +52,10 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     }
 }
 
-impl From<NaiveDateTime> for BoltLocalDateTime {
-    fn from(val: NaiveDateTime) -> Self {
-        let seconds = val.timestamp().into();
-        let nanoseconds = (val.nanosecond() as i64).into();
+impl Into<BoltLocalDateTime> for NaiveDateTime {
+    fn into(self) -> BoltLocalDateTime {
+        let seconds = self.timestamp().into();
+        let nanoseconds = (self.nanosecond() as i64).into();
 
         BoltLocalDateTime {
             seconds,
@@ -71,11 +73,11 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     }
 }
 
-impl From<DateTime<FixedOffset>> for BoltDateTime {
-    fn from(val: DateTime<FixedOffset>) -> Self {
-        let seconds = (val.timestamp() + val.offset().fix().local_minus_utc() as i64).into();
-        let nanoseconds = (val.nanosecond() as i64).into();
-        let tz_offset_seconds = val.offset().fix().local_minus_utc().into();
+impl Into<BoltDateTime> for DateTime<FixedOffset> {
+    fn into(self) -> BoltDateTime {
+        let seconds = (self.timestamp() + self.offset().fix().local_minus_utc() as i64).into();
+        let nanoseconds = (self.nanosecond() as i64).into();
+        let tz_offset_seconds = self.offset().fix().local_minus_utc().into();
 
         BoltDateTime {
             seconds,

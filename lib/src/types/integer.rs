@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
@@ -93,22 +95,22 @@ impl BoltInteger {
     }
 }
 
-impl From<i64> for BoltInteger {
-    fn from(val: i64) -> Self {
-        BoltInteger::new(val)
+impl Into<BoltInteger> for i64 {
+    fn into(self) -> BoltInteger {
+        BoltInteger::new(self)
     }
 }
 
-impl From<BoltInteger> for i64 {
-    fn from(val: BoltInteger) -> Self {
-        val.value
+impl Into<i64> for BoltInteger {
+    fn into(self) -> i64 {
+        self.value
     }
 }
 
 //TODO: use macros
-impl From<i32> for BoltInteger {
-    fn from(val: i32) -> Self {
-        BoltInteger::new(val as i64)
+impl Into<BoltInteger> for i32 {
+    fn into(self) -> BoltInteger {
+        BoltInteger::new(self as i64)
     }
 }
 

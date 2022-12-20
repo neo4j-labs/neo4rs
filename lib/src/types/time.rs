@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::types::*;
 use chrono::{FixedOffset, NaiveTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
@@ -15,42 +17,42 @@ pub struct BoltLocalTime {
     nanoseconds: BoltInteger,
 }
 
-impl From<(NaiveTime, FixedOffset)> for BoltTime {
-    fn from(val: (NaiveTime, FixedOffset)) -> Self {
-        let seconds_from_midnight = val.0.num_seconds_from_midnight() as i64;
-        let nanoseconds = seconds_from_midnight * 1_000_000_000 + val.0.nanosecond() as i64;
+impl Into<BoltTime> for (NaiveTime, FixedOffset) {
+    fn into(self) -> BoltTime {
+        let seconds_from_midnight = self.0.num_seconds_from_midnight() as i64;
+        let nanoseconds = seconds_from_midnight * 1_000_000_000 + self.0.nanosecond() as i64;
         BoltTime {
             nanoseconds: nanoseconds.into(),
-            tz_offset_seconds: val.1.fix().local_minus_utc().into(),
+            tz_offset_seconds: self.1.fix().local_minus_utc().into(),
         }
     }
 }
 
-impl From<BoltTime> for (NaiveTime, FixedOffset) {
-    fn from(val: BoltTime) -> Self {
-        let nanos = val.nanoseconds.value;
+impl Into<(NaiveTime, FixedOffset)> for BoltTime {
+    fn into(self) -> (NaiveTime, FixedOffset) {
+        let nanos = self.nanoseconds.value;
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
         (
             NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds).unwrap(),
-            FixedOffset::east_opt(val.tz_offset_seconds.value as i32).unwrap(),
+            FixedOffset::east_opt(self.tz_offset_seconds.value as i32).unwrap(),
         )
     }
 }
 
-impl From<NaiveTime> for BoltLocalTime {
-    fn from(val: NaiveTime) -> Self {
-        let seconds_from_midnight = val.num_seconds_from_midnight() as i64;
-        let nanoseconds = seconds_from_midnight * 1_000_000_000 + val.nanosecond() as i64;
+impl Into<BoltLocalTime> for NaiveTime {
+    fn into(self) -> BoltLocalTime {
+        let seconds_from_midnight = self.num_seconds_from_midnight() as i64;
+        let nanoseconds = seconds_from_midnight * 1_000_000_000 + self.nanosecond() as i64;
         BoltLocalTime {
             nanoseconds: nanoseconds.into(),
         }
     }
 }
 
-impl From<BoltLocalTime> for NaiveTime {
-    fn from(val: BoltLocalTime) -> Self {
-        let nanos = val.nanoseconds.value;
+impl Into<NaiveTime> for BoltLocalTime {
+    fn into(self) -> NaiveTime {
+        let nanos = self.nanoseconds.value;
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
         NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds).unwrap()

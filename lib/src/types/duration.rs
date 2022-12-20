@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
@@ -26,10 +28,10 @@ impl BoltDuration {
     }
 }
 
-impl From<std::time::Duration> for BoltDuration {
-    fn from(val: std::time::Duration) -> Self {
-        let seconds = val.as_secs();
-        let nanos = val.subsec_nanos();
+impl Into<BoltDuration> for std::time::Duration {
+    fn into(self) -> BoltDuration {
+        let seconds = self.as_secs();
+        let nanos = self.subsec_nanos();
         BoltDuration::new(
             0.into(),
             0.into(),
@@ -39,12 +41,12 @@ impl From<std::time::Duration> for BoltDuration {
     }
 }
 
-impl From<BoltDuration> for std::time::Duration {
-    fn from(val: BoltDuration) -> Self {
+impl Into<std::time::Duration> for BoltDuration {
+    fn into(self) -> std::time::Duration {
         //TODO: clarify month issue
         let seconds =
-            val.seconds.value + (val.days.value * 24 * 3600) + (val.months.value * 2_629_800);
-        std::time::Duration::new(seconds as u64, val.nanoseconds.value as u32)
+            self.seconds.value + (self.days.value * 24 * 3600) + (self.months.value * 2_629_800);
+        std::time::Duration::new(seconds as u64, self.nanoseconds.value as u32)
     }
 }
 

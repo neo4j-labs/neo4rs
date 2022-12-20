@@ -1,3 +1,5 @@
+#![allow(clippy::from_over_into)]
+
 use crate::errors::*;
 use crate::types::*;
 use crate::version::Version;
@@ -66,9 +68,9 @@ impl IntoIterator for BoltList {
     }
 }
 
-impl From<BoltList> for Vec<String> {
-    fn from(val: BoltList) -> Self {
-        val.value.into_iter().map(|x| x.to_string()).collect()
+impl Into<Vec<String>> for BoltList {
+    fn into(self) -> Vec<String> {
+        self.value.into_iter().map(|x| x.to_string()).collect()
     }
 }
 
@@ -139,9 +141,9 @@ impl BoltList {
     }
 }
 
-impl From<BoltList> for Vec<BoltType> {
-    fn from(val: BoltList) -> Self {
-        val.value
+impl Into<Vec<BoltType>> for BoltList {
+    fn into(self) -> Vec<BoltType> {
+        self.value
     }
 }
 
