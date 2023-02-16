@@ -273,10 +273,16 @@ impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
 impl<A: Into<BoltType> + Clone> Into<BoltType> for Vec<A> {
     fn into(self) -> BoltType {
         BoltType::List(BoltList {
-            value: self
-                .iter()
-                .map(|v| v.clone().into())
-                .collect()})
+            value: self.iter().map(|v| v.clone().into()).collect(),
+        })
+    }
+}
+
+impl<A: Into<BoltType> + Clone> Into<BoltType> for &[A] {
+    fn into(self) -> BoltType {
+        BoltType::List(BoltList {
+            value: self.iter().map(|v| v.clone().into()).collect(),
+        })
     }
 }
 
@@ -336,5 +342,35 @@ mod tests {
         });
         let value = Vec::<i64>::try_from(value).unwrap_err();
         assert!(matches!(value, Error::ConverstionError));
+    }
+
+    #[test]
+    fn convert_from_vec() {
+        let value: Vec<i64> = vec![42, 1337];
+        let value: BoltType = value.into();
+        assert_eq!(
+            value,
+            BoltType::List(BoltList {
+                value: vec![
+                    BoltType::Integer(BoltInteger::new(42)),
+                    BoltType::Integer(BoltInteger::new(1337)),
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn convert_from_slice() {
+        let value: Vec<i64> = vec![42, 1337];
+        let value: BoltType = value.as_slice().into();
+        assert_eq!(
+            value,
+            BoltType::List(BoltList {
+                value: vec![
+                    BoltType::Integer(BoltInteger::new(42)),
+                    BoltType::Integer(BoltInteger::new(1337)),
+                ],
+            })
+        );
     }
 }
