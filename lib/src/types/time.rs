@@ -31,10 +31,18 @@ impl Into<(NaiveTime, FixedOffset)> for BoltTime {
         let nanos = self.nanoseconds.value;
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
-        (
-            NaiveTime::from_num_seconds_from_midnight(seconds, nanoseconds),
-            FixedOffset::east(self.tz_offset_seconds.value as i32),
-        )
+
+        let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds)
+            .unwrap_or_else(|| {
+                panic!(
+                    "invalid number of seconds {} or nanoseconds {}",
+                    seconds, nanoseconds
+                )
+            });
+        let offset = FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
+            .unwrap_or_else(|| panic!("invald timezone offset {}", self.tz_offset_seconds.value));
+
+        (time, offset)
     }
 }
 
@@ -53,7 +61,12 @@ impl Into<NaiveTime> for BoltLocalTime {
         let nanos = self.nanoseconds.value;
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
-        NaiveTime::from_num_seconds_from_midnight(seconds, nanoseconds)
+        NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds).unwrap_or_else(|| {
+            panic!(
+                "invalid number of seconds {} and nanoseconds {}",
+                seconds, nanoseconds
+            )
+        })
     }
 }
 
@@ -68,7 +81,7 @@ mod tests {
     #[test]
     fn should_serialize_time() {
         let time = NaiveTime::from_hms_nano_opt(7, 8, 9, 100).unwrap();
-        let offset = FixedOffset::east(2 * 3600);
+        let offset = FixedOffset::east_opt(2 * 3600).unwrap();
 
         let time: BoltTime = (time, offset).into();
 
@@ -92,7 +105,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(time.to_string(), "07:08:09.000000100");
-        assert_eq!(offset, FixedOffset::east(2 * 3600));
+        assert_eq!(offset, FixedOffset::east_opt(2 * 3600).unwrap());
     }
 
     #[test]

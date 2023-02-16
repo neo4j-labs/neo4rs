@@ -12,7 +12,7 @@ pub struct BoltDate {
 
 impl Into<BoltDate> for NaiveDate {
     fn into(self) -> BoltDate {
-        let epoch = NaiveDate::from_ymd(1970, 1, 1);
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
         let days = (self - epoch).num_days().into();
         BoltDate { days }
     }
@@ -22,7 +22,7 @@ impl TryInto<NaiveDate> for BoltDate {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDate> {
-        let epoch = NaiveDate::from_ymd(1970, 1, 1);
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
         let days = Duration::days(self.days.value);
         epoch
             .checked_add_signed(days)
@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn should_serialize_a_date() {
-        let date: BoltDate = NaiveDate::from_ymd(2010, 1, 1).into();
+        let date: BoltDate = NaiveDate::from_ymd_opt(2010, 1, 1).unwrap().into();
         assert_eq!(
             date.into_bytes(Version::V4_1).unwrap(),
             Bytes::from_static(&[0xB1, 0x44, 0xC9, 0x39, 0x12])

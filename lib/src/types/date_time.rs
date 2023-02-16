@@ -43,9 +43,9 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     type Error = Error;
 
     fn try_into(self) -> Result<(NaiveDateTime, String)> {
-        let datetime =
-            NaiveDateTime::from_timestamp(self.seconds.value, self.nanoseconds.value as u32);
-        Ok((datetime, self.tz_id.into()))
+        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+            .map(|datetime| (datetime, self.tz_id.into()))
+            .ok_or(Error::ConverstionError)
     }
 }
 
@@ -65,10 +65,8 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDateTime> {
-        Ok(NaiveDateTime::from_timestamp(
-            self.seconds.value,
-            self.nanoseconds.value as u32,
-        ))
+        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+            .ok_or(Error::ConverstionError)
     }
 }
 
@@ -91,11 +89,12 @@ impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
 
     fn try_into(self) -> Result<DateTime<FixedOffset>> {
         let seconds = self.seconds.value - self.tz_offset_seconds.value;
-        let datetime = NaiveDateTime::from_timestamp(seconds, self.nanoseconds.value as u32);
-        Ok(DateTime::from_utc(
-            datetime,
-            FixedOffset::east(self.tz_offset_seconds.value as i32),
-        ))
+        let offset = FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
+            .ok_or(Error::ConverstionError)?;
+        let datetime = NaiveDateTime::from_timestamp_opt(seconds, self.nanoseconds.value as u32)
+            .ok_or(Error::ConverstionError)?;
+
+        Ok(DateTime::from_utc(datetime, offset))
     }
 }
 
