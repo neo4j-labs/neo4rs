@@ -13,7 +13,7 @@ pub enum Error {
     UnexpectedMessage(String),
     UnknownType(String),
     UnknownMessage(String),
-    ConverstionError,
+    ConversionError,
     AuthenticationError(String),
     InvalidTypeMarker(String),
     DeserializationError(String),

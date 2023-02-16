@@ -24,9 +24,7 @@ impl TryInto<NaiveDate> for BoltDate {
     fn try_into(self) -> Result<NaiveDate> {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
         let days = Duration::days(self.days.value);
-        epoch
-            .checked_add_signed(days)
-            .ok_or(Error::ConverstionError)
+        epoch.checked_add_signed(days).ok_or(Error::ConversionError)
     }
 }
 
