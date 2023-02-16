@@ -3,17 +3,12 @@ use crate::row::*;
 use crate::types::*;
 use std::convert::{TryFrom, TryInto};
 
-impl<A: TryFrom<BoltType>> TryFrom<BoltType> for Vec<A> {
+impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     type Error = Error;
 
     fn try_from(input: BoltType) -> Result<Vec<A>> {
         match input {
-            BoltType::List(l) => Ok(l.value
-                                    .to_vec()
-                                    .iter()
-                                    .flat_map(|x| A::try_from(x.clone()))
-                                    .collect()
-                                    ),
+            BoltType::List(l) => l.value.iter().map(|x| A::try_from(x.clone())).collect(),
             _ => Err(Error::ConverstionError),
         }
     }
@@ -312,5 +307,34 @@ impl Into<BoltType> for String {
 impl Into<BoltType> for &str {
     fn into(self) -> BoltType {
         BoltType::String(self.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_into_vec() {
+        let value = BoltType::List(BoltList {
+            value: vec![
+                BoltType::Integer(BoltInteger::new(42)),
+                BoltType::Integer(BoltInteger::new(1337)),
+            ],
+        });
+        let value = Vec::<i64>::try_from(value).unwrap();
+        assert_eq!(value, vec![42, 1337]);
+    }
+
+    #[test]
+    fn convert_propagates_error() {
+        let value = BoltType::List(BoltList {
+            value: vec![
+                BoltType::Integer(BoltInteger::new(42)),
+                BoltType::Float(BoltFloat::new(13.37)),
+            ],
+        });
+        let value = Vec::<i64>::try_from(value).unwrap_err();
+        assert!(matches!(value, Error::ConverstionError));
     }
 }
