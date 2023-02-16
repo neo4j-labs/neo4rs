@@ -59,14 +59,14 @@ impl RowStream {
                     self.state = State::Streaming;
                 }
                 State::Streaming => match connection.recv().await {
-                    Ok(BoltResponse::SuccessMessage(s)) => {
+                    Ok(BoltResponse::Success(s)) => {
                         if s.get("has_more").unwrap_or(false) {
                             self.state = State::Buffered;
                         } else {
                             self.state = State::Complete;
                         }
                     }
-                    Ok(BoltResponse::RecordMessage(record)) => {
+                    Ok(BoltResponse::Record(record)) => {
                         let row = Row::new(self.fields.clone(), record.data);
                         self.buffer.push_back(row);
                     }

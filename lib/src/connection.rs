@@ -27,8 +27,8 @@ impl Connection {
         let mut connection = Connection { version, stream };
         let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
         match connection.send_recv(hello).await? {
-            BoltResponse::SuccessMessage(_msg) => Ok(connection),
-            BoltResponse::FailureMessage(msg) => {
+            BoltResponse::Success(_msg) => Ok(connection),
+            BoltResponse::Failure(msg) => {
                 Err(Error::AuthenticationError(msg.get("message").unwrap()))
             }
 
@@ -38,7 +38,7 @@ impl Connection {
 
     pub async fn reset(&mut self) -> Result<()> {
         match self.send_recv(BoltRequest::reset()).await? {
-            BoltResponse::SuccessMessage(_) => Ok(()),
+            BoltResponse::Success(_) => Ok(()),
             msg => Err(unexpected(msg, "RESET")),
         }
     }
