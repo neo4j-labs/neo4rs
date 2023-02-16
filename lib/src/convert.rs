@@ -3,6 +3,17 @@ use crate::row::*;
 use crate::types::*;
 use std::convert::{TryFrom, TryInto};
 
+impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Vec<A>> {
+        match input {
+            BoltType::List(l) => l.value.iter().map(|x| A::try_from(x.clone())).collect(),
+            _ => Err(Error::ConverstionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for f64 {
     type Error = Error;
 
@@ -259,9 +270,31 @@ impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
     }
 }
 
+impl<A: Into<BoltType> + Clone> Into<BoltType> for Vec<A> {
+    fn into(self) -> BoltType {
+        BoltType::List(BoltList {
+            value: self.iter().map(|v| v.clone().into()).collect(),
+        })
+    }
+}
+
+impl<A: Into<BoltType> + Clone> Into<BoltType> for &[A] {
+    fn into(self) -> BoltType {
+        BoltType::List(BoltList {
+            value: self.iter().map(|v| v.clone().into()).collect(),
+        })
+    }
+}
+
 impl Into<BoltType> for Vec<u8> {
     fn into(self) -> BoltType {
         BoltType::Bytes(BoltBytes::new(self.into()))
+    }
+}
+
+impl Into<BoltType> for f64 {
+    fn into(self) -> BoltType {
+        BoltType::Float(BoltFloat::new(self))
     }
 }
 
@@ -280,5 +313,64 @@ impl Into<BoltType> for String {
 impl Into<BoltType> for &str {
     fn into(self) -> BoltType {
         BoltType::String(self.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_into_vec() {
+        let value = BoltType::List(BoltList {
+            value: vec![
+                BoltType::Integer(BoltInteger::new(42)),
+                BoltType::Integer(BoltInteger::new(1337)),
+            ],
+        });
+        let value = Vec::<i64>::try_from(value).unwrap();
+        assert_eq!(value, vec![42, 1337]);
+    }
+
+    #[test]
+    fn convert_propagates_error() {
+        let value = BoltType::List(BoltList {
+            value: vec![
+                BoltType::Integer(BoltInteger::new(42)),
+                BoltType::Float(BoltFloat::new(13.37)),
+            ],
+        });
+        let value = Vec::<i64>::try_from(value).unwrap_err();
+        assert!(matches!(value, Error::ConverstionError));
+    }
+
+    #[test]
+    fn convert_from_vec() {
+        let value: Vec<i64> = vec![42, 1337];
+        let value: BoltType = value.into();
+        assert_eq!(
+            value,
+            BoltType::List(BoltList {
+                value: vec![
+                    BoltType::Integer(BoltInteger::new(42)),
+                    BoltType::Integer(BoltInteger::new(1337)),
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn convert_from_slice() {
+        let value: Vec<i64> = vec![42, 1337];
+        let value: BoltType = value.as_slice().into();
+        assert_eq!(
+            value,
+            BoltType::List(BoltList {
+                value: vec![
+                    BoltType::Integer(BoltInteger::new(42)),
+                    BoltType::Integer(BoltInteger::new(1337)),
+                ],
+            })
+        );
     }
 }
