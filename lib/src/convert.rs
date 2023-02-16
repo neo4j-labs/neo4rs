@@ -228,91 +228,91 @@ impl TryFrom<BoltType> for String {
     }
 }
 
-impl Into<BoltType> for std::time::Duration {
-    fn into(self) -> BoltType {
-        BoltType::Duration(self.into())
+impl From<std::time::Duration> for BoltType {
+    fn from(value: std::time::Duration) -> BoltType {
+        BoltType::Duration(value.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveDate {
-    fn into(self) -> BoltType {
-        BoltType::Date(self.into())
+impl From<chrono::NaiveDate> for BoltType {
+    fn from(value: chrono::NaiveDate) -> BoltType {
+        BoltType::Date(value.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveTime {
-    fn into(self) -> BoltType {
-        BoltType::LocalTime(self.into())
+impl From<chrono::NaiveTime> for BoltType {
+    fn from(value: chrono::NaiveTime) -> BoltType {
+        BoltType::LocalTime(value.into())
     }
 }
 
-impl Into<BoltType> for chrono::NaiveDateTime {
-    fn into(self) -> BoltType {
-        BoltType::LocalDateTime(self.into())
+impl From<chrono::NaiveDateTime> for BoltType {
+    fn from(value: chrono::NaiveDateTime) -> BoltType {
+        BoltType::LocalDateTime(value.into())
     }
 }
 
-impl Into<BoltType> for chrono::DateTime<chrono::FixedOffset> {
-    fn into(self) -> BoltType {
-        BoltType::DateTime(self.into())
+impl From<chrono::DateTime<chrono::FixedOffset>> for BoltType {
+    fn from(value: chrono::DateTime<chrono::FixedOffset>) -> Self {
+        BoltType::DateTime(value.into())
     }
 }
 
-impl Into<BoltType> for (chrono::NaiveTime, chrono::FixedOffset) {
-    fn into(self) -> BoltType {
-        BoltType::Time(self.into())
+impl From<(chrono::NaiveTime, chrono::FixedOffset)> for BoltType {
+    fn from(value: (chrono::NaiveTime, chrono::FixedOffset)) -> Self {
+        BoltType::Time(value.into())
     }
 }
 
-impl Into<BoltType> for (chrono::NaiveDateTime, &str) {
-    fn into(self) -> BoltType {
-        BoltType::DateTimeZoneId(self.into())
+impl From<(chrono::NaiveDateTime, &str)> for BoltType {
+    fn from(value: (chrono::NaiveDateTime, &str)) -> Self {
+        BoltType::DateTimeZoneId(value.into())
     }
 }
 
-impl<A: Into<BoltType> + Clone> Into<BoltType> for Vec<A> {
-    fn into(self) -> BoltType {
+impl<A: Into<BoltType> + Clone> From<Vec<A>> for BoltType {
+    fn from(value: Vec<A>) -> BoltType {
         BoltType::List(BoltList {
-            value: self.iter().map(|v| v.clone().into()).collect(),
+            value: value.iter().map(|v| v.clone().into()).collect(),
         })
     }
 }
 
-impl<A: Into<BoltType> + Clone> Into<BoltType> for &[A] {
-    fn into(self) -> BoltType {
+impl<A: Into<BoltType> + Clone> From<&[A]> for BoltType {
+    fn from(value: &[A]) -> Self {
         BoltType::List(BoltList {
-            value: self.iter().map(|v| v.clone().into()).collect(),
+            value: value.iter().map(|v| v.clone().into()).collect(),
         })
     }
 }
 
-impl Into<BoltType> for Vec<u8> {
-    fn into(self) -> BoltType {
-        BoltType::Bytes(BoltBytes::new(self.into()))
+impl From<Vec<u8>> for BoltType {
+    fn from(value: Vec<u8>) -> Self {
+        BoltType::Bytes(BoltBytes::new(value.into()))
     }
 }
 
-impl Into<BoltType> for f64 {
-    fn into(self) -> BoltType {
-        BoltType::Float(BoltFloat::new(self))
+impl From<f64> for BoltType {
+    fn from(val: f64) -> Self {
+        BoltType::Float(BoltFloat::new(val))
     }
 }
 
-impl Into<BoltType> for i64 {
-    fn into(self) -> BoltType {
-        BoltType::Integer(BoltInteger::new(self))
+impl From<i64> for BoltType {
+    fn from(value: i64) -> BoltType {
+        BoltType::Integer(BoltInteger::new(value))
     }
 }
 
-impl Into<BoltType> for String {
-    fn into(self) -> BoltType {
-        BoltType::String(self.into())
+impl From<String> for BoltType {
+    fn from(value: String) -> Self {
+        BoltType::String(value.into())
     }
 }
 
-impl Into<BoltType> for &str {
-    fn into(self) -> BoltType {
-        BoltType::String(self.into())
+impl From<&str> for BoltType {
+    fn from(value: &str) -> Self {
+        BoltType::String(value.into())
     }
 }
 
