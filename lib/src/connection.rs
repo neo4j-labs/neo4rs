@@ -73,7 +73,7 @@ impl Connection {
             chunk_size = self.read_u16().await?;
         }
 
-        Ok(BoltResponse::parse(self.version, bytes.freeze())?)
+        BoltResponse::parse(self.version, bytes.freeze())
     }
 
     async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
