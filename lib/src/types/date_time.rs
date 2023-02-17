@@ -27,14 +27,14 @@ pub struct BoltDateTimeZoneId {
     tz_id: BoltString,
 }
 
-impl Into<BoltDateTimeZoneId> for (NaiveDateTime, &str) {
-    fn into(self) -> BoltDateTimeZoneId {
-        let seconds = self.0.timestamp().into();
-        let nanoseconds = (self.0.timestamp_subsec_nanos() as i64).into();
+impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
+    fn from(value: (NaiveDateTime, &str)) -> Self {
+        let seconds = value.0.timestamp().into();
+        let nanoseconds = (value.0.timestamp_subsec_nanos() as i64).into();
         BoltDateTimeZoneId {
             seconds,
             nanoseconds,
-            tz_id: self.1.into(),
+            tz_id: value.1.into(),
         }
     }
 }
@@ -49,10 +49,10 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     }
 }
 
-impl Into<BoltLocalDateTime> for NaiveDateTime {
-    fn into(self) -> BoltLocalDateTime {
-        let seconds = self.timestamp().into();
-        let nanoseconds = (self.nanosecond() as i64).into();
+impl From<NaiveDateTime> for BoltLocalDateTime {
+    fn from(value: NaiveDateTime) -> Self {
+        let seconds = value.timestamp().into();
+        let nanoseconds = (value.nanosecond() as i64).into();
 
         BoltLocalDateTime {
             seconds,
@@ -70,11 +70,11 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     }
 }
 
-impl Into<BoltDateTime> for DateTime<FixedOffset> {
-    fn into(self) -> BoltDateTime {
-        let seconds = (self.timestamp() + self.offset().fix().local_minus_utc() as i64).into();
-        let nanoseconds = (self.nanosecond() as i64).into();
-        let tz_offset_seconds = self.offset().fix().local_minus_utc().into();
+impl From<DateTime<FixedOffset>> for BoltDateTime {
+    fn from(value: DateTime<FixedOffset>) -> Self {
+        let seconds = (value.timestamp() + value.offset().fix().local_minus_utc() as i64).into();
+        let nanoseconds = (value.nanosecond() as i64).into();
+        let tz_offset_seconds = value.offset().fix().local_minus_utc().into();
 
         BoltDateTime {
             seconds,

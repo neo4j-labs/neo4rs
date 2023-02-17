@@ -10,10 +10,10 @@ pub struct BoltDate {
     days: BoltInteger,
 }
 
-impl Into<BoltDate> for NaiveDate {
-    fn into(self) -> BoltDate {
+impl From<NaiveDate> for BoltDate {
+    fn from(value: NaiveDate) -> Self {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        let days = (self - epoch).num_days().into();
+        let days = (value - epoch).num_days().into();
         BoltDate { days }
     }
 }
