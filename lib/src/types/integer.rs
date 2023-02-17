@@ -55,7 +55,7 @@ impl BoltInteger {
             INT_8 => input.get_i8() as i64,
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
-            INT_64 => input.get_i64() as i64,
+            INT_64 => input.get_i64(),
             _ => return Err(Error::InvalidTypeMarker("invalid integer marker".into())),
         };
 
@@ -81,7 +81,7 @@ impl BoltInteger {
             2_147_483_648..=9_223_372_036_854_775_807
             | -9_223_372_036_854_775_808..=-2_147_483_649 => {
                 bytes.put_u8(INT_64);
-                bytes.put_i64(self.value as i64);
+                bytes.put_i64(self.value);
             }
         }
         Ok(bytes.freeze())

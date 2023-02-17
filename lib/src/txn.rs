@@ -20,7 +20,7 @@ impl Txn {
     pub(crate) async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
         let begin = BoltRequest::begin();
         match connection.send_recv(begin).await? {
-            BoltResponse::SuccessMessage(_) => Ok(Txn {
+            BoltResponse::Success(_) => Ok(Txn {
                 config,
                 connection: Arc::new(Mutex::new(connection)),
             }),
@@ -50,7 +50,7 @@ impl Txn {
     pub async fn commit(self) -> Result<()> {
         let commit = BoltRequest::commit();
         match self.connection.lock().await.send_recv(commit).await? {
-            BoltResponse::SuccessMessage(_) => Ok(()),
+            BoltResponse::Success(_) => Ok(()),
             msg => Err(unexpected(msg, "COMMIT")),
         }
     }
@@ -59,7 +59,7 @@ impl Txn {
     pub async fn rollback(self) -> Result<()> {
         let rollback = BoltRequest::rollback();
         match self.connection.lock().await.send_recv(rollback).await? {
-            BoltResponse::SuccessMessage(_) => Ok(()),
+            BoltResponse::Success(_) => Ok(()),
             msg => Err(unexpected(msg, "ROLLBACK")),
         }
     }

@@ -35,12 +35,10 @@ impl Query {
         let run = BoltRequest::run(&config.db, &self.query, self.params.clone());
         let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
-            BoltResponse::SuccessMessage(_) => {
-                match connection.send_recv(BoltRequest::discard()).await? {
-                    BoltResponse::SuccessMessage(_) => Ok(()),
-                    msg => Err(unexpected(msg, "DISCARD")),
-                }
-            }
+            BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
+                BoltResponse::Success(_) => Ok(()),
+                msg => Err(unexpected(msg, "DISCARD")),
+            },
             msg => Err(unexpected(msg, "RUN")),
         }
     }
@@ -52,7 +50,7 @@ impl Query {
     ) -> Result<RowStream> {
         let run = BoltRequest::run(&config.db, &self.query, self.params);
         match connection.lock().await.send_recv(run).await {
-            Ok(BoltResponse::SuccessMessage(success)) => {
+            Ok(BoltResponse::Success(success)) => {
                 let fields: BoltList = success.get("fields").unwrap_or_else(BoltList::new);
                 let qid: i64 = success.get("qid").unwrap_or(-1);
                 Ok(RowStream::new(
