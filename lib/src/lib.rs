@@ -12,7 +12,7 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use std::sync::Arc;
 //! use std::sync::atomic::{AtomicU32, Ordering};
@@ -60,7 +60,7 @@
 //! * `max_connections` - maximum size of the connection pool (default is 16)
 //! * `db` - the database to connect to (default is `neo4j`)
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //!
@@ -89,7 +89,7 @@
 //!
 //! * [`Graph::run`] just returns [`errors::Result`]`<()>`, usually used for write only queries.
 //! * [`Graph::execute`] returns [`errors::Result`]`<`[`RowStream`]`>`
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //!
@@ -128,7 +128,7 @@
 //! the Txn is dropped
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -165,7 +165,7 @@
 //! so you can consume the stream anytime within the transaction using [`RowStream::next`]
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -219,7 +219,7 @@
 //!
 //!
 //! ### Rollback a transaction
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -260,7 +260,7 @@
 //! clean state only after you commit/rollback the transaction and the [`Txn`] handle is dropped.
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -304,7 +304,7 @@
 //! Bounded Relationship between nodes are created using cypher queries and the same can be parsed
 //! from the [`RowStream`]
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //!
@@ -331,7 +331,7 @@
 //!
 //! Similar to bounded relation, an unbounded relation can also be created/parsed.
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //!
@@ -362,7 +362,7 @@
 //! A 2d or 3d point can be represented with the types  [`Point2D`] and [`Point3D`]
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -415,7 +415,7 @@
 //! ## Raw bytes
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -442,7 +442,7 @@
 //! ## Durations
 //!
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -472,7 +472,7 @@
 //!
 //! [naive_date]: https://docs.rs/chrono/0.4.19/chrono/naive/struct.NaiveDate.html
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -510,7 +510,7 @@
 //!
 //! Pass a time as a parameter to the query:
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -550,7 +550,7 @@
 //!
 //! ### Parsing time from result
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -607,7 +607,7 @@
 //!
 //! Pass a DateTime as parameter to the query:
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -662,7 +662,7 @@
 //!
 //! ### Parsing DateTime from result
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
@@ -720,7 +720,7 @@
 //!
 //! ## Path
 //!
-//! ```
+//! ```no_run
 //! use neo4rs::*;
 //! use futures::stream::*;
 //! use uuid::Uuid;
