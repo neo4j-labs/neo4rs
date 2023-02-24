@@ -292,6 +292,12 @@ impl From<Vec<u8>> for BoltType {
     }
 }
 
+impl From<&[u8]> for BoltType {
+    fn from(value: &[u8]) -> Self {
+        Self::from(value.to_vec())
+    }
+}
+
 impl From<f64> for BoltType {
     fn from(val: f64) -> Self {
         BoltType::Float(BoltFloat::new(val))
