@@ -3,7 +3,7 @@ pub use crate::errors::*;
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
-/// The configuration used to connect to the database, see [`Graph::connect`]
+/// The configuration used to connect to the database, see [`crate::Graph::connect`]
 #[derive(Debug, Clone)]
 pub struct Config {
     pub(crate) uri: String,

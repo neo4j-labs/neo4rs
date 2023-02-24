@@ -7,7 +7,7 @@ use crate::stream::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// A handle which is used to control a transaction, created as a result of [`Graph::start_txn`]
+/// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
 ///
 /// When a transation is started, a dedicated connection is resered and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
