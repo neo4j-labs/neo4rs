@@ -292,9 +292,21 @@ impl From<Vec<u8>> for BoltType {
     }
 }
 
+impl From<&[u8]> for BoltType {
+    fn from(value: &[u8]) -> Self {
+        Self::from(value.to_vec())
+    }
+}
+
 impl From<f64> for BoltType {
     fn from(val: f64) -> Self {
         BoltType::Float(BoltFloat::new(val))
+    }
+}
+
+impl From<f32> for BoltType {
+    fn from(val: f32) -> Self {
+        Self::from(f64::from(val))
     }
 }
 
@@ -303,6 +315,38 @@ impl From<i64> for BoltType {
         BoltType::Integer(BoltInteger::new(value))
     }
 }
+
+macro_rules! int_impl {
+    ($($ty:ty),+) => {
+        $(
+            impl From<$ty> for BoltType {
+                fn from(val: $ty) -> Self {
+                    Self::from(i64::from(val))
+                }
+            }
+        )+
+    };
+
+    (try $($ty:ty),+) => {
+        $(
+            impl TryFrom<$ty> for BoltType {
+                type Error = ::std::num::TryFromIntError;
+
+                fn try_from(val: $ty) -> ::std::result::Result<Self, Self::Error> {
+                    match i64::try_from(val) {
+                        Ok(v) => Ok(Self::from(v)),
+                        Err(e) => Err(e),
+                    }
+                }
+            }
+        )+
+    };
+}
+
+// no impl for u8 as it produces a
+// conflict of From impls for Vec<A> and Vec<u8>
+int_impl!(i8, i16, i32, u16, u32);
+int_impl!(try isize, i128, usize, u64, u128);
 
 impl From<String> for BoltType {
     fn from(value: String) -> Self {
