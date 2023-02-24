@@ -426,13 +426,14 @@
 //!    let user = "neo4j";
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let bytes = b"Hello, Neo4j!";
 //!    let mut result = graph
-//!        .execute(query("RETURN $b as output").param("b", vec![11, 12]))
+//!        .execute(query("RETURN $b as output").param("b", bytes.as_ref()))
 //!        .await
 //!        .unwrap();
 //!    let row = result.next().await.unwrap().unwrap();
 //!    let b: Vec<u8> = row.get("output").unwrap();
-//!    assert_eq!(b, &[11, 12]);
+//!    assert_eq!(b, bytes);
 //!    assert!(result.next().await.unwrap().is_none());
 //! }
 //!
