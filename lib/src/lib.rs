@@ -482,7 +482,7 @@
 //!    let user = "neo4j";
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
-//!    let date = chrono::NaiveDate::from_ymd(1985, 2, 5);
+//!    let date = chrono::NaiveDate::from_ymd_opt(1985, 2, 5).unwrap();
 //!    let mut result = graph
 //!        .execute(query("RETURN $d as output").param("d", date))
 //!        .await
@@ -522,7 +522,7 @@
 //!    let graph = Graph::new(uri, user, pass).await.unwrap();
 //!
 //!    //send time without offset as param
-//!    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
+//!    let time = chrono::NaiveTime::from_hms_nano_opt(11, 15, 30, 200).unwrap();
 //!    let mut result = graph.execute(query("RETURN $d as output").param("d", time)).await.unwrap();
 //!    let row = result.next().await.unwrap().unwrap();
 //!    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
@@ -532,8 +532,8 @@
 //!
 //!
 //!    //send time with offset as param
-//!    let time = chrono::NaiveTime::from_hms_nano(11, 15, 30, 200);
-//!    let offset = chrono::FixedOffset::east(3 * 3600);
+//!    let time = chrono::NaiveTime::from_hms_nano_opt(11, 15, 30, 200).unwrap();
+//!    let offset = chrono::FixedOffset::east_opt(3 * 3600).unwrap();
 //!    let mut result = graph
 //!        .execute(query("RETURN $d as output").param("d", (time, offset)))
 //!        .await
@@ -584,7 +584,7 @@
 //!    let row = result.next().await.unwrap().unwrap();
 //!    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("t").unwrap();
 //!    assert_eq!(t.0.to_string(), "10:15:33.000000200");
-//!    assert_eq!(t.1, Some(chrono::FixedOffset::east(1 * 3600)));
+//!    assert_eq!(t.1, Some(chrono::FixedOffset::east_opt(1 * 3600).unwrap()));
 //!    assert!(result.next().await.unwrap().is_none());
 //! }
 //!
