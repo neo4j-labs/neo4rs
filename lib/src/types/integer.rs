@@ -1,5 +1,3 @@
-#![allow(clippy::from_over_into)]
-
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;

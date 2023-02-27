@@ -1,17 +1,15 @@
-#![allow(clippy::from_over_into)]
-
 use crate::types::*;
 use chrono::{FixedOffset, NaiveTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB2, 0x54)]
 pub struct BoltTime {
     nanoseconds: BoltInteger,
     tz_offset_seconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x74)]
 pub struct BoltLocalTime {
     nanoseconds: BoltInteger,

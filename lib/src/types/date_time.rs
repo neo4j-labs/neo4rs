@@ -1,12 +1,10 @@
-#![allow(clippy::from_over_into)]
-
 use crate::errors::Error;
 use crate::types::*;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB3, 0x46)]
 pub struct BoltDateTime {
     seconds: BoltInteger,
@@ -14,14 +12,14 @@ pub struct BoltDateTime {
     tz_offset_seconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB2, 0x64)]
 pub struct BoltLocalDateTime {
     seconds: BoltInteger,
     nanoseconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB3, 0x66)]
 pub struct BoltDateTimeZoneId {
     seconds: BoltInteger,

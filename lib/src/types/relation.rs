@@ -1,5 +1,3 @@
-#![allow(clippy::from_over_into)]
-
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 

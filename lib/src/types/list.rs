@@ -1,5 +1,3 @@
-#![allow(clippy::from_over_into)]
-
 use crate::errors::*;
 use crate::types::*;
 use crate::version::Version;
@@ -125,10 +123,10 @@ impl BoltList {
             MEDIUM => input.borrow_mut().get_u16() as usize,
             LARGE => input.borrow_mut().get_u32() as usize,
             _ => {
-                return Err(Error::InvalidTypeMarker {
-                    type_name: "list",
-                    marker,
-                })
+                return Err(Error::InvalidTypeMarker(format!(
+                    "invalid list marker {}",
+                    marker
+                )))
             }
         };
 

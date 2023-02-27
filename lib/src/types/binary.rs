@@ -9,7 +9,7 @@ pub const SMALL: u8 = 0xCC;
 pub const MEDIUM: u8 = 0xCD;
 pub const LARGE: u8 = 0xCE;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoltBytes {
     pub value: Bytes,
 }
@@ -61,10 +61,10 @@ impl BoltBytes {
             MEDIUM => input.borrow_mut().get_u16() as usize,
             LARGE => input.borrow_mut().get_u32() as usize,
             _ => {
-                return Err(Error::InvalidTypeMarker {
-                    type_name: "bytes",
-                    marker,
-                })
+                return Err(Error::InvalidTypeMarker(format!(
+                    "invalid bytes marker {}",
+                    marker
+                )))
             }
         };
 

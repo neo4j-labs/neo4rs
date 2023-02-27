@@ -1,12 +1,10 @@
-#![allow(clippy::from_over_into)]
-
 use crate::errors::Error;
 use crate::types::*;
 use chrono::{Duration, NaiveDate};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x44)]
 pub struct BoltDate {
     days: BoltInteger,

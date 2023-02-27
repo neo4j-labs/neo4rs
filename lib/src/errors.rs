@@ -1,67 +1,53 @@
-use std::{io, string::FromUtf8Error};
-
-use deadpool::managed::PoolError;
-
-use crate::types::{BoltDate, BoltType};
-
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("an IO error occurred")]
-    IoError(#[from] io::Error),
-
-    #[error("connection pool error: {0:?}")]
-    ConnectionError(Box<PoolError<Self>>),
-
-    #[error("attempted to serialize excessively long string")]
+    IOError { detail: String },
+    ConnectionError,
     StringTooLong,
-
-    #[error("attempted to serialize excessively large map")]
     MapTooBig,
-
-    #[error("attempted to serialize excessively large byte array")]
     BytesTooBig,
-
-    #[error("attempted to serialize excessively long list")]
     ListTooLong,
-
-    #[error("invalid config: {0}")]
-    InvalidConfig(String),
-
-    #[error("version {0} is not supported")]
-    UnsupportedVersion(u32),
-
-    #[error("an unexpected response was received for `{request}`: {response}")]
-    UnexpectedMessage { request: String, response: String },
-
-    #[error("attempted to parse unknown type: `{0}`")]
+    InvalidConfig,
+    UnsupportedVersion(String),
+    UnexpectedMessage(String),
     UnknownType(String),
-
-    #[error("received unknown message: {0}")]
     UnknownMessage(String),
     ConversionError,
     AuthenticationError(String),
-
-    #[error("invalid {type_name} marker: {marker}")]
-    InvalidTypeMarker { type_name: &'static str, marker: u8 },
-
-    #[error("deserialization error")]
-    DeserializationError(#[from] FromUtf8Error),
+    InvalidTypeMarker(String),
+    DeserializationError(String),
 }
 
-impl From<PoolError<Error>> for Error {
-    fn from(e: PoolError<Error>) -> Self {
+impl std::convert::From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IOError {
+            detail: e.to_string(),
+        }
+    }
+}
+
+impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {
+    fn from(e: deadpool::managed::PoolError<Error>) -> Self {
         match e {
-            PoolError::Backend(e) => e,
-            _ => Error::ConnectionError(Box::new(e)),
+            deadpool::managed::PoolError::Backend(e) => e,
+            _ => Error::ConnectionError,
+        }
+    }
+}
+
+impl std::convert::From<deadpool::managed::BuildError<Error>> for Error {
+    fn from(value: deadpool::managed::BuildError<Error>) -> Self {
+        match value {
+            deadpool::managed::BuildError::Backend(e) => e,
+            _ => Error::ConnectionError,
         }
     }
 }
 
 pub fn unexpected<T: std::fmt::Debug>(response: T, request: &str) -> Error {
-    Error::UnexpectedMessage {
-        request: request.into(),
-        response: format!("{:?}", response),
-    }
+    Error::UnexpectedMessage(format!(
+        "unexpected response for {}: {:?}",
+        request, response
+    ))
 }

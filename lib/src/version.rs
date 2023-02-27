@@ -3,7 +3,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
     V4_1,
     V4,
@@ -23,7 +23,10 @@ impl Version {
         match u32::from_be_bytes(version_bytes) {
             260 => Ok(Version::V4_1),
             4 => Ok(Version::V4),
-            v => Err(Error::UnsupportedVersion(v)),
+            v => Err(Error::UnsupportedVersion(format!(
+                "version {} is not supported",
+                v
+            ))),
         }
     }
 }

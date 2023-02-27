@@ -37,10 +37,7 @@ impl BoltBoolean {
         match value {
             TRUE => Ok(BoltBoolean::new(true)),
             FALSE => Ok(BoltBoolean::new(false)),
-            marker => Err(Error::InvalidTypeMarker {
-                type_name: "boolean",
-                marker,
-            }),
+            _ => Err(Error::InvalidTypeMarker("invalid boolean marker".into())),
         }
     }
 }
@@ -64,10 +61,10 @@ mod tests {
     fn should_deserialize_boolean() {
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[TRUE])));
         let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
-        assert!(bolt_boolean.value);
+        assert_eq!(bolt_boolean.value, true);
 
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[FALSE])));
         let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
-        assert!(!bolt_boolean.value);
+        assert_eq!(bolt_boolean.value, false);
     }
 }
