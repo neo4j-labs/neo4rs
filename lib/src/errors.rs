@@ -40,14 +40,7 @@ pub enum Error {
 
     #[error("received unknown message: {0}")]
     UnknownMessage(String),
-
-    #[error("attempted to convert {0:?} into differing native type")]
-    ConvertError(BoltType),
-
-    #[error("failed to convert `{0:?}` into native type")]
-    DateConvertError(BoltDate),
-
-    #[error("authentication error: {0}")]
+    ConversionError,
     AuthenticationError(String),
 
     #[error("invalid {type_name} marker: {marker}")]

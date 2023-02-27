@@ -28,10 +28,10 @@ impl BoltDuration {
     }
 }
 
-impl Into<BoltDuration> for std::time::Duration {
-    fn into(self) -> BoltDuration {
-        let seconds = self.as_secs();
-        let nanos = self.subsec_nanos();
+impl From<std::time::Duration> for BoltDuration {
+    fn from(value: std::time::Duration) -> Self {
+        let seconds = value.as_secs();
+        let nanos = value.subsec_nanos();
         BoltDuration::new(
             0.into(),
             0.into(),
@@ -41,12 +41,12 @@ impl Into<BoltDuration> for std::time::Duration {
     }
 }
 
-impl Into<std::time::Duration> for BoltDuration {
-    fn into(self) -> std::time::Duration {
+impl From<BoltDuration> for std::time::Duration {
+    fn from(value: BoltDuration) -> Self {
         //TODO: clarify month issue
         let seconds =
-            self.seconds.value + (self.days.value * 24 * 3600) + (self.months.value * 2_629_800);
-        std::time::Duration::new(seconds as u64, self.nanoseconds.value as u32)
+            value.seconds.value + (value.days.value * 24 * 3600) + (value.months.value * 2_629_800);
+        std::time::Duration::new(seconds as u64, value.nanoseconds.value as u32)
     }
 }
 

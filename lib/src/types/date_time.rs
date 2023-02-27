@@ -29,14 +29,14 @@ pub struct BoltDateTimeZoneId {
     tz_id: BoltString,
 }
 
-impl Into<BoltDateTimeZoneId> for (NaiveDateTime, &str) {
-    fn into(self) -> BoltDateTimeZoneId {
-        let seconds = self.0.timestamp().into();
-        let nanoseconds = (self.0.timestamp_subsec_nanos() as i64).into();
+impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
+    fn from(value: (NaiveDateTime, &str)) -> Self {
+        let seconds = value.0.timestamp().into();
+        let nanoseconds = (value.0.timestamp_subsec_nanos() as i64).into();
         BoltDateTimeZoneId {
             seconds,
             nanoseconds,
-            tz_id: self.1.into(),
+            tz_id: value.1.into(),
         }
     }
 }
@@ -45,17 +45,16 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     type Error = Error;
 
     fn try_into(self) -> Result<(NaiveDateTime, String)> {
-        let datetime =
-            NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
-                .ok_or_else(|| Error::ConvertError(BoltType::DateTimeZoneId(self.clone())))?;
-        Ok((datetime, self.tz_id.into()))
+        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+            .map(|datetime| (datetime, self.tz_id.into()))
+            .ok_or(Error::ConversionError)
     }
 }
 
-impl Into<BoltLocalDateTime> for NaiveDateTime {
-    fn into(self) -> BoltLocalDateTime {
-        let seconds = self.timestamp().into();
-        let nanoseconds = (self.nanosecond() as i64).into();
+impl From<NaiveDateTime> for BoltLocalDateTime {
+    fn from(value: NaiveDateTime) -> Self {
+        let seconds = value.timestamp().into();
+        let nanoseconds = (value.nanosecond() as i64).into();
 
         BoltLocalDateTime {
             seconds,
@@ -69,15 +68,15 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
 
     fn try_into(self) -> Result<NaiveDateTime> {
         NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
-            .ok_or_else(|| Error::ConvertError(BoltType::LocalDateTime(self.clone())))
+            .ok_or(Error::ConversionError)
     }
 }
 
-impl Into<BoltDateTime> for DateTime<FixedOffset> {
-    fn into(self) -> BoltDateTime {
-        let seconds = (self.timestamp() + self.offset().fix().local_minus_utc() as i64).into();
-        let nanoseconds = (self.nanosecond() as i64).into();
-        let tz_offset_seconds = self.offset().fix().local_minus_utc().into();
+impl From<DateTime<FixedOffset>> for BoltDateTime {
+    fn from(value: DateTime<FixedOffset>) -> Self {
+        let seconds = (value.timestamp() + value.offset().fix().local_minus_utc() as i64).into();
+        let nanoseconds = (value.nanosecond() as i64).into();
+        let tz_offset_seconds = value.offset().fix().local_minus_utc().into();
 
         BoltDateTime {
             seconds,
@@ -92,13 +91,12 @@ impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
 
     fn try_into(self) -> Result<DateTime<FixedOffset>> {
         let seconds = self.seconds.value - self.tz_offset_seconds.value;
+        let offset = FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
+            .ok_or(Error::ConversionError)?;
         let datetime = NaiveDateTime::from_timestamp_opt(seconds, self.nanoseconds.value as u32)
-            .ok_or_else(|| Error::ConvertError(BoltType::DateTime(self.clone())))?;
-        Ok(DateTime::from_utc(
-            datetime,
-            FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
-                .ok_or_else(|| Error::ConvertError(BoltType::DateTime(self.clone())))?,
-        ))
+            .ok_or(Error::ConversionError)?;
+
+        Ok(DateTime::from_utc(datetime, offset))
     }
 }
 

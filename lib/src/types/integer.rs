@@ -58,12 +58,7 @@ impl BoltInteger {
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
             INT_64 => input.get_i64(),
-            marker => {
-                return Err(Error::InvalidTypeMarker {
-                    type_name: "integer",
-                    marker,
-                })
-            }
+            _ => return Err(Error::InvalidTypeMarker("invalid integer marker".into())),
         };
 
         Ok(BoltInteger::new(value))
@@ -95,22 +90,21 @@ impl BoltInteger {
     }
 }
 
-impl Into<BoltInteger> for i64 {
-    fn into(self) -> BoltInteger {
-        BoltInteger::new(self)
+impl From<i64> for BoltInteger {
+    fn from(value: i64) -> Self {
+        BoltInteger::new(value)
     }
 }
 
-impl Into<i64> for BoltInteger {
-    fn into(self) -> i64 {
-        self.value
+impl From<BoltInteger> for i64 {
+    fn from(value: BoltInteger) -> Self {
+        value.value
     }
 }
 
-//TODO: use macros
-impl Into<BoltInteger> for i32 {
-    fn into(self) -> BoltInteger {
-        BoltInteger::new(self as i64)
+impl From<i32> for BoltInteger {
+    fn from(value: i32) -> Self {
+        BoltInteger::new(value as i64)
     }
 }
 

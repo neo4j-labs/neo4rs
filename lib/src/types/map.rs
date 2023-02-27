@@ -15,7 +15,7 @@ pub const SMALL: u8 = 0xD8;
 pub const MEDIUM: u8 = 0xD9;
 pub const LARGE: u8 = 0xDA;
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct BoltMap {
     pub value: HashMap<BoltString, BoltType>,
 }

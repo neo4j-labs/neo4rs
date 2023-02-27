@@ -53,9 +53,9 @@ impl From<String> for BoltString {
     }
 }
 
-impl Into<String> for BoltString {
-    fn into(self) -> String {
-        self.value
+impl From<BoltString> for String {
+    fn from(value: BoltString) -> Self {
+        value.value
     }
 }
 
