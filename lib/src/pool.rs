@@ -4,8 +4,8 @@ use crate::errors::Error;
 use async_trait::async_trait;
 use log::info;
 
-pub type ConnectionPool = deadpool::managed::Pool<ConnectionManager>;
-pub type ManagedConnection = deadpool::managed::Object<ConnectionManager>;
+pub type ConnectionPool = deadpool::managed::Pool<Connection, Error>;
+pub type ManagedConnection = deadpool::managed::Object<Connection, Error>;
 
 pub struct ConnectionManager {
     uri: String,
@@ -24,10 +24,7 @@ impl ConnectionManager {
 }
 
 #[async_trait]
-impl deadpool::managed::Manager for ConnectionManager {
-    type Type = Connection;
-    type Error = Error;
-
+impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
     async fn create(&self) -> std::result::Result<Connection, Error> {
         info!("creating new connection...");
         Connection::new(&self.uri, &self.user, &self.password).await
@@ -38,13 +35,11 @@ impl deadpool::managed::Manager for ConnectionManager {
     }
 }
 
-pub async fn create_pool(config: &Config) -> Result<ConnectionPool, Error> {
+pub async fn create_pool(config: &Config) -> ConnectionPool {
     let mgr = ConnectionManager::new(&config.uri, &config.user, &config.password);
     info!(
         "creating connection pool with max size {}",
         config.max_connections
     );
-    Ok(ConnectionPool::builder(mgr)
-        .max_size(config.max_connections)
-        .build()?)
+    ConnectionPool::new(mgr, config.max_connections)
 }
