@@ -1,0 +1,37 @@
+name: checks
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+
+jobs:
+  checks:
+    name: Tests and clippy checks
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        rust: [stable, beta]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+          override: true
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+      - name: Run CI
+        uses: actions-rs/cargo@v1
+        with:
+          command: make
+          args: ci-flow
