@@ -20,18 +20,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
-          override: true
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
       - name: Run CI
-        uses: actions-rs/cargo@v1
-        with:
-          command: make
-          args: ci-flow
+        run: cargo make ci-flow
