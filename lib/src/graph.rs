@@ -22,7 +22,7 @@ impl Graph {
     /// Connects to the database with configurations provided, you can build a config using
     /// [`config`]
     pub async fn connect(config: Config) -> Result<Self> {
-        let pool = create_pool(&config).await;
+        let pool = create_pool(&config).await?;
         Ok(Graph { config, pool })
     }
 
