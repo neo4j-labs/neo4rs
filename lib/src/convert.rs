@@ -310,6 +310,12 @@ impl From<f32> for BoltType {
     }
 }
 
+impl From<bool> for BoltType {
+    fn from(val: bool) -> Self {
+        BoltType::Boolean(BoltBoolean::new(val))
+    }
+}
+
 impl From<i64> for BoltType {
     fn from(value: i64) -> BoltType {
         BoltType::Integer(BoltInteger::new(value))
