@@ -1,4 +1,6 @@
 use crate::types::*;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json::Value;
 use std::convert::TryInto;
 /// Represents a row returned as a result of executing a query.
@@ -146,6 +148,19 @@ impl Node {
         match serde_json::to_value(self.inner.properties.clone()) {
             Ok(value) => Some(value),
             Err(_err) => None,
+        }
+    }
+
+    pub fn get_typed<T>(&self) -> Option<T>
+    where
+        T: Clone + Serialize + DeserializeOwned + Unpin + std::marker::Send + std::marker::Sync,
+    {
+        match serde_json::to_value(&self.inner.properties) {
+            Ok(value) => match serde_json::from_value(value) {
+                Ok(value) => Some(value),
+                Err(_) => None,
+            },
+            Err(_) => None,
         }
     }
 }
