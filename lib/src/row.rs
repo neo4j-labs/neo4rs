@@ -151,16 +151,16 @@ impl Node {
         }
     }
 
-    pub fn get_typed<T>(&self) -> Option<T>
+    pub fn get_typed<T>(&self) -> Result<T, serde_json::Error>
     where
-        T: Clone + Serialize + DeserializeOwned + Unpin + std::marker::Send + std::marker::Sync,
+        T: Serialize + DeserializeOwned,
     {
         match serde_json::to_value(&self.inner.properties) {
             Ok(value) => match serde_json::from_value(value) {
-                Ok(value) => Some(value),
-                Err(_) => None,
+                Ok(value) => Ok(value),
+                Err(err) => Err(err),
             },
-            Err(_) => None,
+            Err(err) => Err(err),
         }
     }
 }
