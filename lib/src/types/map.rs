@@ -10,6 +10,9 @@ use std::iter::FromIterator;
 use std::mem;
 use std::rc::Rc;
 
+use serde::ser::{SerializeMap, Serializer};
+use serde::Serialize;
+
 pub const TINY: u8 = 0xA0;
 pub const SMALL: u8 = 0xD8;
 pub const MEDIUM: u8 = 0xD9;
@@ -18,6 +21,19 @@ pub const LARGE: u8 = 0xDA;
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BoltMap {
     pub value: HashMap<BoltString, BoltType>,
+}
+
+impl Serialize for BoltMap {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.value.len()))?;
+        for (k, v) in &self.value {
+            map.serialize_entry(&k, &v)?;
+        }
+        map.end()
+    }
 }
 
 impl BoltMap {

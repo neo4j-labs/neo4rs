@@ -1,6 +1,6 @@
 use crate::types::*;
+use serde_json::Value;
 use std::convert::TryInto;
-
 /// Represents a row returned as a result of executing a query.
 ///
 /// A row is very similar to a `HashMap`, you can get the attributes using [`Row::get`] method.
@@ -140,6 +140,13 @@ impl Node {
     /// Get the attributes of the node
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
+    }
+
+    pub fn get_json(&self) -> Option<Value> {
+        match serde_json::to_value(self.inner.properties.clone()) {
+            Ok(value) => Some(value),
+            Err(_err) => None,
+        }
     }
 }
 

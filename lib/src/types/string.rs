@@ -1,6 +1,8 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::ser::Serializer;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::convert::From;
 use std::fmt::Display;
@@ -15,6 +17,15 @@ pub const LARGE: u8 = 0xD2;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct BoltString {
     pub value: String,
+}
+
+impl Serialize for BoltString {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.value)
+    }
 }
 
 impl BoltString {

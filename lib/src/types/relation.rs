@@ -1,7 +1,8 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB5, 0x52)]
 pub struct BoltRelation {
     pub id: BoltInteger,
@@ -11,7 +12,7 @@ pub struct BoltRelation {
     pub properties: BoltMap,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB3, 0x72)]
 pub struct BoltUnboundedRelation {
     pub id: BoltInteger,

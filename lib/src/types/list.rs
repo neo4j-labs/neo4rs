@@ -2,6 +2,8 @@ use crate::errors::*;
 use crate::types::*;
 use crate::version::Version;
 use bytes::*;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
@@ -14,6 +16,19 @@ pub const LARGE: u8 = 0xD6;
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoltList {
     pub value: Vec<BoltType>,
+}
+
+impl Serialize for BoltList {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.value.len()))?;
+        for element in &self.value {
+            seq.serialize_element(&element)?;
+        }
+        seq.end()
+    }
 }
 
 impl Default for BoltList {

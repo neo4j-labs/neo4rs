@@ -1,7 +1,9 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
+use serde::Serialize;
+use serde_json::Value;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB3, 0x4E)]
 pub struct BoltNode {
     pub id: BoltInteger,

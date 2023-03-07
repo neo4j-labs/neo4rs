@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
@@ -10,6 +11,15 @@ pub const MARKER: u8 = 0xC1;
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoltFloat {
     pub value: f64,
+}
+
+impl Serialize for BoltFloat {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f64(self.value)
+    }
 }
 
 impl BoltFloat {

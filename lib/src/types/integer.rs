@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::mem;
 use std::ops::{Add, Sub};
@@ -14,6 +15,15 @@ pub const INT_64: u8 = 0xCB;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoltInteger {
     pub value: i64,
+}
+
+impl Serialize for BoltInteger {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_i64(self.value)
+    }
 }
 
 impl Add for BoltInteger {

@@ -1,15 +1,25 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::ser::Serializer;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::rc::Rc;
-
 pub const FALSE: u8 = 0xC2;
 pub const TRUE: u8 = 0xC3;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoltBoolean {
     pub value: bool,
+}
+
+impl Serialize for BoltBoolean {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bool(self.value)
+    }
 }
 
 impl BoltBoolean {

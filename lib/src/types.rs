@@ -14,8 +14,11 @@ pub mod point;
 pub mod relation;
 pub mod string;
 pub mod time;
+use crate::errors::*;
+use crate::version::Version;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
+use bytes::Bytes;
 pub use date::BoltDate;
 pub use date_time::{BoltDateTime, BoltDateTimeZoneId, BoltLocalDateTime};
 pub use duration::BoltDuration;
@@ -28,17 +31,15 @@ pub use null::BoltNull;
 pub use path::BoltPath;
 pub use point::{BoltPoint2D, BoltPoint3D};
 pub use relation::{BoltRelation, BoltUnboundedRelation};
-pub use string::BoltString;
-pub use time::{BoltLocalTime, BoltTime};
-
-use crate::errors::*;
-use crate::version::Version;
-use bytes::Bytes;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
+pub use string::BoltString;
+pub use time::{BoltLocalTime, BoltTime};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
+#[serde(untagged)]
 pub enum BoltType {
     String(BoltString),
     Boolean(BoltBoolean),

@@ -1,15 +1,16 @@
 use crate::types::*;
 use chrono::{FixedOffset, NaiveTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB2, 0x54)]
 pub struct BoltTime {
     nanoseconds: BoltInteger,
     tz_offset_seconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB1, 0x74)]
 pub struct BoltLocalTime {
     nanoseconds: BoltInteger,

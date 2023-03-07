@@ -1,7 +1,8 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB3, 0x50)]
 pub struct BoltPath {
     pub nodes: BoltList,

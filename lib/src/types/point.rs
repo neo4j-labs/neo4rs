@@ -1,7 +1,8 @@
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB3, 0x58)]
 pub struct BoltPoint2D {
     pub sr_id: BoltInteger,
@@ -9,7 +10,7 @@ pub struct BoltPoint2D {
     pub y: BoltFloat,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Clone, BoltStruct, Serialize)]
 #[signature(0xB4, 0x59)]
 pub struct BoltPoint3D {
     pub sr_id: BoltInteger,

@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
@@ -12,6 +13,15 @@ pub const LARGE: u8 = 0xCE;
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoltBytes {
     pub value: Bytes,
+}
+
+impl Serialize for BoltBytes {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(&self.value)
+    }
 }
 
 impl BoltBytes {
