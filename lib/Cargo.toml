@@ -10,6 +10,7 @@ documentation = "https://docs.rs/neo4rs"
 readme = "../README.md"
 keywords = ["neo4j", "rust", "bolt", "cypher", "driver"]
 categories = ["database", "network-programming", "asynchronous"]
+rust-version = "1.60"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

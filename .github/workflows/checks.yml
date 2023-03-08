@@ -13,6 +13,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_MAKE_RUN_CHECK_FORMAT: true
   CARGO_MAKE_RUN_CLIPPY: true
+  MSRV: 1.60.0
 
 jobs:
   checks:
@@ -43,3 +44,19 @@ jobs:
         uses: davidB/rust-cargo-make@v1
       - name: Run CI
         run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo make ci-flow
+  msrv:
+    name: Validate MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+      - name: Prepare MSRV
+        run: cp Cargo.lock.msrv Cargo.lock
+      - name: Run MSRV tests
+        run: cargo +$MSRV make test-flow

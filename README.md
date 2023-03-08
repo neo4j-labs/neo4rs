@@ -48,6 +48,14 @@ This driver is compatible with neo4j 4.x versions
     
 ```
 
+## MSRV
+
+The crate has a minimum supported Rust version (MSRV) of `1.60.0`.
+
+A change in the MSRV in *not* considered a breaking change.
+For versions past 1.0.0, a change in the MSRV can be done in a minor version increment (1.1.3 -> 1.2.0)
+for versions before 1.0.0, a change in the MSRV can be done in a patch version increment (0.1.3 -> 0.1.4).
+
 
 ## License
 
