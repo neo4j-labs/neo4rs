@@ -9,7 +9,8 @@
 
 Neo4rs is a Neo4j rust driver implemented using [bolt specification](https://7687.org/bolt/bolt-protocol-message-specification-4.html#version-41)
 
-This driver is compatible with neo4j 4.x versions
+This driver is compatible with Neo4j version 5.x and 4.4.
+Only the latest 5.x version is supported, following the [Neo4j Version support policy](https://neo4j.com/developer/kb/neo4j-supported-versions/).
 
 ## API Documentation: [![Docs.rs][docs-badge]][docs-url]
 
