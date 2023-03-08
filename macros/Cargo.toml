@@ -11,5 +11,5 @@ repository = "https://github.com/yehohanan7/neo4rs"
 proc-macro = true
 
 [dependencies]
-syn = { version="1.0", features=["full", "extra-traits"]}
 quote = "1.0"
+syn = { version = "1.0", features = ["full", "extra-traits"] }
