@@ -1,7 +1,7 @@
 # Neo4rs [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
 
-[ci-badge]: https://circleci.com/gh/yehohanan7/neo4rs.svg?style=shield&circle-token=6537a33de9b96ea8f26a2732b9ca6ef95ab3762b
-[ci-url]: https://github.com/yehohanan7/neo4rs
+[ci-badge]: https://github.com/neo4j-labs/neo4rs/actions/workflows/checks.yml/badge.svg
+[ci-url]: https://github.com/neo4j-labs/neo4rs
 [crates-badge]: https://img.shields.io/crates/v/neo4rs.svg?style=shield
 [crates-url]: https://crates.io/crates/neo4rs
 [docs-badge]: https://img.shields.io/badge/docs-latest-blue.svg?style=shield
