@@ -1,0 +1,6 @@
+[tasks.test.mac]
+args = [ "test", "--lib" ]
+
+[tasks.test.windows]
+args = [ "test", "--lib" ]
+
