@@ -29,6 +29,8 @@ impl Neo4jContainer {
         config: ConfigBuilder,
         version: impl Into<String>,
     ) -> Self {
+        let _ = pretty_env_logger::try_init();
+
         let docker = Cli::default();
         let docker = Box::leak(Box::new(docker));
 
