@@ -4,6 +4,7 @@ use crate::messages::*;
 use crate::pool::*;
 use crate::stream::*;
 use crate::types::*;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -24,6 +25,17 @@ impl Query {
 
     pub fn param<T: std::convert::Into<BoltType>>(mut self, key: &str, value: T) -> Self {
         self.params.put(key.into(), value.into());
+        self
+    }
+
+    pub fn params<T: std::convert::Into<BoltType>>(
+        mut self,
+        input_params: HashMap<&str, T>,
+    ) -> Self {
+        for (key, value) in input_params {
+            self.params.put(key.into(), value.into());
+        }
+
         self
     }
 
