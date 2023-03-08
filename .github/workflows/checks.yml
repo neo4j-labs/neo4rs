@@ -57,10 +57,10 @@ jobs:
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
       - name: Prepare MSRV
-        run: cp Cargo.lock.msrv Cargo.lock
+        run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run MSRV tests
         run: cargo +$MSRV make test-flow
       - name: Prepare minimal dependency versions
-        run: cp Cargo.lock.min Cargo.lock
+        run: cp ci/Cargo.lock.min Cargo.lock
       - name: Run minimal dependency tests
         run: cargo +$MSRV make test-flow
