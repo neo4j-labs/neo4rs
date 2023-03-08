@@ -9,6 +9,9 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_LOG: debug
 
 jobs:
   checks:
@@ -19,6 +22,10 @@ jobs:
         rust: [stable, beta]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Debug docker
+        run: |
+          echo "Docker version: $(docker version)"
+          echo "Docker info: $(docker info)"
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Setup Rust
