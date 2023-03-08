@@ -5,7 +5,7 @@ authors = ["John Pradeep Vincent <yehohanan7@gmail.com>"]
 edition = "2021"
 description = "Macros used by neo4rs"
 license = "MIT"
-repository = "https://github.com/yehohanan7/neo4rs"
+repository = "https://github.com/neo4j-labs/neo4rs"
 rust-version = "1.60"
 
 [lib]
