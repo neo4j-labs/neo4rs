@@ -23,6 +23,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [stable, beta]
+        neo4j: ["4.2"]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.2"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.1"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Debug docker
@@ -39,4 +47,4 @@ jobs:
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
       - name: Run CI
-        run: cargo make ci-flow
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo make ci-flow
