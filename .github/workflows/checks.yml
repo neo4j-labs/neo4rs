@@ -46,6 +46,14 @@ jobs:
         run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo make ci-flow
   msrv:
     name: Validate MSRV and minimal dependency versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: Cargo.lock.msrv
+            name: MSRV
+          - file: Cargo.lock.min
+            name: minimal dependency versions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -56,11 +64,7 @@ jobs:
           toolchain: ${{ env.MSRV }}
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
-      - name: Prepare MSRV
-        run: cp ci/Cargo.lock.msrv Cargo.lock
-      - name: Run MSRV tests
-        run: cargo +$MSRV make test-flow
-      - name: Prepare minimal dependency versions
-        run: cp ci/Cargo.lock.min Cargo.lock
-      - name: Run minimal dependency tests
+      - name: Prepare ${{ matrix.name }} lockfile
+        run: cp ci/${{ matrix.file }} Cargo.lock
+      - name: Run ${{ matrix.name }} tests
         run: cargo +$MSRV make test-flow
