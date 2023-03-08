@@ -42,8 +42,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(extra.get::<i64>("n").unwrap(), 42.into());
-        assert_eq!(extra.get::<i64>("qid").unwrap(), 1.into());
+        assert_eq!(
+            extra.get::<i64>("n").unwrap(),
+            <i64 as std::convert::Into<i64>>::into(42)
+        );
+        assert_eq!(
+            extra.get::<i64>("qid").unwrap(),
+            <i64 as std::convert::Into<i64>>::into(1)
+        );
     }
 
     #[test]
@@ -58,7 +64,13 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(extra.get::<i64>("n").unwrap(), 255.into());
-        assert_eq!(extra.get::<i64>("qid").unwrap(), 255.into());
+        assert_eq!(
+            extra.get::<i64>("n").unwrap(),
+            <i64 as std::convert::Into<i64>>::into(255)
+        );
+        assert_eq!(
+            extra.get::<i64>("qid").unwrap(),
+            <i64 as std::convert::Into<i64>>::into(255)
+        );
     }
 }
