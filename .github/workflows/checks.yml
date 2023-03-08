@@ -13,7 +13,6 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_MAKE_RUN_CHECK_FORMAT: true
   CARGO_MAKE_RUN_CLIPPY: true
-  RUST_LOG: debug
 
 jobs:
   checks:
@@ -33,10 +32,6 @@ jobs:
             neo4j: "4.1"
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Debug docker
-        run: |
-          echo "Docker version: $(docker version)"
-          echo "Docker info: $(docker info)"
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Setup Rust
