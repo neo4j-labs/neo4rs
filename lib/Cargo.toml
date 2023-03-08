@@ -1,7 +1,7 @@
 [package]
 name = "neo4rs"
 version = "0.5.9"
-authors = ["John Pradeep Vincent <yehohanan7@gmail.com>"]
+authors = ["Neo4j Labs <devrel@neo4j.com>", "John Pradeep Vincent <yehohanan7@gmail.com>"]
 edition = "2021"
 description = "Neo4j driver in rust"
 license = "MIT"
