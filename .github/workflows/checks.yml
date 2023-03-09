@@ -29,6 +29,15 @@ jobs:
           - os: ubuntu-latest
             rust: stable
             neo4j: "4.4"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.3"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.2"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.1"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
