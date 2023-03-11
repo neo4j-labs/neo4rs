@@ -9,14 +9,29 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  RUST_LOG: debug
+  CARGO_TERM_COLOR: always
+  CARGO_MAKE_RUN_CHECK_FORMAT: true
+  CARGO_MAKE_RUN_CLIPPY: true
+  MSRV: 1.60.0
 
 jobs:
   checks:
     name: Tests and clippy checks
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [stable, beta]
+        neo4j: ["4.2"]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.2"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.1"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -29,4 +44,28 @@ jobs:
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
       - name: Run CI
-        run: cargo make ci-flow
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo make ci-flow
+  msrv:
+    name: Validate MSRV and minimal dependency versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: Cargo.lock.msrv
+            name: MSRV
+          - file: Cargo.lock.min
+            name: minimal dependency versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+      - name: Prepare ${{ matrix.name }} lockfile
+        run: cp ci/${{ matrix.file }} Cargo.lock
+      - name: Run ${{ matrix.name }} tests
+        run: cargo +$MSRV make test-flow

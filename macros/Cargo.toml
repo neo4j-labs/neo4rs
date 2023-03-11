@@ -1,15 +1,16 @@
 [package]
 name = "neo4rs-macros"
 version = "0.2.1"
-authors = ["John Pradeep Vincent <yehohanan7@gmail.com>"]
-edition = "2018"
-description = "macros used by neo4rs"
+authors = ["Neo4j Labs <devrel@neo4j.com>", "John Pradeep Vincent <yehohanan7@gmail.com>"]
+edition = "2021"
+description = "Macros used by neo4rs"
 license = "MIT"
-repository = "https://github.com/yehohanan7/neo4rs"
+repository = "https://github.com/neo4j-labs/neo4rs"
+rust-version = "1.60"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-syn = { version="1.0", features=["full", "extra-traits"]}
 quote = "1.0"
+syn = { version = "1.0", features = ["full", "extra-traits"] }
