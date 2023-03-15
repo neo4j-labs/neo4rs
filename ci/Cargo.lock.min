@@ -332,6 +332,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8f31047daa365f19be14b47c29df4f7c3b581832407daabe6ae77397619237d"
 
 [[package]]
+name = "lenient_semver"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de8de3f4f3754c280ce1c8c42ed8dd26a9c8385c2e5ad4ec5a77e774cea9c1ec"
+dependencies = [
+ "lenient_semver_parser",
+ "lenient_version",
+]
+
+[[package]]
+name = "lenient_semver_parser"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8ac1ce16a388f50972b5b75482136e17d2e7771f1d8683f465dc607579bc366"
+dependencies = [
+ "lenient_semver_version_builder",
+]
+
+[[package]]
+name = "lenient_semver_version_builder"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "585fc4f763be024281bf8d9281b67d3f7a3f2a71f442c84c34e3121702c7eb68"
+
+[[package]]
+name = "lenient_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54f04209ce292387c3e9d9742bb051ef0651389ee7074912754eca7e91088717"
+dependencies = [
+ "lenient_semver_parser",
+ "lenient_semver_version_builder",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -402,6 +437,7 @@ dependencies = [
  "chrono",
  "deadpool",
  "futures",
+ "lenient_semver",
  "log",
  "neo4rs-macros",
  "pretty_env_logger",

@@ -1,3 +1,4 @@
+use lenient_semver::Version;
 use neo4rs::{config, ConfigBuilder, Graph};
 use testcontainers::{clients::Cli, core::WaitFor, Container, Image};
 
@@ -5,6 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 
 pub struct Neo4jContainer {
     graph: Arc<Graph>,
+    version: String,
     _container: Container<'static, Neo4j>,
 }
 
@@ -35,7 +37,7 @@ impl Neo4jContainer {
         let docker = Box::leak(Box::new(docker));
 
         let version = version.into();
-        let container = docker.run(Neo4j::new(USER, PASS, version));
+        let container = docker.run(Neo4j::new(USER, PASS, version.clone()));
 
         let bolt_port = container.ports().map_to_host_port_ipv4(7687).unwrap();
         let uri = format!("127.0.0.1:{}", bolt_port);
@@ -46,12 +48,21 @@ impl Neo4jContainer {
 
         Self {
             graph,
+            version,
             _container: container,
         }
     }
 
     pub fn graph(&self) -> Arc<Graph> {
         self.graph.clone()
+    }
+
+    #[allow(dead_code)]
+    pub fn version(&self) -> Version<'static> {
+        Version::parse(&self.version)
+            .unwrap()
+            .disassociate_metadata()
+            .0
     }
 
     fn version_from_env() -> String {
@@ -75,6 +86,10 @@ impl Neo4j {
     fn new(user: &str, pass: &str, version: String) -> Self {
         let mut env_vars = HashMap::new();
         env_vars.insert("NEO4J_AUTH".to_owned(), format!("{user}/{pass}"));
+        env_vars.insert(
+            "NEO4J_dbms_security_auth__minimum__password__length".to_owned(),
+            "3".to_owned(),
+        );
 
         Self { env_vars, version }
     }

@@ -24,8 +24,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [stable, beta]
-        neo4j: ["4.2"]
+        neo4j: ["5.5"]
         include:
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.4"
+          - os: ubuntu-latest
+            rust: stable
+            neo4j: "4.3"
           - os: ubuntu-latest
             rust: stable
             neo4j: "4.2"
