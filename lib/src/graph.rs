@@ -1,4 +1,4 @@
-use crate::config::{config, Config};
+use crate::config::{Config, ConfigBuilder};
 use crate::errors::*;
 use crate::pool::{create_pool, ConnectionPool};
 use crate::query::Query;
@@ -32,7 +32,7 @@ impl Graph {
         user: impl AsRef<str>,
         password: impl AsRef<str>,
     ) -> Result<Self> {
-        let config = config()
+        let config = ConfigBuilder::default()
             .uri(uri.as_ref())
             .user(user.as_ref())
             .password(password.as_ref())

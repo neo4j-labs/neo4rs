@@ -66,7 +66,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!    let config = config()
+//!    let config = ConfigBuilder::default()
 //!        .uri("127.0.0.1:7687")
 //!        .user("neo4j")
 //!        .password("neo")
@@ -172,7 +172,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!    let config = config()
+//!    let config = ConfigBuilder::default()
 //!        .uri("127.0.0.1:7687")
 //!        .user("neo4j")
 //!        .password("neo")
@@ -764,7 +764,7 @@ mod txn;
 mod types;
 mod version;
 
-pub use crate::config::{config, Config, ConfigBuilder};
+pub use crate::config::{Config, ConfigBuilder};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;

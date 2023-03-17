@@ -1,5 +1,5 @@
 use lenient_semver::Version;
-use neo4rs::{config, ConfigBuilder, Graph};
+use neo4rs::{ConfigBuilder, Graph};
 use testcontainers::{clients::Cli, core::WaitFor, Container, Image};
 
 use std::{collections::HashMap, sync::Arc};
@@ -18,7 +18,7 @@ impl Neo4jContainer {
 
     #[allow(dead_code)]
     pub async fn from_version(version: impl Into<String>) -> Self {
-        Self::from_config_and_version(config(), version).await
+        Self::from_config_and_version(ConfigBuilder::default(), version).await
     }
 
     #[allow(dead_code)]

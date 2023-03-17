@@ -86,15 +86,16 @@ impl ConfigBuilder {
     }
 }
 
-/// Creates a config builder with reasonable default values wherever appropriate.
-pub fn config() -> ConfigBuilder {
-    ConfigBuilder {
-        uri: None,
-        user: None,
-        password: None,
-        db: Some("".to_owned()),
-        max_connections: Some(DEFAULT_MAX_CONNECTIONS),
-        fetch_size: Some(DEFAULT_FETCH_SIZE),
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        ConfigBuilder {
+            uri: None,
+            user: None,
+            password: None,
+            db: Some("".to_owned()),
+            max_connections: Some(DEFAULT_MAX_CONNECTIONS),
+            fetch_size: Some(DEFAULT_FETCH_SIZE),
+        }
     }
 }
 
@@ -104,7 +105,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_build_config() {
-        let config = config()
+        let config = ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .user("some_user")
             .password("some_password")
@@ -123,7 +124,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_build_with_defaults() {
-        let config = config()
+        let config = ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .user("some_user")
             .password("some_password")
@@ -139,19 +140,19 @@ mod tests {
 
     #[tokio::test]
     async fn should_reject_invalid_config() {
-        assert!(config()
+        assert!(ConfigBuilder::default()
             .user("some_user")
             .password("some_password")
             .build()
             .is_err());
 
-        assert!(config()
+        assert!(ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .password("some_password")
             .build()
             .is_err());
 
-        assert!(config()
+        assert!(ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .user("some_user")
             .build()
