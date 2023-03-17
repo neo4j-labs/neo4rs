@@ -19,8 +19,9 @@ pub fn query(q: &str) -> Query {
 }
 
 impl Graph {
-    /// Connects to the database with configurations provided, you can build a config using
-    /// [`config`]
+    /// Connects to the database with configurations provided.
+    ///
+    /// You can build a config using [`ConfigBuilder::default()`].
     pub async fn connect(config: Config) -> Result<Self> {
         let pool = create_pool(&config).await?;
         Ok(Graph { config, pool })
