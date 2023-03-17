@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+  merge_group:
   pull_request:
     branches:
       - master
@@ -12,45 +13,110 @@ on:
 env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
-  CARGO_MAKE_RUN_CHECK_FORMAT: true
-  CARGO_MAKE_RUN_CLIPPY: true
   MSRV: 1.60.0
 
 jobs:
-  checks:
-    name: Tests and clippy checks
+  check:
+    name: Compile on MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run cargo check
+        run: cargo +$MSRV check --all-targets
+
+  fmt:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run cargo fmt
+        run: cargo +stable fmt --all -- --check
+
+  clippy:
+    name: Check clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+          components: clippy
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        run: cargo +$MSRV clippy --all-targets --all-features -- -D warnings
+
+  unit-tests:
+    name: Run unit tests
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        rust: [stable, beta]
-        neo4j: ["5.5"]
-        include:
-          - os: ubuntu-latest
-            rust: stable
-            neo4j: "4.4"
-          - os: ubuntu-latest
-            rust: stable
-            neo4j: "4.3"
-          - os: ubuntu-latest
-            rust: stable
-            neo4j: "4.2"
-          - os: ubuntu-latest
-            rust: stable
-            neo4j: "4.1"
+        os: [windows-latest, macOS-latest]
+        rust: [stable, beta, 1.60.0]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          components: rustfmt, clippy
-      - name: Install cargo-make
-        uses: davidB/rust-cargo-make@v1
-      - name: Run CI
-        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo make ci-flow
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run unit tests
+        run: cargo +${{ matrix.rust }} nextext run --lib --all-features
+
+  integration-tests:
+    name: Run integration tests
+    strategy:
+      fail-fast: false
+      matrix:
+        neo4j: ["5.5", "4.4", "4.3", "4.2", "4.1"]
+        rust: [stable, 1.60.0]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run integration tests
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +${{ matrix.rust }} nextest run --all-features
+
   msrv:
     name: Validate MSRV and minimal dependency versions
     strategy:
@@ -69,9 +135,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
-      - name: Install cargo-make
-        uses: davidB/rust-cargo-make@v1
       - name: Prepare ${{ matrix.name }} lockfile
         run: cp ci/${{ matrix.file }} Cargo.lock
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Run ${{ matrix.name }} tests
-        run: cargo +$MSRV make test-flow
+        run: cargo +$MSRV nextest run --lib --all-features
