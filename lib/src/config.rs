@@ -26,26 +26,26 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
     ///the uri of the neo4j server
-    pub fn uri(mut self, uri: &str) -> Self {
-        self.uri = Some(uri.to_owned());
+    pub fn uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
         self
     }
 
     ///username for authentication
-    pub fn user(mut self, user: &str) -> Self {
-        self.user = Some(user.to_owned());
+    pub fn user(mut self, user: impl Into<String>) -> Self {
+        self.user = Some(user.into());
         self
     }
 
     ///password for authentication
-    pub fn password(mut self, password: &str) -> Self {
-        self.password = Some(password.to_owned());
+    pub fn password(mut self, password: impl Into<String>) -> Self {
+        self.password = Some(password.into());
         self
     }
 
     ///the name of the database, defaults to "neo4j" if not configured.
-    pub fn db(mut self, db: &str) -> Self {
-        self.db = Some(db.to_owned());
+    pub fn db(mut self, db: impl Into<String>) -> Self {
+        self.db = Some(db.into());
         self
     }
 
