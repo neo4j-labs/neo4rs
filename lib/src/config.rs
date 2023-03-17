@@ -3,7 +3,7 @@ pub use crate::errors::*;
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
-/// The configuration used to connect to the database, see [`crate::Graph::connect`]
+/// The configuration used to connect to the database, see [`crate::Graph::connect`].
 #[derive(Debug, Clone)]
 pub struct Config {
     pub(crate) uri: String,
@@ -14,7 +14,7 @@ pub struct Config {
     pub(crate) fetch_size: usize,
 }
 
-/// A builder to override default configurations and build the [`Config`]
+/// A builder to override default configurations and build the [`Config`].
 pub struct ConfigBuilder {
     uri: Option<String>,
     user: Option<String>,
@@ -26,38 +26,40 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
     ///the uri of the neo4j server
+    /// The uri of the Neo4j server, e.g. "127.0.0.1:7687".
     pub fn uri(mut self, uri: impl Into<String>) -> Self {
         self.uri = Some(uri.into());
         self
     }
 
-    ///username for authentication
+    /// The username for authenticating with the Neo4j server.
     pub fn user(mut self, user: impl Into<String>) -> Self {
         self.user = Some(user.into());
         self
     }
 
-    ///password for authentication
+    /// The password for authenticating with the Neo4j server.
     pub fn password(mut self, password: impl Into<String>) -> Self {
         self.password = Some(password.into());
         self
     }
 
-    ///the name of the database, defaults to "neo4j" if not configured.
+    /// The name of the database, defaults to "neo4j" if not configured.
     pub fn db(mut self, db: impl Into<String>) -> Self {
         self.db = Some(db.into());
         self
     }
 
-    ///fetch_size indicates the number of rows to fetch from server in one request, it is
-    ///recommended to use a large fetch_size if you are working with large data sets.
-    ///default fetch_size is 200
+    /// `fetch_size` indicates the number of rows to fetch from server in one request.
+    /// It is recommended to use a large `fetch_size` if you are working with large data sets.
+    ///
+    /// If not set, defaults to 200.
     pub fn fetch_size(mut self, fetch_size: usize) -> Self {
         self.fetch_size = Some(fetch_size);
         self
     }
 
-    ///maximum number of connections in the connection pool
+    /// The maximum number of connections in the connection pool.
     pub fn max_connections(mut self, max_connections: usize) -> Self {
         self.max_connections = Some(max_connections);
         self
