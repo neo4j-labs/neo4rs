@@ -27,8 +27,16 @@ impl Graph {
     }
 
     /// Connects to the database with default configurations
-    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let config = config().uri(uri).user(user).password(password).build()?;
+    pub async fn new(
+        uri: impl AsRef<str>,
+        user: impl AsRef<str>,
+        password: impl AsRef<str>,
+    ) -> Result<Self> {
+        let config = config()
+            .uri(uri.as_ref())
+            .user(user.as_ref())
+            .password(password.as_ref())
+            .build()?;
         Self::connect(config).await
     }
 
