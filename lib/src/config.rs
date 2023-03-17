@@ -66,24 +66,31 @@ impl ConfigBuilder {
     }
 
     pub fn build(self) -> Result<Config> {
-        if self.uri.is_none()
-            || self.user.is_none()
-            || self.password.is_none()
-            || self.fetch_size.is_none()
-            || self.max_connections.is_none()
-            || self.db.is_none()
-        {
-            Err(Error::InvalidConfig)
-        } else {
-            //The config attributes are validated before unwrapping
+        if let (
+            Some(uri),
+            Some(user),
+            Some(password),
+            Some(fetch_size),
+            Some(max_connections),
+            Some(db),
+        ) = (
+            self.uri,
+            self.user,
+            self.password,
+            self.fetch_size,
+            self.max_connections,
+            self.db,
+        ) {
             Ok(Config {
-                uri: self.uri.unwrap(),
-                user: self.user.unwrap(),
-                password: self.password.unwrap(),
-                fetch_size: self.fetch_size.unwrap(),
-                max_connections: self.max_connections.unwrap(),
-                db: self.db.unwrap(),
+                uri,
+                user,
+                password,
+                fetch_size,
+                max_connections,
+                db,
             })
+        } else {
+            Err(Error::InvalidConfig)
         }
     }
 }
