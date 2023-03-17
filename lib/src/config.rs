@@ -26,7 +26,11 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    ///the uri of the neo4j server
+    /// Creates a new `ConfigBuilder` with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// The uri of the Neo4j server, e.g. "127.0.0.1:7687".
     pub fn uri(mut self, uri: impl Into<String>) -> Self {
         self.uri = Some(uri.into());
@@ -45,7 +49,9 @@ impl ConfigBuilder {
         self
     }
 
-    /// The name of the database, defaults to "neo4j" if not configured.
+    /// The name of the database to connect to.
+    ///
+    /// Defaults to "neo4j" if not set.
     pub fn db(mut self, db: impl Into<String>) -> Self {
         self.db = Some(db.into());
         self
@@ -54,13 +60,15 @@ impl ConfigBuilder {
     /// `fetch_size` indicates the number of rows to fetch from server in one request.
     /// It is recommended to use a large `fetch_size` if you are working with large data sets.
     ///
-    /// If not set, defaults to 200.
+    /// Defaults to 200 if not set.
     pub fn fetch_size(mut self, fetch_size: usize) -> Self {
         self.fetch_size = Some(fetch_size);
         self
     }
 
     /// The maximum number of connections in the connection pool.
+    ///
+    /// Defaults to 16 if not set.
     pub fn max_connections(mut self, max_connections: usize) -> Self {
         self.max_connections = Some(max_connections);
         self
