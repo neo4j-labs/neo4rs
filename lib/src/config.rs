@@ -1,5 +1,6 @@
 pub use crate::errors::*;
 
+const DEFAULT_DATABASE: &'static str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
@@ -101,7 +102,7 @@ impl Default for ConfigBuilder {
             uri: None,
             user: None,
             password: None,
-            db: Some("".to_owned()),
+            db: Some(DEFAULT_DATABASE.into()),
             max_connections: Some(DEFAULT_MAX_CONNECTIONS),
             fetch_size: Some(DEFAULT_FETCH_SIZE),
         }
@@ -142,7 +143,7 @@ mod tests {
         assert_eq!(config.uri, "127.0.0.1:7687");
         assert_eq!(config.user, "some_user");
         assert_eq!(config.password, "some_password");
-        assert_eq!(config.db, "");
+        assert_eq!(config.db, "neo4j");
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
     }
