@@ -91,7 +91,7 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Run unit tests
-        run: cargo +${{ matrix.rust }} nextext run --lib --all-features
+        run: cargo +${{ matrix.rust }} nextest run --lib --all-features
 
   integration-tests:
     name: Run integration tests
