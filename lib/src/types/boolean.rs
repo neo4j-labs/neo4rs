@@ -65,6 +65,6 @@ mod tests {
 
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[FALSE])));
         let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
-        assert!(bolt_boolean.value);
+        assert!(!bolt_boolean.value);
     }
 }
