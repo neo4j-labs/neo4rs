@@ -61,10 +61,10 @@ mod tests {
     fn should_deserialize_boolean() {
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[TRUE])));
         let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
-        assert_eq!(bolt_boolean.value, true);
+        assert!(bolt_boolean.value);
 
         let b = Rc::new(RefCell::new(Bytes::copy_from_slice(&[FALSE])));
         let bolt_boolean: BoltBoolean = BoltBoolean::parse(Version::V4_1, b).unwrap();
-        assert_eq!(bolt_boolean.value, false);
+        assert!(!bolt_boolean.value);
     }
 }
