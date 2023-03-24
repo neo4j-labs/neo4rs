@@ -1,3 +1,5 @@
 publish = false
-pre-release-commit-message = "Release {{crate_name}} {{version}}"
+shared-version = true
+consolidate-commits = false
+pre-release-commit-message = "Release {{version}}"
 tag-message = "Release {{crate_name}} {{version}}"
