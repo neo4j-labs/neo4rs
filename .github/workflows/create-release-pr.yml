@@ -30,16 +30,10 @@ jobs:
         with:
           fetch-depth: 2
       - uses: chainguard-dev/actions/setup-gitsign@main
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Install cargo-release
+        uses: baptiste0928/cargo-install@v2
         with:
-          toolchain: stable
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@v1
-        with:
-          tool: cargo-release
+          crate: cargo-release
       - uses: cargo-bins/release-pr@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
