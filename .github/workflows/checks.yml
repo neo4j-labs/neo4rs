@@ -99,7 +99,6 @@ jobs:
       fail-fast: false
       matrix:
         neo4j: ["5.5", "4.4", "4.3", "4.2", "4.1"]
-        rust: [stable, 1.60.0]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -109,13 +108,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ env.MSRV }}
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Run integration tests
-        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +${{ matrix.rust }} nextest run --all-features
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --all-features
 
   msrv:
     name: Validate MSRV and minimal dependency versions
