@@ -14,3 +14,8 @@ proc-macro = true
 [dependencies]
 quote = "1.0"
 syn = { version = "1.0", features = ["full", "extra-traits"] }
+
+[package.metadata.release]
+publish = false
+pre-release-commit-message = "Release"
+tag-message = "Release {{crate_name}} {{version}}"

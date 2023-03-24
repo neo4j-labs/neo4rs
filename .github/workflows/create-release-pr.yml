@@ -1,0 +1,47 @@
+name: Open a PR for a new release
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: Which crate to release
+        required: true
+        type: choice
+        options:
+          - neo4rs
+          - neo4rs-macros
+      version:
+        description: >-
+          What version to release.
+          Can be one of 'major', 'minor', 'patch', or a concrete version.
+          See https://github.com/crate-ci/cargo-release/blob/7527065e413b9625ccb09800b765f6c49d011c79/docs/reference.md#bump-level for more details.
+        required: true
+        type: string
+
+jobs:
+  make-release-pr:
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - uses: chainguard-dev/actions/setup-gitsign@main
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v1
+        with:
+          tool: cargo-release
+      - uses: cargo-bins/release-pr@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: ${{ inputs.version }}
+          crate-name: ${{ inputs.crate }}
