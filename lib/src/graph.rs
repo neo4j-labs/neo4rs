@@ -29,14 +29,14 @@ impl Graph {
 
     /// Connects to the database with default configurations
     pub async fn new(
-        uri: impl AsRef<str>,
-        user: impl AsRef<str>,
-        password: impl AsRef<str>,
+        uri: impl Into<String>,
+        user: impl Into<String>,
+        password: impl Into<String>,
     ) -> Result<Self> {
         let config = ConfigBuilder::default()
-            .uri(uri.as_ref())
-            .user(user.as_ref())
-            .password(password.as_ref())
+            .uri(uri)
+            .user(user)
+            .password(password)
             .build()?;
         Self::connect(config).await
     }
