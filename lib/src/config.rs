@@ -107,8 +107,8 @@ impl Default for ConfigBuilder {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn should_build_config() {
+    #[test]
+    fn should_build_config() {
         let config = ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .user("some_user")
@@ -126,8 +126,8 @@ mod tests {
         assert_eq!(config.max_connections, 5);
     }
 
-    #[tokio::test]
-    async fn should_build_with_defaults() {
+    #[test]
+    fn should_build_with_defaults() {
         let config = ConfigBuilder::default()
             .uri("127.0.0.1:7687")
             .user("some_user")
@@ -142,8 +142,8 @@ mod tests {
         assert_eq!(config.max_connections, 16);
     }
 
-    #[tokio::test]
-    async fn should_reject_invalid_config() {
+    #[test]
+    fn should_reject_invalid_config() {
         assert!(ConfigBuilder::default()
             .user("some_user")
             .password("some_password")
