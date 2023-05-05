@@ -22,8 +22,20 @@ impl Query {
         }
     }
 
-    pub fn param<T: std::convert::Into<BoltType>>(mut self, key: &str, value: T) -> Self {
+    pub fn param<T: Into<BoltType>>(mut self, key: &str, value: T) -> Self {
         self.params.put(key.into(), value.into());
+        self
+    }
+
+    pub fn params<K, V>(mut self, input_params: impl IntoIterator<Item = (K, V)>) -> Self
+    where
+        K: Into<BoltString>,
+        V: Into<BoltType>,
+    {
+        for (key, value) in input_params {
+            self.params.put(key.into(), value.into());
+        }
+
         self
     }
 
@@ -62,5 +74,25 @@ impl Query {
             }
             msg => Err(unexpected(msg, "RUN")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_params() {
+        let q = Query::new("MATCH (n) WHERE n.name = $name AND n.age > $age RETURN n".to_owned());
+        let q = q.params([
+            ("name", BoltType::from("Frobniscante")),
+            ("age", BoltType::from(42)),
+        ]);
+
+        assert_eq!(
+            q.params.get::<String>("name").unwrap(),
+            String::from("Frobniscante")
+        );
+        assert_eq!(q.params.get::<i64>("age").unwrap(), 42);
     }
 }
