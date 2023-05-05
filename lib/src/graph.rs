@@ -1,4 +1,4 @@
-use crate::config::{config, Config};
+use crate::config::{Config, ConfigBuilder};
 use crate::errors::*;
 use crate::pool::{create_pool, ConnectionPool};
 use crate::query::Query;
@@ -19,16 +19,25 @@ pub fn query(q: &str) -> Query {
 }
 
 impl Graph {
-    /// Connects to the database with configurations provided, you can build a config using
-    /// [`config`]
+    /// Connects to the database with configurations provided.
+    ///
+    /// You can build a config using [`ConfigBuilder::default()`].
     pub async fn connect(config: Config) -> Result<Self> {
         let pool = create_pool(&config).await?;
         Ok(Graph { config, pool })
     }
 
     /// Connects to the database with default configurations
-    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let config = config().uri(uri).user(user).password(password).build()?;
+    pub async fn new(
+        uri: impl Into<String>,
+        user: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let config = ConfigBuilder::default()
+            .uri(uri)
+            .user(user)
+            .password(password)
+            .build()?;
         Self::connect(config).await
     }
 
