@@ -20,9 +20,9 @@ pub struct ConfigBuilder {
     uri: Option<String>,
     user: Option<String>,
     password: Option<String>,
-    db: Option<String>,
-    fetch_size: Option<usize>,
-    max_connections: Option<usize>,
+    db: String,
+    fetch_size: usize,
+    max_connections: usize,
 }
 
 impl ConfigBuilder {
@@ -53,7 +53,7 @@ impl ConfigBuilder {
     ///
     /// Defaults to "neo4j" if not set.
     pub fn db(mut self, db: impl Into<String>) -> Self {
-        self.db = Some(db.into());
+        self.db = db.into();
         self
     }
 
@@ -62,7 +62,7 @@ impl ConfigBuilder {
     ///
     /// Defaults to 200 if not set.
     pub fn fetch_size(mut self, fetch_size: usize) -> Self {
-        self.fetch_size = Some(fetch_size);
+        self.fetch_size = fetch_size;
         self
     }
 
@@ -70,33 +70,19 @@ impl ConfigBuilder {
     ///
     /// Defaults to 16 if not set.
     pub fn max_connections(mut self, max_connections: usize) -> Self {
-        self.max_connections = Some(max_connections);
+        self.max_connections = max_connections;
         self
     }
 
     pub fn build(self) -> Result<Config> {
-        if let (
-            Some(uri),
-            Some(user),
-            Some(password),
-            Some(fetch_size),
-            Some(max_connections),
-            Some(db),
-        ) = (
-            self.uri,
-            self.user,
-            self.password,
-            self.fetch_size,
-            self.max_connections,
-            self.db,
-        ) {
+        if let (Some(uri), Some(user), Some(password)) = (self.uri, self.user, self.password) {
             Ok(Config {
                 uri,
                 user,
                 password,
-                fetch_size,
-                max_connections,
-                db,
+                fetch_size: self.fetch_size,
+                max_connections: self.max_connections,
+                db: self.db,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -110,9 +96,9 @@ impl Default for ConfigBuilder {
             uri: None,
             user: None,
             password: None,
-            db: Some(DEFAULT_DATABASE.into()),
-            max_connections: Some(DEFAULT_MAX_CONNECTIONS),
-            fetch_size: Some(DEFAULT_FETCH_SIZE),
+            db: DEFAULT_DATABASE.into(),
+            max_connections: DEFAULT_MAX_CONNECTIONS,
+            fetch_size: DEFAULT_FETCH_SIZE,
         }
     }
 }
