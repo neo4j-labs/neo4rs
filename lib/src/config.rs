@@ -1,6 +1,6 @@
 pub use crate::errors::*;
 
-const DEFAULT_DATABASE: &'static str = "neo4j";
+const DEFAULT_DATABASE: &str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
