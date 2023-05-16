@@ -141,6 +141,15 @@ impl Node {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
     }
+
+    /// Get the keys for the node's attributes
+    pub fn keys(&self) -> Vec<String> {
+        self.inner.keys().into_iter().map(
+            |key: BoltString| -> String {
+                key.to_string()
+            }
+        ).collect::<Vec<String>>()
+    }
 }
 
 impl Relation {

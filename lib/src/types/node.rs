@@ -25,6 +25,12 @@ impl BoltNode {
     }
 }
 
+impl BoltNode {
+    pub fn keys(&self) -> Vec<BoltString> {
+        self.properties.value.keys().cloned().collect()
+    }
+}
+
 impl From<BoltNode> for BoltType {
     fn from(value: BoltNode) -> Self {
         BoltType::Node(value)

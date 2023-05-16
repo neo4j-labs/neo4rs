@@ -1,3 +1,5 @@
+use std::vec;
+
 use neo4rs::*;
 
 mod container;
@@ -19,10 +21,12 @@ async fn nodes() {
     while let Ok(Some(row)) = result.next().await {
         let node: Node = row.get("friend").unwrap();
         let id = node.id();
+        let keys = node.keys();
         let labels = node.labels();
         let name: String = node.get("name").unwrap();
         assert_eq!(name, "Mr Mark");
         assert_eq!(labels, vec!["Person"]);
+        assert_eq!(keys, vec![String::from("name")]);
         assert!(id >= 0);
     }
 }
