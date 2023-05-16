@@ -35,6 +35,13 @@ impl BoltRelation {
     }
 }
 
+
+impl BoltRelation {
+    pub fn keys(&self) -> Vec<BoltString> {
+        self.properties.value.keys().cloned().collect()
+    }
+}
+
 impl BoltUnboundedRelation {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.properties.get(key)
