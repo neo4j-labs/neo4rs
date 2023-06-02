@@ -7,49 +7,33 @@ use std::{collections::HashMap, sync::Arc};
 pub struct Neo4jContainer {
     graph: Arc<Graph>,
     version: String,
-    _container: Container<'static, Neo4j>,
+    _container: Option<Container<'static, Neo4j>>,
 }
 
 impl Neo4jContainer {
     #[allow(dead_code)]
     pub async fn new() -> Self {
-        Self::from_version(Self::version_from_env()).await
+        Self::from_config(ConfigBuilder::default()).await
     }
 
-    #[allow(dead_code)]
-    pub async fn from_version(version: impl Into<String>) -> Self {
-        Self::from_config_and_version(ConfigBuilder::default(), version).await
-    }
-
-    #[allow(dead_code)]
     pub async fn from_config(config: ConfigBuilder) -> Self {
-        Self::from_config_and_version(config, Self::version_from_env()).await
-    }
-
-    #[allow(dead_code)]
-    pub async fn from_config_and_version(
-        config: ConfigBuilder,
-        version: impl Into<String>,
-    ) -> Self {
         let _ = pretty_env_logger::try_init();
 
-        let docker = Cli::default();
-        let docker = Box::leak(Box::new(docker));
+        let (server, version) = Self::server_from_env();
 
-        let version = version.into();
-        let container = docker.run(Neo4j::new(USER, PASS, version.clone()));
+        let (connection, _container) = match server {
+            TestServer::TestContainer { auth } => {
+                let (uri, container) = Self::create_testcontainer(&auth, &version).await;
+                (TestConnection { uri, auth }, Some(container))
+            }
+            TestServer::External { connection } => (connection, None),
+        };
 
-        let bolt_port = container.ports().map_to_host_port_ipv4(7687).unwrap();
-        let uri = format!("127.0.0.1:{}", bolt_port);
-
-        let config = config.uri(&uri).user(USER).password(PASS).build().unwrap();
-        let graph = Graph::connect(config).await.unwrap();
-        let graph = Arc::new(graph);
-
+        let graph = Self::connect(config, connection).await;
         Self {
             graph,
             version,
-            _container: container,
+            _container,
         }
     }
 
@@ -65,16 +49,75 @@ impl Neo4jContainer {
             .0
     }
 
-    fn version_from_env() -> String {
+    fn server_from_env() -> (TestServer, String) {
+        const USER_VAR: &str = "NEO4J_TEST_USER";
+        const PASS_VAR: &str = "NEO4J_TEST_PASS";
+        const TEST_URI_VAR: &str = "NEO4J_TEST_URI";
         const VERSION_VAR: &str = "NEO4J_VERSION_TAG";
+
+        const DEFAULT_USER: &str = "neo4j";
+        const DEFAULT_PASS: &str = "neo";
         const DEFAULT_VERSION_TAG: &str = "4.2";
 
-        std::env::var(VERSION_VAR).unwrap_or_else(|_| DEFAULT_VERSION_TAG.to_owned())
+        use std::env::var;
+
+        let user = var(USER_VAR).unwrap_or_else(|_| DEFAULT_USER.to_owned());
+        let pass = var(PASS_VAR).unwrap_or_else(|_| DEFAULT_PASS.to_owned());
+        let auth = TestAuth { user, pass };
+
+        let version = var(VERSION_VAR).unwrap_or_else(|_| DEFAULT_VERSION_TAG.to_owned());
+
+        if let Ok(uri) = var(TEST_URI_VAR) {
+            let config = TestConnection { uri, auth };
+            (TestServer::External { connection: config }, version)
+        } else {
+            (TestServer::TestContainer { auth }, version)
+        }
+    }
+
+    async fn create_testcontainer(
+        auth: &TestAuth,
+        version: &str,
+    ) -> (String, Container<'static, Neo4j>) {
+        let docker = Cli::default();
+        let docker = Box::leak(Box::new(docker));
+
+        let container = docker.run(Neo4j::new(&auth.user, &auth.pass, version.to_owned()));
+
+        let bolt_port = container.ports().map_to_host_port_ipv4(7687).unwrap();
+        let uri = format!("bolt://127.0.0.1:{}", bolt_port);
+
+        (uri, container)
+    }
+
+    async fn connect(config: ConfigBuilder, info: TestConnection) -> Arc<Graph> {
+        let config = config
+            .uri(&info.uri)
+            .user(&info.auth.user)
+            .password(&info.auth.pass)
+            .build()
+            .unwrap();
+
+        let graph = Graph::connect(config).await.unwrap();
+
+        Arc::new(graph)
     }
 }
 
-const USER: &str = "neo4j";
-const PASS: &str = "neo";
+struct TestAuth {
+    user: String,
+    pass: String,
+}
+
+struct TestConnection {
+    uri: String,
+    auth: TestAuth,
+}
+
+enum TestServer {
+    TestContainer { auth: TestAuth },
+    External { connection: TestConnection },
+}
 
 #[derive(Debug)]
 struct Neo4j {
