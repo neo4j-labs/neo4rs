@@ -3,21 +3,102 @@ use crate::messages::*;
 use crate::version::Version;
 use bytes::*;
 use std::mem;
+use std::sync::Arc;
+use stream::ConnectionStream;
 use tokio::io::BufStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio_rustls::rustls::{OwnedTrustAnchor, RootCertStore, ServerName};
+use tokio_rustls::{rustls::ClientConfig, TlsConnector};
+use url::{Host, Url};
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
 #[derive(Debug)]
 pub struct Connection {
     version: Version,
-    stream: BufStream<TcpStream>,
+    stream: BufStream<ConnectionStream>,
 }
 
 impl Connection {
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
-        let mut stream = BufStream::new(TcpStream::connect(uri).await?);
+        let url = match Url::parse(uri) {
+            Ok(url) => url,
+            Err(url::ParseError::RelativeUrlWithoutBase) => Url::parse(&format!("bolt://{}", uri))?,
+            Err(err) => return Err(Error::UrlParseError(err)),
+        };
+
+        let port = url.port().unwrap_or(7687);
+
+        let host = match url.host() {
+            Some(host) => host,
+            None => return Err(Error::UrlParseError(url::ParseError::EmptyHost)),
+        };
+
+        let stream = match host {
+            Host::Domain(domain) => TcpStream::connect((domain, port)).await?,
+            Host::Ipv4(ip) => TcpStream::connect((ip, port)).await?,
+            Host::Ipv6(ip) => TcpStream::connect((ip, port)).await?,
+        };
+
+        match url.scheme() {
+            "bolt" | "neo4j" | "" => Self::new_unencrypted(stream, user, password).await,
+            "bolt+s" | "neo4j+s" => Self::new_tls(stream, host, user, password).await,
+            otherwise => Err(Error::UnsupportedScheme(otherwise.to_owned())),
+        }
+    }
+
+    pub async fn new_unencrypted(
+        stream: TcpStream,
+        user: &str,
+        password: &str,
+    ) -> Result<Connection> {
+        Self::init(user, password, stream).await
+    }
+
+    pub async fn new_tls(
+        stream: TcpStream,
+        host: Host<&str>,
+        user: &str,
+        password: &str,
+    ) -> Result<Connection> {
+        let mut root_cert_store = RootCertStore::empty();
+        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
+            |ta| {
+                OwnedTrustAnchor::from_subject_spki_name_constraints(
+                    ta.subject,
+                    ta.spki,
+                    ta.name_constraints,
+                )
+            },
+        ));
+
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_cert_store)
+            .with_no_client_auth();
+
+        let config = Arc::new(config);
+        let connector = TlsConnector::from(config);
+
+        let domain = match host {
+            Host::Domain(domain) => ServerName::try_from(domain)
+                .map_err(|_| Error::InvalidDnsName(domain.to_owned()))?,
+            Host::Ipv4(ip) => ServerName::IpAddress(ip.into()),
+            Host::Ipv6(ip) => ServerName::IpAddress(ip.into()),
+        };
+
+        let stream = connector.connect(domain, stream).await?;
+
+        Self::init(user, password, stream).await
+    }
+
+    async fn init(
+        user: &str,
+        password: &str,
+        stream: impl Into<ConnectionStream>,
+    ) -> Result<Connection> {
+        let mut stream = BufStream::new(stream.into());
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
         stream.write_all(&Version::supported_versions()).await?;
         stream.flush().await?;
@@ -25,7 +106,7 @@ impl Connection {
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
         let mut connection = Connection { version, stream };
-        let hello = BoltRequest::hello("neo4rs", user.to_owned(), password.to_owned());
+        let hello = BoltRequest::hello("neo4rs", user, password);
         match connection.send_recv(hello).await? {
             BoltResponse::Success(_msg) => Ok(connection),
             BoltResponse::Failure(msg) => {
@@ -86,5 +167,81 @@ impl Connection {
         let mut data = [0, 0];
         self.stream.read_exact(&mut data).await?;
         Ok(u16::from_be_bytes(data))
+    }
+}
+
+mod stream {
+    use pin_project_lite::pin_project;
+    use tokio::{
+        io::{AsyncRead, AsyncWrite},
+        net::TcpStream,
+    };
+    use tokio_rustls::client::TlsStream;
+
+    pin_project! {
+        #[project = ConnectionStreamProj]
+        #[derive(Debug)]
+        pub(super) enum ConnectionStream {
+            Unencrypted { #[pin] stream: TcpStream },
+            Encrypted { #[pin] stream: TlsStream<TcpStream> },
+        }
+    }
+
+    impl From<TcpStream> for ConnectionStream {
+        fn from(stream: TcpStream) -> Self {
+            ConnectionStream::Unencrypted { stream }
+        }
+    }
+
+    impl From<TlsStream<TcpStream>> for ConnectionStream {
+        fn from(stream: TlsStream<TcpStream>) -> Self {
+            ConnectionStream::Encrypted { stream }
+        }
+    }
+
+    impl AsyncRead for ConnectionStream {
+        fn poll_read(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => stream.poll_read(cx, buf),
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_read(cx, buf),
+            }
+        }
+    }
+
+    impl AsyncWrite for ConnectionStream {
+        fn poll_write(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &[u8],
+        ) -> std::task::Poll<Result<usize, std::io::Error>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => stream.poll_write(cx, buf),
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_write(cx, buf),
+            }
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), std::io::Error>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => stream.poll_flush(cx),
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_flush(cx),
+            }
+        }
+
+        fn poll_shutdown(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), std::io::Error>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => stream.poll_shutdown(cx),
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_shutdown(cx),
+            }
+        }
     }
 }

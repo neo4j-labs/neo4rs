@@ -2,8 +2,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("an IO error occurred")]
-    IOError { detail: String },
+    #[error("an IO error occurred: {detail}")]
+    IOError {
+        #[from]
+        detail: std::io::Error,
+    },
+
+    #[error("Invalid URI: {0}")]
+    UrlParseError(#[from] url::ParseError),
+
+    #[error("Unsupported URI scheme: {0}")]
+    UnsupportedScheme(String),
+
+    #[error("Invalid DNS name: {0}")]
+    InvalidDnsName(String),
 
     #[error("connection error")]
     ConnectionError,
@@ -46,14 +58,6 @@ pub enum Error {
 
     #[error("{0}")]
     DeserializationError(String),
-}
-
-impl std::convert::From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IOError {
-            detail: e.to_string(),
-        }
-    }
 }
 
 impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {
