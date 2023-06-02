@@ -103,6 +103,36 @@ It is recommended to only run a single integration test and manually clean up th
 env NEO4J_TEST_URI=neo4j+s://42421337thisisnotarealinstance.databases.neo4j.io NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=supersecret NEO4J_VERSION_TAG=5.8 cargo test --test <name of the integration test, see the file names in lib/tests/>
 ```
 
+### Updating Cargo.lock files for CI
+
+We have CI tests that verify the MSRV as well as the minimal version of the dependencies.
+The minimal versions are the lowest version that still satisfies the Cargo.toml entries, instead of the default of the highest version.
+
+If you change anything in the Cargo.toml, you need to update the Cargo.lock files for CI.
+
+It is recommended to close all editors, or more sepcifically, all rust-analyzer instances for this project before running the commands below.
+
+#### Update `ci/Cargo.lock.msrv`
+
+```bash
+rm Cargo.lock
+cargo +1.60.0 test --no-run
+# If there are errors, update Cargo.toml to fix and try again from the top.
+# You might have to downgrade or remove certain crates to hit the MSRV,
+# or suggest an increase in the MSRV.
+cp Cargo.lock ci/Cargo.lock.msrv
+```
+
+#### Update `ci/Cargo.lock.min`
+
+```bash
+rm Cargo.lock
+RUST_LOG=debug cargo +nightly -Z minimal-versions test --no-run
+# If there are errors, update Cargo.toml to fix and try again from the top.
+cp Cargo.lock ci/Cargo.lock.min
+```
+
+
 ## License
 
 Neo4rs is licensed under either of the following, at your option:
