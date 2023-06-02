@@ -48,15 +48,11 @@ impl Connection {
         }
     }
 
-    pub async fn new_unencrypted(
-        stream: TcpStream,
-        user: &str,
-        password: &str,
-    ) -> Result<Connection> {
+    async fn new_unencrypted(stream: TcpStream, user: &str, password: &str) -> Result<Connection> {
         Self::init(user, password, stream).await
     }
 
-    pub async fn new_tls(
+    async fn new_tls(
         stream: TcpStream,
         host: Host<&str>,
         user: &str,
