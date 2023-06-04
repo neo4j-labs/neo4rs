@@ -48,7 +48,7 @@ pub enum BoltRequest {
 }
 
 impl BoltRequest {
-    pub fn hello(agent: &str, principal: String, credentials: String) -> BoltRequest {
+    pub fn hello(agent: &str, principal: &str, credentials: &str) -> BoltRequest {
         let mut data = BoltMap::default();
         data.put("user_agent".into(), agent.into());
         data.put("scheme".into(), "basic".into());

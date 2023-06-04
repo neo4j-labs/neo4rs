@@ -26,7 +26,7 @@
 //!    let pass = "neo";
 //!    let id = Uuid::new_v4().to_string();
 //!
-//!    let graph = Arc::new(Graph::new(&uri, user, pass).await.unwrap());
+//!    let graph = Arc::new(Graph::new(uri, user, pass).await.unwrap());
 //!    let mut result = graph.run(
 //!      query("CREATE (p:Person {id: $id})").param("id", id.clone())
 //!    ).await.unwrap();
