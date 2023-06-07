@@ -31,5 +31,6 @@ webpki-roots = "0.23.0"
 [dev-dependencies]
 lenient_semver = { version = "0.4.2", default_features = false, features = ["version_lite"] }
 pretty_env_logger = "0.4.0"
-testcontainers = { version = "0.14.0" }
+testcontainers = "0.14.0"
+neo4j_testcontainers = "0.1.0"
 uuid = { version = "1.0.0", features = ["v4"] }
