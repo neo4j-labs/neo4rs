@@ -42,8 +42,22 @@ impl Connection {
         };
 
         match url.scheme() {
-            "bolt" | "neo4j" | "" => Self::new_unencrypted(stream, user, password).await,
-            "bolt+s" | "neo4j+s" => Self::new_tls(stream, host, user, password).await,
+            "bolt" | "" => Self::new_unencrypted(stream, user, password).await,
+            "bolt+s" => Self::new_tls(stream, host, user, password).await,
+            "neo4j" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Self::new_unencrypted(stream, user, password).await
+            }
+            "neo4j+s" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Self::new_tls(stream, host, user, password).await
+            }
             otherwise => Err(Error::UnsupportedScheme(otherwise.to_owned())),
         }
     }
