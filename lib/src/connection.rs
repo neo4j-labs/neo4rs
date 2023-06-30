@@ -22,18 +22,9 @@ pub struct Connection {
 
 impl Connection {
     pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
-        let url = match Url::parse(uri) {
-            Ok(url) => url,
-            Err(url::ParseError::RelativeUrlWithoutBase) => Url::parse(&format!("bolt://{}", uri))?,
-            Err(err) => return Err(Error::UrlParseError(err)),
-        };
-
-        let port = url.port().unwrap_or(7687);
-
-        let host = match url.host() {
-            Some(host) => host,
-            None => return Err(Error::UrlParseError(url::ParseError::EmptyHost)),
-        };
+        let url = NeoUrl::parse(uri)?;
+        let port = url.port();
+        let host = url.host();
 
         let stream = match host {
             Host::Domain(domain) => TcpStream::connect((domain, port)).await?,
@@ -180,6 +171,33 @@ impl Connection {
     }
 }
 
+struct NeoUrl(Url);
+
+impl NeoUrl {
+    fn parse(uri: &str) -> Result<Self> {
+        let url = match Url::parse(uri) {
+            Ok(url) if url.has_host() => url,
+            // missing scheme
+            Ok(_) => Url::parse(&format!("bolt://{}", uri))?,
+            Err(err) => return Err(Error::UrlParseError(err)),
+        };
+
+        Ok(Self(url))
+    }
+
+    fn scheme(&self) -> &str {
+        self.0.scheme()
+    }
+
+    fn host(&self) -> Host<&str> {
+        self.0.host().unwrap()
+    }
+
+    fn port(&self) -> u16 {
+        self.0.port().unwrap_or(7687)
+    }
+}
+
 mod stream {
     use pin_project_lite::pin_project;
     use tokio::{
@@ -253,5 +271,28 @@ mod stream {
                 ConnectionStreamProj::Encrypted { stream } => stream.poll_shutdown(cx),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use url::Host;
+
+    use super::NeoUrl;
+
+    #[test]
+    fn should_parse_uri() {
+        let url = NeoUrl::parse("bolt://localhost:4242").unwrap();
+        assert_eq!(url.port(), 4242);
+        assert_eq!(url.host(), Host::Domain("localhost"));
+        assert_eq!(url.scheme(), "bolt");
+    }
+
+    #[test]
+    fn should_parse_uri_without_scheme() {
+        let url = NeoUrl::parse("localhost:4242").unwrap();
+        assert_eq!(url.port(), 4242);
+        assert_eq!(url.host(), Host::Domain("localhost"));
+        assert_eq!(url.scheme(), "bolt");
     }
 }
