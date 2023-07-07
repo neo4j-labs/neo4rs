@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::BoltMap;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
@@ -42,8 +42,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(extra.get::<i64>("n").unwrap(), 42.into());
-        assert_eq!(extra.get::<i64>("qid").unwrap(), 1.into());
+        assert_eq!(extra.get::<i64>("n").unwrap(), 42);
+        assert_eq!(extra.get::<i64>("qid").unwrap(), 1);
     }
 
     #[test]
@@ -58,7 +58,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(extra.get::<i64>("n").unwrap(), 255.into());
-        assert_eq!(extra.get::<i64>("qid").unwrap(), 255.into());
+        assert_eq!(extra.get::<i64>("n").unwrap(), 255);
+        assert_eq!(extra.get::<i64>("qid").unwrap(), 255);
     }
 }
