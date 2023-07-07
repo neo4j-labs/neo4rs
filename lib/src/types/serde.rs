@@ -2,26 +2,36 @@ use ::serde::{
     de::{self, value::StrDeserializer},
     forward_to_deserialize_any, Deserialize,
 };
+use serde::de::value::{MapDeserializer, SeqDeserializer};
 
 use crate::types::{BoltMap, BoltString, BoltType};
-use std::collections::HashMap;
 
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
         T: Deserialize<'this>,
     {
-        let deserializer = BoltMapDeserializer::new(self);
-        let t = T::deserialize(deserializer)?;
-        Ok(t)
+        T::deserialize(MapDeserializer::new(self.value.iter()))
     }
 }
 
+impl BoltType {
+    #[allow(unused)]
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(BoltTypeDeserializer::new(self))
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DeError {
     #[error("{0}")]
-    Error(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
+    Error(String),
+
+    #[error("Could not convert the integer `{1}` to to target type: {0}")]
+    IntegerOutOfBounds(#[source] std::num::TryFromIntError, i64),
 }
 
 impl de::Error for DeError {
@@ -29,77 +39,11 @@ impl de::Error for DeError {
     where
         T: std::fmt::Display,
     {
-        Self::Error(msg.to_string().into())
+        Self::Error(msg.to_string())
     }
 }
 
-struct BoltMapDeserializer<'de> {
-    entries: <&'de HashMap<BoltString, BoltType> as IntoIterator>::IntoIter,
-    value: Option<&'de BoltType>,
-}
-
-impl<'de> BoltMapDeserializer<'de> {
-    fn new(input: &'de BoltMap) -> Self {
-        Self {
-            entries: input.value.iter(),
-            value: None,
-        }
-    }
-}
-
-impl<'de> de::MapAccess<'de> for BoltMapDeserializer<'de> {
-    type Error = DeError;
-
-    fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        match self.entries.next() {
-            Some((key, value)) => {
-                self.value = Some(value);
-                seed.deserialize(StrDeserializer::new(&key.value)).map(Some)
-            }
-            None => Ok(None),
-        }
-    }
-
-    fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        match self.value.take() {
-            Some(value) => seed.deserialize(BoltTypeDeserializer::new(value)),
-            None => Err(de::Error::custom("value is missing")),
-        }
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        match self.entries.size_hint() {
-            (lower, Some(upper)) if lower == upper => Some(upper),
-            _ => None,
-        }
-    }
-}
-
-impl<'de> de::Deserializer<'de> for BoltMapDeserializer<'de> {
-    type Error = DeError;
-
-    #[inline]
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_map(self)
-    }
-
-    forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
-    }
-}
-
-struct BoltTypeDeserializer<'de> {
+pub struct BoltTypeDeserializer<'de> {
     value: &'de BoltType,
 }
 
@@ -109,43 +53,307 @@ impl<'de> BoltTypeDeserializer<'de> {
     }
 }
 
+impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltType {
+    type Deserializer = BoltTypeDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BoltTypeDeserializer::new(self)
+    }
+}
+
+impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltString {
+    type Deserializer = StrDeserializer<'de, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        StrDeserializer::new(&self.value)
+    }
+}
+
 impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     type Error = DeError;
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BoltType::Bytes(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter().copied())),
+            _ => self.unexpected(visitor),
+        }
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
+            _ => self.unexpected(visitor),
+        }
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
+            _ => self.unexpected(visitor),
+        }
+    }
+
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::String(v) = self.value {
+            visitor.visit_borrowed_str(&v.value)
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::String(v) = self.value {
+            visitor.visit_string(v.value.clone())
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::Bytes(v) = self.value {
+            visitor.visit_borrowed_bytes(&v.value)
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::Bytes(v) = self.value {
+            visitor.visit_byte_buf(v.value.to_vec())
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::Boolean(v) = self.value {
+            visitor.visit_bool(v.value)
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_i8(v)
+    }
+
+    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_i16(v)
+    }
+
+    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_i32(v)
+    }
+
+    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_i64(v)
+    }
+
+    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_u8(v)
+    }
+
+    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_u16(v)
+    }
+
+    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_u32(v)
+    }
+
+    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_integer(visitor)?;
+        visitor.visit_u64(v)
+    }
+
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_float(visitor)?;
+        visitor.visit_f32(v)
+    }
+
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let (v, visitor) = self.read_float(visitor)?;
+        visitor.visit_f64(v)
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::Null(_) = self.value {
+            visitor.visit_unit()
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if let BoltType::Null(_) = self.value {
+            visitor.visit_unit()
+        } else {
+            self.unexpected(visitor)
+        }
+    }
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        #[allow(unused)]
-        match self.value {
-            BoltType::String(v) => visitor.visit_borrowed_str(&v.value),
-            BoltType::Boolean(v) => visitor.visit_bool(v.value),
-            BoltType::Map(v) => visitor.visit_map(BoltMapDeserializer::new(v)),
-            BoltType::Null(v) => visitor.visit_unit(),
-            BoltType::Integer(v) => visitor.visit_i64(v.value),
-            BoltType::Float(v) => visitor.visit_f64(v.value),
-            BoltType::List(v) => todo!(),
-            BoltType::Node(v) => todo!(),
-            BoltType::Relation(v) => todo!(),
-            BoltType::UnboundedRelation(v) => todo!(),
-            BoltType::Point2D(v) => todo!(),
-            BoltType::Point3D(v) => todo!(),
-            BoltType::Bytes(v) => todo!(),
-            BoltType::Path(v) => todo!(),
-            BoltType::Duration(v) => todo!(),
-            BoltType::Date(v) => todo!(),
-            BoltType::Time(v) => todo!(),
-            BoltType::LocalTime(v) => todo!(),
-            BoltType::DateTime(v) => todo!(),
-            BoltType::LocalDateTime(v) => todo!(),
-            BoltType::DateTimeZoneId(v) => todo!(),
-        }
+        self.unexpected(visitor)
     }
 
     forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
+        char option newtype_struct enum identifier ignored_any tuple tuple_struct
+    }
+}
+
+impl<'de> BoltTypeDeserializer<'de> {
+    fn read_integer<T, E, V>(self, visitor: V) -> Result<(T, V), DeError>
+    where
+        V: de::Visitor<'de>,
+        i64: TryInto<T, Error = E>,
+        E: Into<std::num::TryFromIntError>,
+    {
+        if let BoltType::Integer(v) = self.value {
+            match v.value.try_into() {
+                Ok(v) => Ok((v, visitor)),
+                Err(e) => Err(DeError::IntegerOutOfBounds(e.into(), v.value)),
+            }
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn read_float<T, V>(self, visitor: V) -> Result<(T, V), DeError>
+    where
+        V: de::Visitor<'de>,
+        T: FromFloat,
+    {
+        if let BoltType::Float(v) = self.value {
+            Ok((T::from_float(v.value), visitor))
+        } else {
+            self.unexpected(visitor)
+        }
+    }
+
+    fn unexpected<V, T>(self, visitor: V) -> Result<T, DeError>
+    where
+        V: de::Visitor<'de>,
+    {
+        let typ = match self.value {
+            BoltType::String(v) => de::Unexpected::Str(&v.value),
+            BoltType::Boolean(v) => de::Unexpected::Bool(v.value),
+            BoltType::Map(_) => de::Unexpected::Map,
+            BoltType::Null(_) => de::Unexpected::Unit,
+            BoltType::Integer(v) => de::Unexpected::Signed(v.value),
+            BoltType::Float(v) => de::Unexpected::Float(v.value),
+            BoltType::List(_) => de::Unexpected::Seq,
+            BoltType::Node(_) => de::Unexpected::Map,
+            BoltType::Relation(_) => de::Unexpected::Map,
+            BoltType::UnboundedRelation(_) => de::Unexpected::Map,
+            BoltType::Point2D(_) => de::Unexpected::Other("Point2D"),
+            BoltType::Point3D(_) => de::Unexpected::Other("Point3D"),
+            BoltType::Bytes(v) => de::Unexpected::Bytes(&v.value),
+            BoltType::Path(_) => de::Unexpected::Other("Path"),
+            BoltType::Duration(_) => de::Unexpected::Other("Duration"),
+            BoltType::Date(_) => de::Unexpected::Other("Date"),
+            BoltType::Time(_) => de::Unexpected::Other("Time"),
+            BoltType::LocalTime(_) => de::Unexpected::Other("LocalTime"),
+            BoltType::DateTime(_) => de::Unexpected::Other("DateTime"),
+            BoltType::LocalDateTime(_) => de::Unexpected::Other("LocalDateTime"),
+            BoltType::DateTimeZoneId(_) => de::Unexpected::Other("DateTimeZoneId"),
+        };
+
+        Err(de::Error::invalid_type(typ, &visitor))
+    }
+}
+
+trait FromFloat {
+    fn from_float(f: f64) -> Self;
+}
+
+impl FromFloat for f32 {
+    fn from_float(f: f64) -> Self {
+        f as f32
+    }
+}
+
+impl FromFloat for f64 {
+    fn from_float(f: f64) -> Self {
+        f
     }
 }
 
@@ -251,6 +459,120 @@ mod tests {
             long: 1337,
             boolean: true,
             unit: (),
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn std_bytes() {
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Bytes<'a> {
+            bytes: Vec<u8>,
+            slice: &'a [u8],
+        }
+
+        let map = [
+            (BoltString::from("bytes"), BoltType::from(vec![4_u8, 2])),
+            (
+                BoltString::from("slice"),
+                BoltType::from(vec![1_u8, 3, 3, 7]),
+            ),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let actual = map.to::<Bytes>().unwrap();
+        let expected = Bytes {
+            bytes: vec![4, 2],
+            slice: &[1, 3, 3, 7],
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn serde_bytes_bytes() {
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Bytes<'a> {
+            #[serde(with = "serde_bytes")]
+            bytes: Vec<u8>,
+            #[serde(with = "serde_bytes")]
+            slice: &'a [u8],
+        }
+
+        let map = [
+            (BoltString::from("bytes"), BoltType::from(vec![4_u8, 2])),
+            (
+                BoltString::from("slice"),
+                BoltType::from(vec![1_u8, 3, 3, 7]),
+            ),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let actual = map.to::<Bytes>().unwrap();
+        let expected = Bytes {
+            bytes: vec![4, 2],
+            slice: &[1, 3, 3, 7],
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn serde_with_bytes() {
+        use serde_with::{serde_as, Bytes};
+
+        #[serde_as]
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct AsBytes<'a> {
+            #[serde_as(as = "Bytes")]
+            array: [u8; 4],
+
+            #[serde_as(as = "Bytes")]
+            boxed: Box<[u8]>,
+
+            #[serde_as(as = "Bytes")]
+            #[serde(borrow)]
+            cow: Cow<'a, [u8]>,
+
+            #[serde_as(as = "Bytes")]
+            #[serde(borrow)]
+            cow_array: Cow<'a, [u8; 2]>,
+
+            #[serde_as(as = "Bytes")]
+            bytes: Vec<u8>,
+
+            #[serde_as(as = "Bytes")]
+            slice: &'a [u8],
+        }
+
+        let map = [
+            (
+                BoltString::from("array"),
+                BoltType::from(vec![1_u8, 3, 3, 7]),
+            ),
+            (BoltString::from("boxed"), BoltType::from(vec![4_u8, 2])),
+            (BoltString::from("cow"), BoltType::from(vec![1_u8, 3, 3, 7])),
+            (BoltString::from("cow_array"), BoltType::from(vec![4_u8, 2])),
+            (
+                BoltString::from("bytes"),
+                BoltType::from(vec![1_u8, 3, 3, 7]),
+            ),
+            (BoltString::from("slice"), BoltType::from(vec![4_u8, 2])),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let actual = map.to::<AsBytes>().unwrap();
+        let expected = AsBytes {
+            array: [1, 3, 3, 7],
+            boxed: vec![4, 2].into_boxed_slice(),
+            cow: vec![1_u8, 3, 3, 7].into(),
+            cow_array: Cow::Owned([4_u8, 2]),
+            bytes: vec![1, 3, 3, 7],
+            slice: &[4, 2],
         };
 
         assert_eq!(actual, expected);

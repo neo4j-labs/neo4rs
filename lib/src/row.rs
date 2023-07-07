@@ -216,6 +216,8 @@ mod tests {
             age: i32,
             score: f64,
             awesome: bool,
+            #[serde(with = "serde_bytes")]
+            data: Vec<u8>,
         }
 
         #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -224,6 +226,8 @@ mod tests {
             age: i32,
             score: f64,
             awesome: bool,
+            #[serde(with = "serde_bytes")]
+            data: &'a [u8],
         }
 
         #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -243,6 +247,7 @@ mod tests {
                         (BoltString::from("age"), BoltType::from(42)),
                         (BoltString::from("score"), BoltType::from(4.2)),
                         (BoltString::from("awesome"), BoltType::from(true)),
+                        (BoltString::from("data"), BoltType::from(vec![4_u8, 2])),
                     ]
                     .into_iter()
                     .collect(),
@@ -253,6 +258,10 @@ mod tests {
                         (BoltString::from("age"), BoltType::from(1337)),
                         (BoltString::from("score"), BoltType::from(13.37)),
                         (BoltString::from("awesome"), BoltType::from(false)),
+                        (
+                            BoltString::from("data"),
+                            BoltType::from(vec![1_u8, 3, 3, 7]),
+                        ),
                     ]
                     .into_iter()
                     .collect(),
@@ -268,12 +277,14 @@ mod tests {
                 age: 42,
                 score: 4.2,
                 awesome: true,
+                data: vec![4, 2],
             },
             p1: Person1 {
                 name: "Bob",
                 age: 1337,
                 score: 13.37,
                 awesome: false, // poor Bob
+                data: &[1, 3, 3, 7],
             },
         };
 
