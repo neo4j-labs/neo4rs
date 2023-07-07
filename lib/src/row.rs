@@ -1,7 +1,11 @@
-use serde::{de::value::StrDeserializer, forward_to_deserialize_any, Deserialize};
+use crate::types::serde::DeError;
+use crate::types::{
+    BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation, BoltType,
+    BoltUnboundedRelation,
+};
 
-use crate::types::*;
-use std::{collections::HashMap, convert::TryInto};
+use serde::Deserialize;
+use std::convert::TryInto;
 
 /// Represents a row returned as a result of executing a query.
 ///
@@ -127,9 +131,7 @@ impl Row {
     where
         T: Deserialize<'this>,
     {
-        let deserializer = BoltMapDeserializer::new(&self.attributes);
-        let t = T::deserialize(deserializer)?;
-        Ok(t)
+        self.attributes.to::<T>()
     }
 }
 
@@ -198,270 +200,37 @@ impl UnboundedRelation {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum DeError {
-    #[error("{0}")]
-    Error(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
-}
-
-impl serde::de::Error for DeError {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: std::fmt::Display,
-    {
-        Self::Error(msg.to_string().into())
-    }
-}
-
-struct BoltMapDeserializer<'de> {
-    map: <&'de HashMap<BoltString, BoltType> as IntoIterator>::IntoIter,
-    value: Option<&'de BoltType>,
-}
-
-impl<'de> BoltMapDeserializer<'de> {
-    fn new(input: &'de BoltMap) -> Self {
-        Self {
-            map: input.value.iter(),
-            value: None,
-        }
-    }
-}
-
-impl<'de> serde::de::MapAccess<'de> for BoltMapDeserializer<'de> {
-    type Error = DeError;
-
-    fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        match self.map.next() {
-            Some((key, value)) => {
-                self.value = Some(value);
-                seed.deserialize(StrDeserializer::new(&key.value)).map(Some)
-            }
-            None => Ok(None),
-        }
-    }
-
-    fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        match self.value.take() {
-            Some(value) => Ok(seed.deserialize(BoltTypeDeserializer::new(value))?),
-            None => Err(serde::de::Error::custom("value is missing")),
-        }
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        match self.map.size_hint() {
-            (lower, Some(upper)) if lower == upper => Some(upper),
-            _ => None,
-        }
-    }
-}
-
-impl<'de> serde::de::Deserializer<'de> for BoltMapDeserializer<'de> {
-    type Error = DeError;
-
-    #[inline]
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        visitor.visit_map(self)
-    }
-
-    forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
-    }
-}
-
-struct BoltTypeDeserializer<'de> {
-    value: &'de BoltType,
-}
-
-impl<'de> BoltTypeDeserializer<'de> {
-    fn new(value: &'de BoltType) -> Self {
-        Self { value }
-    }
-}
-
-impl<'de> serde::de::Deserializer<'de> for BoltTypeDeserializer<'de> {
-    type Error = DeError;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        #[allow(unused)]
-        match self.value {
-            BoltType::String(v) => visitor.visit_borrowed_str(&v.value),
-            BoltType::Boolean(v) => visitor.visit_bool(v.value),
-            BoltType::Map(v) => visitor.visit_map(BoltMapDeserializer::new(v)),
-            BoltType::Null(v) => visitor.visit_unit(),
-            BoltType::Integer(v) => visitor.visit_i64(v.value),
-            BoltType::Float(v) => visitor.visit_f64(v.value),
-            BoltType::List(v) => todo!(),
-            BoltType::Node(v) => todo!(),
-            BoltType::Relation(v) => todo!(),
-            BoltType::UnboundedRelation(v) => todo!(),
-            BoltType::Point2D(v) => todo!(),
-            BoltType::Point3D(v) => todo!(),
-            BoltType::Bytes(v) => visitor.visit_bytes(&v.value),
-            BoltType::Path(v) => todo!(),
-            BoltType::Duration(v) => todo!(),
-            BoltType::Date(v) => todo!(),
-            BoltType::Time(v) => todo!(),
-            BoltType::LocalTime(v) => todo!(),
-            BoltType::DateTime(v) => todo!(),
-            BoltType::LocalDateTime(v) => todo!(),
-            BoltType::DateTimeZoneId(v) => todo!(),
-        }
-    }
-
-    forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;
 
+    use crate::types::BoltString;
+
     use super::*;
 
     #[test]
-    fn test_person() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
+    fn row_serializes_from_fields() {
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Person0 {
             name: String,
-            age: u8,
+            age: i32,
+            score: f64,
+            awesome: bool,
         }
-        let row = {
-            let name_field = BoltType::from("name");
-            let age_field = BoltType::from("age");
 
-            let fields = BoltList::from(vec![name_field, age_field]);
-
-            let name = BoltType::from("Alice");
-            let age = BoltType::from(42);
-
-            let data = BoltList::from(vec![name, age]);
-            Row::new(fields, data)
-        };
-
-        let actual = row.to::<Person>().unwrap();
-        let expected = Person {
-            name: "Alice".into(),
-            age: 42,
-        };
-
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_borrowed_person() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<'a> {
-            #[serde(borrow)]
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Person1<'a> {
             name: &'a str,
-            age: u8,
+            age: i32,
+            score: f64,
+            awesome: bool,
         }
 
-        let row = {
-            let name_field = BoltType::from("name");
-            let age_field = BoltType::from("age");
-
-            let fields = BoltList::from(vec![name_field, age_field]);
-
-            let name = BoltType::from("Alice");
-            let age = BoltType::from(42);
-
-            let data = BoltList::from(vec![name, age]);
-            Row::new(fields, data)
-        };
-
-        let actual = row.to::<Person>().unwrap();
-        let expected = Person {
-            name: "Alice",
-            age: 42,
-        };
-
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_more_types() {
         #[derive(Clone, Debug, PartialEq, Deserialize)]
-        struct Bag<'a> {
+        struct Couple<'a> {
+            p0: Person0,
             #[serde(borrow)]
-            borrowed: &'a str,
-
-            owned: String,
-
-            float: f64,
-            int: i32,
-            long: i64,
-
-            boolean: bool,
-
-            unit: (),
-        }
-
-        let row = {
-            let fields = BoltList::from(vec![
-                BoltType::from("borrowed"),
-                BoltType::from("owned"),
-                BoltType::from("float"),
-                BoltType::from("int"),
-                BoltType::from("long"),
-                BoltType::from("boolean"),
-                BoltType::from("unit"),
-            ]);
-
-            let data = BoltList::from(vec![
-                BoltType::from("I am borrowed"),
-                BoltType::from("I am cloned and owned"),
-                BoltType::from(13.37),
-                BoltType::from(42_i32),
-                BoltType::from(1337_i64),
-                BoltType::from(true),
-                BoltType::Null(BoltNull::default()),
-            ]);
-            Row::new(fields, data)
-        };
-
-        let actual = row.to::<Bag>().unwrap();
-        let expected = Bag {
-            borrowed: "I am borrowed",
-            owned: "I am cloned and owned".to_owned(),
-            float: 13.37,
-            int: 42,
-            long: 1337,
-            boolean: true,
-            unit: (),
-        };
-
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_nested_structs() {
-        #[derive(Clone, Debug, PartialEq, Deserialize)]
-        struct Person {
-            name: String,
-            age: u32,
-        }
-
-        #[derive(Clone, Debug, PartialEq, Deserialize)]
-        struct Couple {
-            p0: Person,
-            p1: Person,
+            p1: Person1<'a>,
         }
 
         let row = {
@@ -472,6 +241,8 @@ mod tests {
                     [
                         (BoltString::from("name"), BoltType::from("Alice")),
                         (BoltString::from("age"), BoltType::from(42)),
+                        (BoltString::from("score"), BoltType::from(4.2)),
+                        (BoltString::from("awesome"), BoltType::from(true)),
                     ]
                     .into_iter()
                     .collect(),
@@ -480,6 +251,8 @@ mod tests {
                     [
                         (BoltString::from("name"), BoltType::from("Bob")),
                         (BoltString::from("age"), BoltType::from(1337)),
+                        (BoltString::from("score"), BoltType::from(13.37)),
+                        (BoltString::from("awesome"), BoltType::from(false)),
                     ]
                     .into_iter()
                     .collect(),
@@ -490,13 +263,17 @@ mod tests {
 
         let actual = row.to::<Couple>().unwrap();
         let expected = Couple {
-            p0: Person {
-                name: "Alice".into(),
+            p0: Person0 {
+                name: "Alice".to_owned(),
                 age: 42,
+                score: 4.2,
+                awesome: true,
             },
-            p1: Person {
-                name: "Bob".into(),
+            p1: Person1 {
+                name: "Bob",
                 age: 1337,
+                score: 13.37,
+                awesome: false, // poor Bob
             },
         };
 

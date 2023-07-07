@@ -12,6 +12,7 @@ pub mod null;
 pub mod path;
 pub mod point;
 pub mod relation;
+pub(crate) mod serde;
 pub mod string;
 pub mod time;
 pub use binary::BoltBytes;
