@@ -90,6 +90,12 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
             BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltType::Relation(v) => {
+                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+            }
+            BoltType::UnboundedRelation(v) => {
+                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+            }
             _ => self.unexpected(visitor),
         }
     }
@@ -106,6 +112,12 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
             BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltType::Relation(v) => {
+                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+            }
+            BoltType::UnboundedRelation(v) => {
+                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+            }
             _ => self.unexpected(visitor),
         }
     }
@@ -401,7 +413,7 @@ mod tests {
     use std::borrow::Cow;
 
     use super::*;
-    use crate::types::{BoltInteger, BoltNode, BoltNull};
+    use crate::types::{BoltInteger, BoltNode, BoltNull, BoltRelation};
 
     #[test]
     fn map_with_extra_fields() {
@@ -535,6 +547,36 @@ mod tests {
             name: "Alice".to_owned(),
             age: 42,
         };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn relation() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Knows {
+            since: u16,
+        }
+
+        let id = BoltInteger::new(42);
+        let start_node_id = BoltInteger::new(13);
+        let end_node_id = BoltInteger::new(37);
+        let typ = BoltString::new("REL");
+        let properties = vec![("since".into(), 1337_u16.into())]
+            .into_iter()
+            .collect();
+
+        let relation = BoltRelation {
+            id,
+            start_node_id,
+            end_node_id,
+            typ,
+            properties,
+        };
+        let relation = BoltType::Relation(relation);
+
+        let actual = relation.to::<Knows>().unwrap();
+        let expected = Knows { since: 1337 };
 
         assert_eq!(actual, expected);
     }
