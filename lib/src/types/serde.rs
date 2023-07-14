@@ -77,6 +77,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.value {
+            BoltType::List(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter())),
             BoltType::Bytes(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter().copied())),
             _ => self.unexpected(visitor),
         }
@@ -633,6 +634,32 @@ mod tests {
                 name: "Bob".into(),
                 age: 1337,
             },
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn list() {
+        let list = BoltType::from(vec![42_i64, 1337]);
+        let actual = list.to::<Vec<i64>>().unwrap();
+
+        assert_eq!(actual, vec![42_i64, 1337]);
+    }
+
+    #[test]
+    fn nested_list() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Foo {
+            bars: Vec<i64>,
+        }
+
+        let data = [(BoltString::from("bars"), BoltType::from(vec![42, 1337]))]
+            .into_iter()
+            .collect::<BoltMap>();
+        let actual = data.to::<Foo>().unwrap();
+        let expected = Foo {
+            bars: vec![42, 1337],
         };
 
         assert_eq!(actual, expected);
