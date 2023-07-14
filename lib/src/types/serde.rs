@@ -108,6 +108,30 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         }
     }
 
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BoltType::List(v) if v.len() == len => {
+                visitor.visit_seq(SeqDeserializer::new(v.value.iter()))
+            }
+            _ => self.unexpected(visitor),
+        }
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        _name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_tuple(len, visitor)
+    }
+
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -277,7 +301,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char option newtype_struct enum identifier ignored_any tuple tuple_struct
+        char option newtype_struct enum identifier ignored_any
     }
 }
 
@@ -390,6 +414,47 @@ mod tests {
             name: "Alice".into(),
             age: 42,
         };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn tuple_struct_from_list() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person(String, u8);
+
+        let list = BoltType::from(vec![BoltType::from("Alice"), BoltType::from(42)]);
+        let actual = list.to::<Person>().unwrap();
+        let expected = Person("Alice".into(), 42);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn tuple_struct_from_map_fails() {
+        // We do not support this since maps are unordered and
+        // we cannot gurantee that the values are in the same
+        // order as the tuple struct fields.
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person(String, u8);
+
+        let map = [
+            (BoltString::from("name"), BoltType::from("Alice")),
+            (BoltString::from("age"), BoltType::from(42)),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let map = BoltType::Map(map);
+
+        assert!(map.to::<Person>().is_err());
+    }
+
+    #[test]
+    fn tuple() {
+        let list = BoltType::from(vec![BoltType::from("Alice"), BoltType::from(42)]);
+        let actual = list.to::<(String, u8)>().unwrap();
+        let expected = ("Alice".into(), 42);
 
         assert_eq!(actual, expected);
     }
