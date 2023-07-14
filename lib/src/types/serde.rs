@@ -89,6 +89,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
+            BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
             _ => self.unexpected(visitor),
         }
     }
@@ -104,6 +105,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
+            BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
             _ => self.unexpected(visitor),
         }
     }
@@ -399,7 +401,7 @@ mod tests {
     use std::borrow::Cow;
 
     use super::*;
-    use crate::types::BoltNull;
+    use crate::types::{BoltInteger, BoltNode, BoltNull};
 
     #[test]
     fn map_with_extra_fields() {
@@ -502,6 +504,39 @@ mod tests {
         let map = BoltType::Map(map);
 
         assert!(map.to::<Person>().is_err());
+    }
+
+    #[test]
+    fn node() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            name: String,
+            age: u8,
+        }
+
+        let id = BoltInteger::new(42);
+        let labels = vec!["Person".into()].into();
+        let properties = vec![
+            ("name".into(), "Alice".into()),
+            ("age".into(), 42_u16.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let node = BoltNode {
+            id,
+            labels,
+            properties,
+        };
+        let node = BoltType::Node(node);
+
+        let actual = node.to::<Person>().unwrap();
+        let expected = Person {
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
