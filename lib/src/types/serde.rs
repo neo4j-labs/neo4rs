@@ -30,8 +30,8 @@ pub enum DeError {
     #[error("{0}")]
     Error(String),
 
-    #[error("Could not convert the integer `{1}` to to target type: {0}")]
-    IntegerOutOfBounds(#[source] std::num::TryFromIntError, i64),
+    #[error("Could not convert the integer `{1}` to the target type {2}")]
+    IntegerOutOfBounds(#[source] std::num::TryFromIntError, i64, &'static str),
 }
 
 impl de::Error for DeError {
@@ -290,7 +290,11 @@ impl<'de> BoltTypeDeserializer<'de> {
         if let BoltType::Integer(v) = self.value {
             match v.value.try_into() {
                 Ok(v) => Ok((v, visitor)),
-                Err(e) => Err(DeError::IntegerOutOfBounds(e.into(), v.value)),
+                Err(e) => Err(DeError::IntegerOutOfBounds(
+                    e.into(),
+                    v.value,
+                    std::any::type_name::<T>(),
+                )),
             }
         } else {
             self.unexpected(visitor)
@@ -632,5 +636,22 @@ mod tests {
         };
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn type_convert() {
+        let i = BoltType::from(42);
+
+        assert_eq!(i.to::<i8>().unwrap(), 42);
+    }
+
+    #[test]
+    fn type_convert_error() {
+        let i = BoltType::from(1337);
+
+        assert_eq!(
+            i.to::<i8>().unwrap_err().to_string(),
+            "Could not convert the integer `1337` to the target type i8"
+        );
     }
 }
