@@ -293,6 +293,13 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         }
     }
 
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_unit()
+    }
+
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -301,7 +308,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char option newtype_struct enum identifier ignored_any
+        char option newtype_struct enum identifier
     }
 }
 
@@ -393,6 +400,53 @@ mod tests {
 
     use super::*;
     use crate::types::BoltNull;
+
+    #[test]
+    fn map_with_extra_fields() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            name: String,
+            age: u8,
+        }
+
+        let map = [
+            (BoltString::from("name"), BoltType::from("Alice")),
+            (BoltString::from("age"), BoltType::from(42)),
+            (BoltString::from("bar"), BoltType::from(1337)),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+        let map = BoltType::Map(map);
+
+        let actual = map.to::<Person>().unwrap();
+        let expected = Person {
+            name: "Alice".into(),
+            age: 42,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn map_with_extra_fields_fails_for_deny_unknown_fields() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Person {
+            name: String,
+            age: u8,
+        }
+
+        let map = [
+            (BoltString::from("name"), BoltType::from("Alice")),
+            (BoltString::from("age"), BoltType::from(42)),
+            (BoltString::from("bar"), BoltType::from(1337)),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+        let map = BoltType::Map(map);
+
+        assert!(map.to::<Person>().is_err());
+    }
 
     #[test]
     fn simple_struct() {
