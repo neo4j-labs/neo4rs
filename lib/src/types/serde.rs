@@ -2,9 +2,9 @@ use ::serde::{
     de::{self, value::StrDeserializer},
     forward_to_deserialize_any, Deserialize,
 };
-use serde::de::value::{MapDeserializer, SeqDeserializer};
+use serde::de::value::{I64Deserializer, MapDeserializer, SeqDeserializer};
 
-use crate::types::{BoltMap, BoltString, BoltType};
+use crate::types::{BoltMap, BoltNode, BoltString, BoltType};
 
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
@@ -103,7 +103,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     fn deserialize_struct<V>(
         self,
         _name: &'static str,
-        _fields: &'static [&'static str],
+        fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -111,7 +111,20 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
-            BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltType::Node(v) => {
+                let additional_fields = fields
+                    .iter()
+                    .copied()
+                    .filter(|f| !v.properties.value.contains_key(*f))
+                    .map(|f| (f, NodeData::Additional(v)));
+                let property_fields = v
+                    .properties
+                    .value
+                    .iter()
+                    .map(|(k, v)| (k.value.as_str(), NodeData::Property(v)));
+                let node_fields = property_fields.chain(additional_fields);
+                visitor.visit_map(MapDeserializer::new(node_fields))
+            }
             BoltType::Relation(v) => {
                 visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
             }
@@ -391,6 +404,585 @@ impl<'de> BoltTypeDeserializer<'de> {
     }
 }
 
+enum NodeData<'de> {
+    Property(&'de BoltType),
+    Additional(&'de BoltNode),
+}
+
+impl<'de> de::IntoDeserializer<'de, DeError> for NodeData<'de> {
+    type Deserializer = NodeDataDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        match self {
+            NodeData::Property(v) => NodeDataDeserializer::Property(BoltTypeDeserializer::new(v)),
+            NodeData::Additional(v) => {
+                NodeDataDeserializer::Additional(AddidtionalNodeDataDeserializer { node: v })
+            }
+        }
+    }
+}
+
+enum NodeDataDeserializer<'de> {
+    Property(BoltTypeDeserializer<'de>),
+    Additional(AddidtionalNodeDataDeserializer<'de>),
+}
+
+impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
+    type Error = DeError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_any(visitor),
+            Self::Additional(v) => v.deserialize_any(visitor),
+        }
+    }
+
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_bool(visitor),
+            Self::Additional(v) => v.deserialize_bool(visitor),
+        }
+    }
+
+    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_i8(visitor),
+            Self::Additional(v) => v.deserialize_i8(visitor),
+        }
+    }
+
+    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_i16(visitor),
+            Self::Additional(v) => v.deserialize_i16(visitor),
+        }
+    }
+
+    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_i32(visitor),
+            Self::Additional(v) => v.deserialize_i32(visitor),
+        }
+    }
+
+    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_i64(visitor),
+            Self::Additional(v) => v.deserialize_i64(visitor),
+        }
+    }
+
+    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_u8(visitor),
+            Self::Additional(v) => v.deserialize_u8(visitor),
+        }
+    }
+
+    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_u16(visitor),
+            Self::Additional(v) => v.deserialize_u16(visitor),
+        }
+    }
+
+    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_u32(visitor),
+            Self::Additional(v) => v.deserialize_u32(visitor),
+        }
+    }
+
+    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_u64(visitor),
+            Self::Additional(v) => v.deserialize_u64(visitor),
+        }
+    }
+
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_f32(visitor),
+            Self::Additional(v) => v.deserialize_f32(visitor),
+        }
+    }
+
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_f64(visitor),
+            Self::Additional(v) => v.deserialize_f64(visitor),
+        }
+    }
+
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_char(visitor),
+            Self::Additional(v) => v.deserialize_char(visitor),
+        }
+    }
+
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_str(visitor),
+            Self::Additional(v) => v.deserialize_str(visitor),
+        }
+    }
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_string(visitor),
+            Self::Additional(v) => v.deserialize_string(visitor),
+        }
+    }
+
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_bytes(visitor),
+            Self::Additional(v) => v.deserialize_bytes(visitor),
+        }
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_byte_buf(visitor),
+            Self::Additional(v) => v.deserialize_byte_buf(visitor),
+        }
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_option(visitor),
+            Self::Additional(v) => v.deserialize_option(visitor),
+        }
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_unit(visitor),
+            Self::Additional(v) => v.deserialize_unit(visitor),
+        }
+    }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_unit_struct(name, visitor),
+            Self::Additional(v) => v.deserialize_unit_struct(name, visitor),
+        }
+    }
+
+    fn deserialize_newtype_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_newtype_struct(name, visitor),
+            Self::Additional(v) => v.deserialize_newtype_struct(name, visitor),
+        }
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_seq(visitor),
+            Self::Additional(v) => v.deserialize_seq(visitor),
+        }
+    }
+
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_tuple(len, visitor),
+            Self::Additional(v) => v.deserialize_tuple(len, visitor),
+        }
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_tuple_struct(name, len, visitor),
+            Self::Additional(v) => v.deserialize_tuple_struct(name, len, visitor),
+        }
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_map(visitor),
+            Self::Additional(v) => v.deserialize_map(visitor),
+        }
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_struct(name, fields, visitor),
+            Self::Additional(v) => v.deserialize_struct(name, fields, visitor),
+        }
+    }
+
+    fn deserialize_enum<V>(
+        self,
+        name: &'static str,
+        variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_enum(name, variants, visitor),
+            Self::Additional(v) => v.deserialize_enum(name, variants, visitor),
+        }
+    }
+
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_identifier(visitor),
+            Self::Additional(v) => v.deserialize_identifier(visitor),
+        }
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self {
+            Self::Property(v) => v.deserialize_ignored_any(visitor),
+            Self::Additional(v) => v.deserialize_ignored_any(visitor),
+        }
+    }
+}
+
+#[allow(unused)]
+struct AddidtionalNodeDataDeserializer<'de> {
+    node: &'de BoltNode,
+}
+
+#[allow(unused)]
+impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
+    type Error = DeError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_newtype_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match name {
+            "Id" => visitor.visit_newtype_struct(I64Deserializer::new(self.node.id.value)),
+            _ => Err(de::Error::unknown_field(name, &["Id"])),
+        }
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_enum<V>(
+        self,
+        name: &'static str,
+        variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        todo!()
+    }
+}
+
 trait FromFloat {
     fn from_float(f: f64) -> Self;
 }
@@ -544,6 +1136,45 @@ mod tests {
 
         let actual = node.to::<Person>().unwrap();
         let expected = Person {
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+
+    #[test]
+    fn extract_node_id_with_own_type() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Id(i16);
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            id: Id,
+            name: String,
+            age: u8,
+        }
+
+        let id = BoltInteger::new(1337);
+        let labels = vec!["Person".into()].into();
+        let properties = vec![
+            ("name".into(), "Alice".into()),
+            ("age".into(), 42_u16.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let node = BoltNode {
+            id,
+            labels,
+            properties,
+        };
+        let node = BoltType::Node(node);
+
+        let actual = node.to::<Person>().unwrap();
+        let expected = Person {
+            id: Id(1337),
             name: "Alice".to_owned(),
             age: 42,
         };
