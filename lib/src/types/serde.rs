@@ -12,6 +12,10 @@ use crate::types::{BoltMap, BoltNode, BoltString, BoltType};
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
 pub struct Id(pub u64);
 
+/// Newtype to extract the node labels during deserialization.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
+pub struct Labels(pub Vec<String>);
+
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
@@ -1110,6 +1114,11 @@ mod tests {
         }
 
         test_extract_node_id(Id { id: 1337.into() });
+    }
+
+    #[test]
+    fn extract_node_labels() {
+        test_extract_node_labels(Labels(vec!["Person".to_owned()]));
     }
 
     #[test]
