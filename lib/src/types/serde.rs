@@ -1223,10 +1223,7 @@ mod tests {
             (BoltString::from("int"), BoltType::from(42_i32)),
             (BoltString::from("long"), BoltType::from(1337_i64)),
             (BoltString::from("boolean"), BoltType::from(true)),
-            (
-                BoltString::from("unit"),
-                BoltType::Null(BoltNull::default()),
-            ),
+            (BoltString::from("unit"), BoltType::Null(BoltNull)),
         ]
         .into_iter()
         .collect::<BoltMap>();
