@@ -1,3 +1,5 @@
+use std::iter;
+
 use ::serde::{
     de::{self, value::StrDeserializer},
     forward_to_deserialize_any, Deserialize,
@@ -753,153 +755,45 @@ struct AddidtionalNodeDataDeserializer<'de> {
     node: &'de BoltNode,
 }
 
+enum Visitation {
+    Newtype,
+    Tuple,
+    Struct(&'static str),
+}
+
+impl<'de> AddidtionalNodeDataDeserializer<'de> {
+    fn deserialize_any_struct<V>(
+        self,
+        name: &str,
+        visitor: V,
+        visitation: Visitation,
+    ) -> Result<V::Value, DeError>
+    where
+        V: de::Visitor<'de>,
+    {
+        match name {
+            "Id" => match visitation {
+                Visitation::Newtype => {
+                    visitor.visit_newtype_struct(I64Deserializer::new(self.node.id.value))
+                }
+                Visitation::Tuple => {
+                    Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(self.node.id.value))))?
+                }
+                Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
+                    iter::once((field, self.node.id.value)),
+                ))?),
+            },
+            _ => Err(de::Error::invalid_type(
+                de::Unexpected::Other(&format!("struct {}", name)),
+                &"struct `Id`",
+            )),
+        }
+    }
+}
+
 #[allow(unused)]
 impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     type Error = DeError;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_unit_struct<V>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
 
     fn deserialize_newtype_struct<V>(
         self,
@@ -909,24 +803,7 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match name {
-            "Id" => visitor.visit_newtype_struct(I64Deserializer::new(self.node.id.value)),
-            _ => Err(de::Error::unknown_field(name, &["Id"])),
-        }
-    }
-
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+        self.deserialize_any_struct(name, visitor, Visitation::Newtype)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -938,14 +815,14 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
-    }
-
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+        if len == 1 {
+            self.deserialize_any_struct(name, visitor, Visitation::Tuple)
+        } else {
+            Err(de::Error::invalid_length(
+                len,
+                &format!("tuple struct {} with 1 element", name).as_str(),
+            ))
+        }
     }
 
     fn deserialize_struct<V>(
@@ -957,33 +834,49 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match fields {
+            [field] => self.deserialize_any_struct(name, visitor, Visitation::Struct(field)),
+            _ => Err(de::Error::invalid_length(fields.len(), &"1")),
+        }
     }
 
-    fn deserialize_enum<V>(
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_unit()
+    }
+
+    fn deserialize_unit_struct<V>(
         self,
         name: &'static str,
-        variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        todo!()
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+        visitor.visit_unit()
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        visitor.visit_unit()
+    }
+
+    forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option seq tuple map enum identifier
+    }
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        Err(de::Error::custom(
+            "deserializing node id or labels requires a struct",
+        ))
     }
 }
 
@@ -1006,7 +899,12 @@ impl FromFloat for f64 {
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;
-    use std::borrow::Cow;
+    use std::{
+        borrow::Cow,
+        fmt::Debug,
+        marker::PhantomData,
+        sync::atomic::{AtomicU32, Ordering},
+    };
 
     use super::*;
     use crate::types::{BoltInteger, BoltNode, BoltNull, BoltRelation};
@@ -1148,52 +1046,70 @@ mod tests {
     }
 
     #[test]
-    fn extract_node_id() {
+    fn extract_node_with_unit_types() {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            id: Id,
+        struct Person<T> {
             name: String,
             age: u8,
+            _t: PhantomData<T>,
+            _u: (),
         }
 
-        let id = BoltInteger::new(1337);
-        let labels = vec!["Person".into()].into();
-        let properties = vec![
-            ("name".into(), "Alice".into()),
-            ("age".into(), 42_u16.into()),
-        ]
-        .into_iter()
-        .collect();
-
-        let node = BoltNode {
-            id,
-            labels,
-            properties,
-        };
-        let node = BoltType::Node(node);
-
-        let actual = node.to::<Person>().unwrap();
-        let expected = Person {
-            id: Id(1337),
+        test_extract_node(Person {
             name: "Alice".to_owned(),
             age: 42,
-        };
-
-        assert_eq!(actual, expected);
+            _t: PhantomData::<i32>,
+            _u: (),
+        });
     }
 
     #[test]
-    fn extract_node_id_with_own_type() {
+    fn extract_node_id() {
+        test_extract_node_id(Id(1337));
+    }
+
+    #[test]
+    fn extract_node_id_with_custom_newtype() {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Id(i16);
 
+        test_extract_node_id(Id(1337));
+    }
+
+    #[test]
+    fn extract_node_id_with_custom_struct() {
+        #[derive(Debug, Deserialize)]
+        struct Id {
+            id: AtomicU32,
+        }
+
+        impl PartialEq for Id {
+            fn eq(&self, other: &Self) -> bool {
+                self.id.load(Ordering::SeqCst) == other.id.load(Ordering::SeqCst)
+            }
+        }
+
+        test_extract_node_id(Id { id: 1337.into() });
+    }
+
+    fn test_extract_node_id<T: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: T) {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            id: Id,
+        struct Person<T> {
+            id: T,
             name: String,
             age: u8,
         }
 
+        let expected = Person {
+            id: expected,
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+
+        test_extract_node(expected);
+    }
+
+    fn test_extract_node<Person: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: Person) {
         let id = BoltInteger::new(1337);
         let labels = vec!["Person".into()].into();
         let properties = vec![
@@ -1211,11 +1127,6 @@ mod tests {
         let node = BoltType::Node(node);
 
         let actual = node.to::<Person>().unwrap();
-        let expected = Person {
-            id: Id(1337),
-            name: "Alice".to_owned(),
-            age: 42,
-        };
 
         assert_eq!(actual, expected);
     }
