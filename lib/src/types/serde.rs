@@ -771,6 +771,16 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
+        struct LabelsDeserializer<'de>(std::slice::Iter<'de, BoltType>);
+
+        impl<'de> de::IntoDeserializer<'de, DeError> for LabelsDeserializer<'de> {
+            type Deserializer = SeqDeserializer<std::slice::Iter<'de, BoltType>, DeError>;
+
+            fn into_deserializer(self) -> Self::Deserializer {
+                SeqDeserializer::new(self.0)
+            }
+        }
+
         match name {
             "Id" => match visitation {
                 Visitation::Newtype => {
@@ -783,9 +793,19 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
                     iter::once((field, self.node.id.value)),
                 ))?),
             },
+            "Labels" => match visitation {
+                Visitation::Newtype => visitor
+                    .visit_newtype_struct(SeqDeserializer::new(self.node.labels.value.iter())),
+                Visitation::Tuple => Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(
+                    LabelsDeserializer(self.node.labels.value.iter()),
+                ))))?,
+                Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
+                    iter::once((field, LabelsDeserializer(self.node.labels.value.iter()))),
+                ))?),
+            },
             _ => Err(de::Error::invalid_type(
                 de::Unexpected::Other(&format!("struct {}", name)),
-                &"struct `Id`",
+                &"struct `Id` or struct `Labels`",
             )),
         }
     }
@@ -1092,6 +1112,65 @@ mod tests {
         test_extract_node_id(Id { id: 1337.into() });
     }
 
+    #[test]
+    fn extract_node_labels_with_custom_newtype() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Labels([String; 1]);
+
+        test_extract_node_labels(Labels(["Person".to_owned()]));
+    }
+
+    #[test]
+    fn extract_node_labels_with_custom_struct() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Labels {
+            labels: Vec<String>,
+        }
+
+        test_extract_node_labels(Labels {
+            labels: vec!["Person".to_owned()],
+        });
+    }
+
+    #[test]
+    fn extract_node_labels_borrowed() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Labels<'a>(#[serde(borrow)] Vec<&'a str>);
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person<'a> {
+            #[serde(borrow)]
+            labels: Labels<'a>,
+            name: String,
+            age: u8,
+        }
+
+        let expected = Person {
+            labels: Labels(vec!["Person"]),
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+        let id = BoltInteger::new(1337);
+        let labels = vec!["Person".into()].into();
+        let properties = vec![
+            ("name".into(), "Alice".into()),
+            ("age".into(), 42_u16.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let node = BoltNode {
+            id,
+            labels,
+            properties,
+        };
+        let node = BoltType::Node(node);
+
+        let actual = node.to::<Person>().unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
     fn test_extract_node_id<T: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: T) {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Person<T> {
@@ -1102,6 +1181,23 @@ mod tests {
 
         let expected = Person {
             id: expected,
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+
+        test_extract_node(expected);
+    }
+
+    fn test_extract_node_labels<T: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: T) {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person<T> {
+            labels: T,
+            name: String,
+            age: u8,
+        }
+
+        let expected = Person {
+            labels: expected,
             name: "Alice".to_owned(),
             age: 42,
         };
