@@ -6,6 +6,10 @@ use serde::de::value::{I64Deserializer, MapDeserializer, SeqDeserializer};
 
 use crate::types::{BoltMap, BoltNode, BoltString, BoltType};
 
+/// Newtype to extract the node id during deserialization.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
+pub struct Id(pub u64);
+
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
@@ -1143,6 +1147,40 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    #[test]
+    fn extract_node_id() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            id: Id,
+            name: String,
+            age: u8,
+        }
+
+        let id = BoltInteger::new(1337);
+        let labels = vec!["Person".into()].into();
+        let properties = vec![
+            ("name".into(), "Alice".into()),
+            ("age".into(), 42_u16.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let node = BoltNode {
+            id,
+            labels,
+            properties,
+        };
+        let node = BoltType::Node(node);
+
+        let actual = node.to::<Person>().unwrap();
+        let expected = Person {
+            id: Id(1337),
+            name: "Alice".to_owned(),
+            age: 42,
+        };
+
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn extract_node_id_with_own_type() {
