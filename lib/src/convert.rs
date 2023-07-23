@@ -366,6 +366,15 @@ impl From<&str> for BoltType {
     }
 }
 
+impl<T: Into<BoltType>> From<Option<T>> for BoltType {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(v) => v.into(),
+            None => BoltType::Null(BoltNull),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,5 +431,23 @@ mod tests {
                 ],
             })
         );
+    }
+
+    #[test]
+    fn convert_from_option() {
+        let value: Option<Vec<i64>> = Some(vec![42, 1337]);
+        let value: BoltType = value.into();
+        assert_eq!(
+            value,
+            BoltType::List(BoltList {
+                value: vec![
+                    BoltType::Integer(BoltInteger::new(42)),
+                    BoltType::Integer(BoltInteger::new(1337)),
+                ],
+            })
+        );
+        let value: Option<Vec<i64>> = None;
+        let value: BoltType = value.into();
+        assert_eq!(value, BoltType::Null(BoltNull));
     }
 }
