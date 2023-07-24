@@ -120,6 +120,7 @@ impl Row {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.attributes.get(key)
     }
+    
 }
 
 impl Node {
@@ -201,5 +202,14 @@ impl UnboundedRelation {
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
+    }
+
+    /// Get the keys for the relationships's attributes
+    pub fn keys(&self) -> Vec<String> {
+        self.inner.keys().into_iter().map(
+            |key: BoltString| -> String {
+                key.to_string()
+            }
+        ).collect::<Vec<String>>()
     }
 }
