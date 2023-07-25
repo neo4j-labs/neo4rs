@@ -100,6 +100,6 @@ mod tests {
         assert_eq!(q.params.get::<i64>("age").unwrap(), 42);
 
         assert!(q.has_param_key("name"));
-        assert!(q.has_param_key("country") == false);
+        assert!(!q.has_param_key("country"));
     }
 }
