@@ -39,6 +39,10 @@ impl Query {
         self
     }
 
+    pub fn has_param_key(&self, key: &str) -> bool {
+        self.params.value.contains_key(key)
+    }
+
     pub(crate) async fn run(
         self,
         config: &Config,
@@ -94,5 +98,8 @@ mod tests {
             String::from("Frobniscante")
         );
         assert_eq!(q.params.get::<i64>("age").unwrap(), 42);
+
+        assert!(q.has_param_key("name"));
+        assert!(!q.has_param_key("country"));
     }
 }
