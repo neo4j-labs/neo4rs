@@ -1,4 +1,10 @@
-use crate::types::*;
+use crate::types::serde::DeError;
+use crate::types::{
+    BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation, BoltType,
+    BoltUnboundedRelation,
+};
+
+use serde::Deserialize;
 use std::convert::TryInto;
 
 /// Represents a row returned as a result of executing a query.
@@ -120,6 +126,13 @@ impl Row {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.attributes.get(key)
     }
+
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.attributes.to::<T>()
+    }
 }
 
 impl Node {
@@ -184,5 +197,97 @@ impl UnboundedRelation {
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use crate::types::BoltString;
+
+    use super::*;
+
+    #[test]
+    fn row_serializes_from_fields() {
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Person0 {
+            name: String,
+            age: i32,
+            score: f64,
+            awesome: bool,
+            #[serde(with = "serde_bytes")]
+            data: Vec<u8>,
+        }
+
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Person1<'a> {
+            name: &'a str,
+            age: i32,
+            score: f64,
+            awesome: bool,
+            #[serde(with = "serde_bytes")]
+            data: &'a [u8],
+        }
+
+        #[derive(Clone, Debug, PartialEq, Deserialize)]
+        struct Couple<'a> {
+            p0: Person0,
+            #[serde(borrow)]
+            p1: Person1<'a>,
+        }
+
+        let row = {
+            let fields = BoltList::from(vec![BoltType::from("p0"), BoltType::from("p1")]);
+
+            let data = BoltList::from(vec![
+                BoltType::Map(
+                    [
+                        (BoltString::from("name"), BoltType::from("Alice")),
+                        (BoltString::from("age"), BoltType::from(42)),
+                        (BoltString::from("score"), BoltType::from(4.2)),
+                        (BoltString::from("awesome"), BoltType::from(true)),
+                        (BoltString::from("data"), BoltType::from(vec![4_u8, 2])),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                BoltType::Map(
+                    [
+                        (BoltString::from("name"), BoltType::from("Bob")),
+                        (BoltString::from("age"), BoltType::from(1337)),
+                        (BoltString::from("score"), BoltType::from(13.37)),
+                        (BoltString::from("awesome"), BoltType::from(false)),
+                        (
+                            BoltString::from("data"),
+                            BoltType::from(vec![1_u8, 3, 3, 7]),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ]);
+            Row::new(fields, data)
+        };
+
+        let actual = row.to::<Couple>().unwrap();
+        let expected = Couple {
+            p0: Person0 {
+                name: "Alice".to_owned(),
+                age: 42,
+                score: 4.2,
+                awesome: true,
+                data: vec![4, 2],
+            },
+            p1: Person1 {
+                name: "Bob",
+                age: 1337,
+                score: 13.37,
+                awesome: false, // poor Bob
+                data: &[1, 3, 3, 7],
+            },
+        };
+
+        assert_eq!(actual, expected);
     }
 }

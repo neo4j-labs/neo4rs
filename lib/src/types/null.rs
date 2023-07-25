@@ -18,7 +18,7 @@ mod tests {
 
     #[test]
     fn should_serialize_null() {
-        let null = BoltNull::default();
+        let null = BoltNull;
         let b: Bytes = null.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[0xC0]);
     }

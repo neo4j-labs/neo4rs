@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::convert::From;
 use std::fmt::Display;
@@ -25,7 +26,7 @@ impl BoltString {
     }
 
     pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
-        let marker = input.borrow()[0];
+        let marker = (*input).borrow()[0];
         (TINY..=(TINY | 0x0F)).contains(&marker)
             || marker == SMALL
             || marker == MEDIUM
@@ -54,6 +55,11 @@ impl From<String> for BoltString {
 impl From<BoltString> for String {
     fn from(value: BoltString) -> Self {
         value.value
+    }
+}
+impl Borrow<str> for BoltString {
+    fn borrow(&self) -> &str {
+        &self.value
     }
 }
 
