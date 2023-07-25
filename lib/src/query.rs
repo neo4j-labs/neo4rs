@@ -40,7 +40,7 @@ impl Query {
     }
 
     pub fn has_param_key(&self, key: &str) -> bool {
-        self.params.value.contains_key(&key.into())
+        self.params.value.contains_key(key)
     }
 
     pub(crate) async fn run(
