@@ -16,5 +16,6 @@ async fn unbounded_relationships() {
     assert!(relation.start_node_id() > -1);
     assert!(relation.end_node_id() > -1);
     assert_eq!(relation.typ(), "RELATED");
+    assert_eq!(relation.keys(), vec!["as"]);
     assert_eq!(relation.get::<String>("as").unwrap(), "friend");
 }

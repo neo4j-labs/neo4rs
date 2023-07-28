@@ -20,9 +20,11 @@ async fn nodes() {
         let node: Node = row.get("friend").unwrap();
         let id = node.id();
         let labels = node.labels();
+        let keys = node.keys();
         let name: String = node.get("name").unwrap();
         assert_eq!(name, "Mr Mark");
         assert_eq!(labels, vec!["Person"]);
+        assert_eq!(keys, vec!["name"]);
         assert!(id >= 0);
     }
 }

@@ -149,6 +149,11 @@ impl Node {
         self.inner.labels.iter().map(|l| l.to_string()).collect()
     }
 
+    /// Get the names of the attributes of this node
+    pub fn keys(&self) -> Vec<&str> {
+        self.to::<crate::Keys<_>>().unwrap().0
+    }
+
     /// Get the attributes of the node
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
@@ -184,6 +189,11 @@ impl Relation {
         self.inner.typ.value.clone()
     }
 
+    /// Get the names of the attributes of this relationship
+    pub fn keys(&self) -> Vec<&str> {
+        self.to::<crate::Keys<_>>().unwrap().0
+    }
+
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
     }
@@ -208,6 +218,11 @@ impl UnboundedRelation {
 
     pub fn typ(&self) -> String {
         self.inner.typ.value.clone()
+    }
+
+    /// Get the names of the attributes of this relationship
+    pub fn keys(&self) -> Vec<&str> {
+        self.to::<crate::Keys<_>>().unwrap().0
     }
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
