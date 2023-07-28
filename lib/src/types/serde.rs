@@ -5,11 +5,11 @@ use crate::types::{
 use serde::{
     de::{
         value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
-        Deserializer, Error, IntoDeserializer, Unexpected, Visitor,
+        Deserializer, Error, Expected, IntoDeserializer, Unexpected as Unexp, Visitor,
     },
     forward_to_deserialize_any, Deserialize,
 };
-use std::{collections::HashSet, iter, marker::PhantomData};
+use std::{collections::HashSet, fmt, iter, marker::PhantomData, sync::Arc};
 
 /// Newtype to extract the node id or relationship id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
@@ -83,11 +83,191 @@ impl BoltType {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DeError {
+    /// Raised when a `Deserialize` receives a type different from what it was
+    /// expecting.
+    #[error("Invalid type: {received}, expected {expected}")]
+    InvalidType {
+        received: Unexpected,
+        expected: String,
+    },
+
+    /// Raised when a `Deserialize` receives a value of the right type but that
+    /// is wrong for some other reason.
+    #[error("Invalid value: {received}, expected {expected}")]
+    InvalidValue {
+        received: Unexpected,
+        expected: String,
+    },
+
+    /// Raised when deserializing a sequence or map and the input data contains
+    /// too many or too few elements.
+    #[error("Invalid length {received}, expected {expected}")]
+    InvalidLength { received: usize, expected: String },
+
+    /// Raised when a `Deserialize` enum type received a variant with an
+    /// unrecognized name.
+    #[error("Unknown variant `{variant}`, expected {expected:?}")]
+    UnknownVariant {
+        variant: String,
+        expected: &'static [&'static str],
+    },
+
+    /// Raised when a `Deserialize` struct type received a field with an
+    /// unrecognized name.
+    #[error("Unknown field `{field}`, expected {expected:?}")]
+    UnknownField {
+        field: String,
+        expected: &'static [&'static str],
+    },
+
+    /// Raised when a `Deserialize` struct type expected to receive a required
+    /// field with a particular name but that field was not present in the
+    /// input.
+    #[error("Missing field `{field}`")]
+    MissingField { field: &'static str },
+
+    /// Raised when a `Deserialize` struct type received more than one of the
+    /// same field.
+    #[error("Duplicate field `{field}`")]
+    DuplicateField { field: &'static str },
+
+    #[error("The property `{0}` does not exist")]
+    NoSuchProperty(String),
+
     #[error("{0}")]
-    Error(String),
+    Other(String),
 
     #[error("Could not convert the integer `{1}` to the target type {2}")]
     IntegerOutOfBounds(#[source] std::num::TryFromIntError, i64, &'static str),
+}
+
+/// `Unexpected` represents an unexpected invocation of any one of the `Visitor`
+/// trait methods.
+///
+/// This mirrors the [`serde::de::Unexpected`] type, but uses owned types
+/// instead of borrowed types.
+///
+/// The owned typed in question are `String` and `Vec<u8>`, which are stored
+/// as `Arc<str>` and `Arc<[u8]>` respectively, so that this type is cheap-ish
+/// to clone and can be shared between threads.
+#[derive(Clone, PartialEq, Debug)]
+pub enum Unexpected {
+    /// The input contained a boolean value that was not expected.
+    Bool(bool),
+
+    /// The input contained an unsigned integer `u8`, `u16`, `u32` or `u64` that
+    /// was not expected.
+    Unsigned(u64),
+
+    /// The input contained a signed integer `i8`, `i16`, `i32` or `i64` that
+    /// was not expected.
+    Signed(i64),
+
+    /// The input contained a floating point `f32` or `f64` that was not
+    /// expected.
+    Float(f64),
+
+    /// The input contained a `char` that was not expected.
+    Char(char),
+
+    /// The input contained a `&str` or `String` that was not expected.
+    Str(Arc<str>),
+
+    /// The input contained a `&[u8]` or `Vec<u8>` that was not expected.
+    Bytes(Arc<[u8]>),
+
+    /// The input contained a unit `()` that was not expected.
+    Unit,
+
+    /// The input contained an `Option<T>` that was not expected.
+    Option,
+
+    /// The input contained a newtype struct that was not expected.
+    NewtypeStruct,
+
+    /// The input contained a sequence that was not expected.
+    Seq,
+
+    /// The input contained a map that was not expected.
+    Map,
+
+    /// The input contained an enum that was not expected.
+    Enum,
+
+    /// The input contained a unit variant that was not expected.
+    UnitVariant,
+
+    /// The input contained a newtype variant that was not expected.
+    NewtypeVariant,
+
+    /// The input contained a tuple variant that was not expected.
+    TupleVariant,
+
+    /// The input contained a struct variant that was not expected.
+    StructVariant,
+
+    /// A message stating what uncategorized thing the input contained that was
+    /// not expected.
+    ///
+    /// The message should be a noun or noun phrase, not capitalized and without
+    /// a period. An example message is "unoriginal superhero".
+    Other(Arc<str>),
+}
+
+impl From<Unexp<'_>> for Unexpected {
+    fn from(value: Unexp<'_>) -> Self {
+        match value {
+            Unexp::Bool(v) => Self::Bool(v),
+            Unexp::Unsigned(v) => Self::Unsigned(v),
+            Unexp::Signed(v) => Self::Signed(v),
+            Unexp::Float(v) => Self::Float(v),
+            Unexp::Char(v) => Self::Char(v),
+            Unexp::Str(v) => Self::Str(v.into()),
+            Unexp::Bytes(v) => Self::Bytes(v.into()),
+            Unexp::Unit => Self::Unit,
+            Unexp::Option => Self::Option,
+            Unexp::NewtypeStruct => Self::NewtypeStruct,
+            Unexp::Seq => Self::Seq,
+            Unexp::Map => Self::Map,
+            Unexp::Enum => Self::Enum,
+            Unexp::UnitVariant => Self::UnitVariant,
+            Unexp::NewtypeVariant => Self::NewtypeVariant,
+            Unexp::TupleVariant => Self::TupleVariant,
+            Unexp::StructVariant => Self::StructVariant,
+            Unexp::Other(v) => Self::Other(v.into()),
+        }
+    }
+}
+
+impl Unexpected {
+    fn into(&self) -> Unexp<'_> {
+        match self {
+            Unexpected::Bool(v) => Unexp::Bool(*v),
+            Unexpected::Unsigned(v) => Unexp::Unsigned(*v),
+            Unexpected::Signed(v) => Unexp::Signed(*v),
+            Unexpected::Float(v) => Unexp::Float(*v),
+            Unexpected::Char(v) => Unexp::Char(*v),
+            Unexpected::Str(v) => Unexp::Str(v),
+            Unexpected::Bytes(v) => Unexp::Bytes(v),
+            Unexpected::Unit => Unexp::Unit,
+            Unexpected::Option => Unexp::Option,
+            Unexpected::NewtypeStruct => Unexp::NewtypeStruct,
+            Unexpected::Seq => Unexp::Seq,
+            Unexpected::Map => Unexp::Map,
+            Unexpected::Enum => Unexp::Enum,
+            Unexpected::UnitVariant => Unexp::UnitVariant,
+            Unexpected::NewtypeVariant => Unexp::NewtypeVariant,
+            Unexpected::TupleVariant => Unexp::TupleVariant,
+            Unexpected::StructVariant => Unexp::StructVariant,
+            Unexpected::Other(v) => Unexp::Other(v),
+        }
+    }
+}
+
+impl fmt::Display for Unexpected {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        self.into().fmt(formatter)
+    }
 }
 
 pub struct BoltTypeDeserializer<'de> {
@@ -460,33 +640,33 @@ impl<'de> BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         let typ = match self.value {
-            BoltRef::Type(BoltType::String(v)) => Unexpected::Str(&v.value),
-            BoltRef::Type(BoltType::Boolean(v)) => Unexpected::Bool(v.value),
-            BoltRef::Type(BoltType::Map(_)) => Unexpected::Map,
-            BoltRef::Type(BoltType::Null(_)) => Unexpected::Unit,
-            BoltRef::Type(BoltType::Integer(v)) => Unexpected::Signed(v.value),
-            BoltRef::Type(BoltType::Float(v)) => Unexpected::Float(v.value),
-            BoltRef::Type(BoltType::List(_)) => Unexpected::Seq,
-            BoltRef::Type(BoltType::Node(_)) => Unexpected::Map,
-            BoltRef::Node(_) => Unexpected::Map,
-            BoltRef::Type(BoltType::Relation(_)) => Unexpected::Map,
-            BoltRef::Rel(_) => Unexpected::Map,
-            BoltRef::Type(BoltType::UnboundedRelation(_)) => Unexpected::Map,
-            BoltRef::URel(_) => Unexpected::Map,
-            BoltRef::Type(BoltType::Point2D(_)) => Unexpected::Other("Point2D"),
-            BoltRef::Type(BoltType::Point3D(_)) => Unexpected::Other("Point3D"),
-            BoltRef::Type(BoltType::Bytes(v)) => Unexpected::Bytes(&v.value),
-            BoltRef::Type(BoltType::Path(_)) => Unexpected::Other("Path"),
-            BoltRef::Type(BoltType::Duration(_)) => Unexpected::Other("Duration"),
-            BoltRef::Type(BoltType::Date(_)) => Unexpected::Other("Date"),
-            BoltRef::Type(BoltType::Time(_)) => Unexpected::Other("Time"),
-            BoltRef::Type(BoltType::LocalTime(_)) => Unexpected::Other("LocalTime"),
-            BoltRef::Type(BoltType::DateTime(_)) => Unexpected::Other("DateTime"),
-            BoltRef::Type(BoltType::LocalDateTime(_)) => Unexpected::Other("LocalDateTime"),
-            BoltRef::Type(BoltType::DateTimeZoneId(_)) => Unexpected::Other("DateTimeZoneId"),
+            BoltRef::Type(BoltType::String(v)) => Unexp::Str(&v.value),
+            BoltRef::Type(BoltType::Boolean(v)) => Unexp::Bool(v.value),
+            BoltRef::Type(BoltType::Map(_)) => Unexp::Map,
+            BoltRef::Type(BoltType::Null(_)) => Unexp::Unit,
+            BoltRef::Type(BoltType::Integer(v)) => Unexp::Signed(v.value),
+            BoltRef::Type(BoltType::Float(v)) => Unexp::Float(v.value),
+            BoltRef::Type(BoltType::List(_)) => Unexp::Seq,
+            BoltRef::Type(BoltType::Node(_)) => Unexp::Map,
+            BoltRef::Node(_) => Unexp::Map,
+            BoltRef::Type(BoltType::Relation(_)) => Unexp::Map,
+            BoltRef::Rel(_) => Unexp::Map,
+            BoltRef::Type(BoltType::UnboundedRelation(_)) => Unexp::Map,
+            BoltRef::URel(_) => Unexp::Map,
+            BoltRef::Type(BoltType::Point2D(_)) => Unexp::Other("Point2D"),
+            BoltRef::Type(BoltType::Point3D(_)) => Unexp::Other("Point3D"),
+            BoltRef::Type(BoltType::Bytes(v)) => Unexp::Bytes(&v.value),
+            BoltRef::Type(BoltType::Path(_)) => Unexp::Other("Path"),
+            BoltRef::Type(BoltType::Duration(_)) => Unexp::Other("Duration"),
+            BoltRef::Type(BoltType::Date(_)) => Unexp::Other("Date"),
+            BoltRef::Type(BoltType::Time(_)) => Unexp::Other("Time"),
+            BoltRef::Type(BoltType::LocalTime(_)) => Unexp::Other("LocalTime"),
+            BoltRef::Type(BoltType::DateTime(_)) => Unexp::Other("DateTime"),
+            BoltRef::Type(BoltType::LocalDateTime(_)) => Unexp::Other("LocalDateTime"),
+            BoltRef::Type(BoltType::DateTimeZoneId(_)) => Unexp::Other("DateTimeZoneId"),
         };
 
-        Err(Error::invalid_type(typ, &visitor))
+        Err(DeError::invalid_type(typ, &visitor))
     }
 }
 
@@ -531,7 +711,7 @@ impl<'de, T: AdditionalData<'de>> Deserializer<'de> for AdditionalDataDeserializ
         if len == 1 {
             self.deserialize_any_struct(name, visitor, Visitation::Tuple)
         } else {
-            Err(Error::invalid_length(
+            Err(DeError::invalid_length(
                 len,
                 &format!("tuple struct {} with 1 element", name).as_str(),
             ))
@@ -549,7 +729,7 @@ impl<'de, T: AdditionalData<'de>> Deserializer<'de> for AdditionalDataDeserializ
     {
         match fields {
             [field] => self.deserialize_any_struct(name, visitor, Visitation::Struct(field)),
-            _ => Err(Error::invalid_length(fields.len(), &"1")),
+            _ => Err(DeError::invalid_length(fields.len(), &"1")),
         }
     }
 
@@ -587,7 +767,7 @@ impl<'de, T: AdditionalData<'de>> Deserializer<'de> for AdditionalDataDeserializ
     where
         V: Visitor<'de>,
     {
-        Err(Error::custom(
+        Err(DeError::custom(
             "deserializing additional data requires a struct",
         ))
     }
@@ -642,7 +822,7 @@ impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
                 let id = self
                     .data
                     .start_node_id()
-                    .ok_or_else(|| Error::missing_field("start_node_id"))?
+                    .ok_or_else(|| DeError::missing_field("start_node_id"))?
                     .value;
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
@@ -658,7 +838,7 @@ impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
                 let id = self
                     .data
                     .end_node_id()
-                    .ok_or_else(|| Error::missing_field("end_node_id"))?
+                    .ok_or_else(|| DeError::missing_field("end_node_id"))?
                     .value;
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
@@ -674,7 +854,7 @@ impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
                 let labels = self
                     .data
                     .labels()
-                    .ok_or_else(|| Error::missing_field("labels"))?;
+                    .ok_or_else(|| DeError::missing_field("labels"))?;
                 match visitation {
                     Visitation::Newtype => {
                         visitor.visit_newtype_struct(SeqDeserializer::new(labels))
@@ -690,7 +870,7 @@ impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
                 let typ = self
                     .data
                     .typ()
-                    .ok_or_else(|| Error::missing_field("type"))?
+                    .ok_or_else(|| DeError::missing_field("type"))?
                     .value
                     .as_str();
                 match visitation {
@@ -718,8 +898,8 @@ impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
                     ))?),
                 }
             }
-            _ => Err(Error::invalid_type(
-                Unexpected::Other(&format!("struct `{}`", name)),
+            _ => Err(DeError::invalid_type(
+                Unexp::Other(&format!("struct `{}`", name)),
                 &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, or `Keys`",
             )),
         }
@@ -825,12 +1005,55 @@ impl<'de> AdditionalData<'de> for &'de BoltUnboundedRelation {
     }
 }
 
-impl Error for DeError {
+impl<'de> Error for DeError {
+    fn invalid_type(unexp: Unexp, exp: &dyn Expected) -> Self {
+        Self::InvalidType {
+            received: unexp.into(),
+            expected: exp.to_string(),
+        }
+    }
+
+    fn invalid_value(unexp: Unexp, exp: &dyn Expected) -> Self {
+        Self::InvalidValue {
+            received: unexp.into(),
+            expected: exp.to_string(),
+        }
+    }
+
+    fn invalid_length(len: usize, exp: &dyn Expected) -> Self {
+        Self::InvalidLength {
+            received: len,
+            expected: exp.to_string(),
+        }
+    }
+
+    fn unknown_variant(variant: &str, expected: &'static [&'static str]) -> Self {
+        Self::UnknownVariant {
+            variant: variant.to_string(),
+            expected,
+        }
+    }
+
+    fn unknown_field(field: &str, expected: &'static [&'static str]) -> Self {
+        Self::UnknownField {
+            field: field.to_string(),
+            expected,
+        }
+    }
+
+    fn missing_field(field: &'static str) -> Self {
+        Self::MissingField { field }
+    }
+
+    fn duplicate_field(field: &'static str) -> Self {
+        Self::DuplicateField { field }
+    }
+
     fn custom<T>(msg: T) -> Self
     where
-        T: std::fmt::Display,
+        T: fmt::Display,
     {
-        Self::Error(msg.to_string())
+        Self::Other(msg.to_string())
     }
 }
 
