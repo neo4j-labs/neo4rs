@@ -25,15 +25,15 @@ pub struct EndNodeId(pub u64);
 
 /// Newtype to extract the node labels during deserialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
-pub struct Labels(pub Vec<String>);
+pub struct Labels<Coll = Vec<String>>(pub Coll);
 
 /// Newtype to extract the relationship type during deserialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
-pub struct Type(pub String);
+pub struct Type<T = String>(pub T);
 
 /// Newtype to extract the node property keys during deserialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
-pub struct Keys(pub HashSet<String>);
+pub struct Keys<Coll = HashSet<String>>(pub Coll);
 
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
@@ -1437,6 +1437,11 @@ mod tests {
     }
 
     #[test]
+    fn extract_node_property_custom_labels_collection() {
+        test_extract_node_extra(Labels([String::from("Person")]));
+    }
+
+    #[test]
     fn extract_node_labels_with_custom_newtype() {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Labels([String; 1]);
@@ -1491,6 +1496,38 @@ mod tests {
 
         let expected = Person {
             keys: Keys(["name".to_owned(), "age".to_owned()].into()),
+        };
+
+        test_extract_node(expected);
+    }
+
+    #[test]
+    fn extract_node_property_keys_custom_vec() {
+        #[derive(Clone, Debug, Eq, Deserialize)]
+        #[serde(transparent)]
+        struct UnorderedVec(Vec<String>);
+
+        impl PartialEq for UnorderedVec {
+            fn eq(&self, other: &Self) -> bool {
+                // compare on sorted vectors to ignore
+                // order on comparison
+                let mut lhs = self.0.clone();
+                lhs.sort();
+
+                let mut rhs = other.0.clone();
+                rhs.sort();
+
+                lhs == rhs
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            keys: Keys<UnorderedVec>,
+        }
+
+        let expected = Person {
+            keys: Keys(UnorderedVec(vec!["name".to_owned(), "age".to_owned()])),
         };
 
         test_extract_node(expected);
@@ -1750,6 +1787,11 @@ mod tests {
     }
 
     #[test]
+    fn extract_relation_type_custom_inner() {
+        test_extract_relation_extra(Type::<Box<str>>("Person".into()));
+    }
+
+    #[test]
     fn extract_relation_type_with_custom_newtype() {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Type(String);
@@ -1804,6 +1846,38 @@ mod tests {
 
         let expected = Person {
             keys: Keys(["name".to_owned(), "age".to_owned()].into()),
+        };
+
+        test_extract_relation(expected);
+    }
+
+    #[test]
+    fn extract_relation_property_keys_custom_vec() {
+        #[derive(Clone, Debug, Eq, Deserialize)]
+        #[serde(transparent)]
+        struct UnorderedVec(Vec<String>);
+
+        impl PartialEq for UnorderedVec {
+            fn eq(&self, other: &Self) -> bool {
+                // compare on sorted vectors to ignore
+                // order on comparison
+                let mut lhs = self.0.clone();
+                lhs.sort();
+
+                let mut rhs = other.0.clone();
+                rhs.sort();
+
+                lhs == rhs
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            keys: Keys<UnorderedVec>,
+        }
+
+        let expected = Person {
+            keys: Keys(UnorderedVec(vec!["name".to_owned(), "age".to_owned()])),
         };
 
         test_extract_relation(expected);
@@ -2011,6 +2085,11 @@ mod tests {
     }
 
     #[test]
+    fn extract_unbounded_relation_type_custom_inner() {
+        test_extract_unbounded_relation_extra(Type::<Box<str>>("Person".into()));
+    }
+
+    #[test]
     fn extract_unbounded_relation_type_with_custom_newtype() {
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Type(String);
@@ -2065,6 +2144,38 @@ mod tests {
 
         let expected = Person {
             keys: Keys(["name".to_owned(), "age".to_owned()].into()),
+        };
+
+        test_extract_unbounded_relation(expected);
+    }
+
+    #[test]
+    fn extract_unbounded_relation_property_keys_custom_vec() {
+        #[derive(Clone, Debug, Eq, Deserialize)]
+        #[serde(transparent)]
+        struct UnorderedVec(Vec<String>);
+
+        impl PartialEq for UnorderedVec {
+            fn eq(&self, other: &Self) -> bool {
+                // compare on sorted vectors to ignore
+                // order on comparison
+                let mut lhs = self.0.clone();
+                lhs.sort();
+
+                let mut rhs = other.0.clone();
+                rhs.sort();
+
+                lhs == rhs
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            keys: Keys<UnorderedVec>,
+        }
+
+        let expected = Person {
+            keys: Keys(UnorderedVec(vec!["name".to_owned(), "age".to_owned()])),
         };
 
         test_extract_unbounded_relation(expected);
