@@ -1612,7 +1612,10 @@ mod tests {
         let actual = node.to::<Person>().unwrap();
         assert_eq!(actual, expected);
 
-        let BoltType::Node(node) = node else { unreachable!() };
+        let node = match node {
+            BoltType::Node(node) => node,
+            _ => unreachable!(),
+        };
         let actual = node.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
@@ -1629,7 +1632,10 @@ mod tests {
         assert_eq!(labels, Labels(vec!["Person".to_owned()]));
         assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
 
-        let BoltType::Node(node) = node else { unreachable!() };
+        let node = match node {
+            BoltType::Node(node) => node,
+            _ => unreachable!(),
+        };
 
         let id = node.to::<Id>().unwrap();
         let labels = node.to::<Labels>().unwrap();
@@ -1964,7 +1970,10 @@ mod tests {
         let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
 
-        let BoltType::Relation(relation) = relation else { unreachable!() };
+        let relation = match relation {
+            BoltType::Relation(relation) => relation,
+            _ => unreachable!(),
+        };
         let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
@@ -1985,7 +1994,10 @@ mod tests {
         assert_eq!(typ, Type("Person".to_owned()));
         assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
 
-        let BoltType::Relation(relation) = relation else { unreachable!() };
+        let relation = match relation {
+            BoltType::Relation(relation) => relation,
+            _ => unreachable!(),
+        };
 
         let id = relation.to::<Id>().unwrap();
         let start_node_id = relation.to::<StartNodeId>().unwrap();
@@ -2264,7 +2276,10 @@ mod tests {
         let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
 
-        let BoltType::UnboundedRelation(relation) = relation else { unreachable!() };
+        let relation = match relation {
+            BoltType::UnboundedRelation(relation) => relation,
+            _ => unreachable!(),
+        };
         let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
@@ -2281,7 +2296,10 @@ mod tests {
         assert_eq!(typ, Type("Person".to_owned()));
         assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
 
-        let BoltType::UnboundedRelation(relation) = relation else { unreachable!() };
+        let relation = match relation {
+            BoltType::UnboundedRelation(relation) => relation,
+            _ => unreachable!(),
+        };
 
         let id = relation.to::<Id>().unwrap();
         let typ = relation.to::<Type>().unwrap();
