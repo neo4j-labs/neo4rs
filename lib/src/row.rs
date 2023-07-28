@@ -1,7 +1,6 @@
-use crate::types::serde::DeError;
 use crate::types::{
-    BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation, BoltType,
-    BoltUnboundedRelation,
+    serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation,
+    BoltType, BoltUnboundedRelation,
 };
 
 use serde::Deserialize;
@@ -155,6 +154,7 @@ impl Node {
         self.inner.get(key)
     }
 
+    /// Deserialize the node into custom type that implements [`serde::Deserialize`]
     pub fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
         T: Deserialize<'this>,
@@ -188,6 +188,7 @@ impl Relation {
         self.inner.get(key)
     }
 
+    /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
     pub fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
         T: Deserialize<'this>,
@@ -213,6 +214,7 @@ impl UnboundedRelation {
         self.inner.get(key)
     }
 
+    /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
     pub fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
         T: Deserialize<'this>,
