@@ -1,4 +1,4 @@
-use crate::types::{BoltMap, BoltNode, BoltString, BoltType};
+use crate::types::{BoltInteger, BoltMap, BoltNode, BoltString, BoltType};
 
 use ::serde::{
     de::value::{I64Deserializer, MapDeserializer, SeqDeserializer, StrDeserializer},
@@ -94,12 +94,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                     .iter()
                     .copied()
                     .filter(|f| !v.properties.value.contains_key(*f))
-                    .map(|f| (f, NodeData::Additional(v)));
+                    .map(|f| (f, ElementData::Additional(v)));
                 let property_fields = v
                     .properties
                     .value
                     .iter()
-                    .map(|(k, v)| (k.value.as_str(), NodeData::Property(v)));
+                    .map(|(k, v)| (k.value.as_str(), ElementData::Property(v)));
                 let node_fields = property_fields.chain(additional_fields);
                 visitor.visit_map(MapDeserializer::new(node_fields))
             }
@@ -387,12 +387,12 @@ impl<'de> BoltTypeDeserializer<'de> {
 }
 
 #[allow(unused)]
-struct AddidtionalNodeDataDeserializer<'de> {
-    node: &'de BoltNode,
+struct AdditionalDataDeserializer<'de, T> {
+    data: &'de T,
 }
 
 #[allow(unused)]
-impl<'de> Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
+impl<'de, T: AdditionalData> Deserializer<'de> for AdditionalDataDeserializer<'de, T> {
     type Error = DeError;
 
     fn deserialize_newtype_struct<V>(
@@ -480,7 +480,11 @@ impl<'de> Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     }
 }
 
-impl<'de> AddidtionalNodeDataDeserializer<'de> {
+impl<'de, T: AdditionalData> AdditionalDataDeserializer<'de, T> {
+    fn new(data: &'de T) -> Self {
+        Self { data }
+    }
+
     fn deserialize_any_struct<V>(
         self,
         name: &str,
@@ -490,10 +494,15 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        struct LabelsDeserializer<'de>(std::slice::Iter<'de, BoltType>);
+        struct IterDeserializer<I>(I);
 
-        impl<'de> IntoDeserializer<'de, DeError> for LabelsDeserializer<'de> {
-            type Deserializer = SeqDeserializer<std::slice::Iter<'de, BoltType>, DeError>;
+        impl<'de, I, T> IntoDeserializer<'de, DeError> for IterDeserializer<I>
+        where
+            T: 'de,
+            I: Iterator<Item = &'de T>,
+            &'de T: IntoDeserializer<'de, DeError>,
+        {
+            type Deserializer = SeqDeserializer<I, DeError>;
 
             fn into_deserializer(self) -> Self::Deserializer {
                 SeqDeserializer::new(self.0)
@@ -501,32 +510,60 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
         }
 
         match name {
-            "Id" => match visitation {
-                Visitation::Newtype => {
-                    visitor.visit_newtype_struct(I64Deserializer::new(self.node.id.value))
+            "Id" => {
+                let id = self.data.id().value;
+                match visitation {
+                    Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
+                    Visitation::Tuple => {
+                        Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(id))))?
+                    }
+                    Visitation::Struct(field) => {
+                        Ok(visitor.visit_map(MapDeserializer::new(iter::once((field, id))))?)
+                    }
                 }
-                Visitation::Tuple => {
-                    Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(self.node.id.value))))?
+            }
+            "Labels" => {
+                let labels = self
+                    .data
+                    .labels()
+                    .ok_or_else(|| Error::missing_field("labels"))?;
+                match visitation {
+                    Visitation::Newtype => {
+                        visitor.visit_newtype_struct(SeqDeserializer::new(labels))
+                    }
+                    Visitation::Tuple => Ok(visitor
+                        .visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(labels)))))?,
+                    Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(labels))),
+                    ))?),
                 }
-                Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
-                    iter::once((field, self.node.id.value)),
-                ))?),
-            },
-            "Labels" => match visitation {
-                Visitation::Newtype => visitor
-                    .visit_newtype_struct(SeqDeserializer::new(self.node.labels.value.iter())),
-                Visitation::Tuple => Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(
-                    LabelsDeserializer(self.node.labels.value.iter()),
-                ))))?,
-                Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
-                    iter::once((field, LabelsDeserializer(self.node.labels.value.iter()))),
-                ))?),
-            },
+            }
             _ => Err(Error::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
                 &"struct `Id` or struct `Labels`",
             )),
         }
+    }
+}
+
+trait AdditionalData {
+    fn id(&self) -> &BoltInteger;
+
+    type Labels<'a>: Iterator<Item = &'a BoltType>
+    where
+        Self: 'a;
+    fn labels(&self) -> Option<Self::Labels<'_>>;
+}
+
+impl AdditionalData for BoltNode {
+    fn id(&self) -> &BoltInteger {
+        &self.id
+    }
+
+    type Labels<'a> = std::slice::Iter<'a, BoltType>;
+
+    fn labels(&self) -> Option<Self::Labels<'_>> {
+        Some(self.labels.value.iter())
     }
 }
 
@@ -555,14 +592,16 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
     }
 }
 
-impl<'de> IntoDeserializer<'de, DeError> for NodeData<'de> {
-    type Deserializer = NodeDataDeserializer<'de>;
+impl<'de, T: AdditionalData> IntoDeserializer<'de, DeError> for ElementData<'de, T> {
+    type Deserializer = ElementDataDeserializer<'de, T>;
 
     fn into_deserializer(self) -> Self::Deserializer {
         match self {
-            NodeData::Property(v) => NodeDataDeserializer::Property(BoltTypeDeserializer::new(v)),
-            NodeData::Additional(v) => {
-                NodeDataDeserializer::Additional(AddidtionalNodeDataDeserializer { node: v })
+            ElementData::Property(v) => {
+                ElementDataDeserializer::Property(BoltTypeDeserializer::new(v))
+            }
+            ElementData::Additional(v) => {
+                ElementDataDeserializer::Additional(AdditionalDataDeserializer::new(v))
             }
         }
     }
@@ -574,17 +613,17 @@ enum Visitation {
     Struct(&'static str),
 }
 
-enum NodeData<'de> {
+enum ElementData<'de, T> {
     Property(&'de BoltType),
-    Additional(&'de BoltNode),
+    Additional(&'de T),
 }
 
-enum NodeDataDeserializer<'de> {
+enum ElementDataDeserializer<'de, T> {
     Property(BoltTypeDeserializer<'de>),
-    Additional(AddidtionalNodeDataDeserializer<'de>),
+    Additional(AdditionalDataDeserializer<'de, T>),
 }
 
-impl<'de> Deserializer<'de> for NodeDataDeserializer<'de> {
+impl<'de, T: AdditionalData> Deserializer<'de> for ElementDataDeserializer<'de, T> {
     type Error = DeError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
