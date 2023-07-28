@@ -36,7 +36,7 @@ impl BoltMap {
     }
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        match self.value.get(&BoltString::new(key)) {
+        match self.value.get(key) {
             Some(bolt_type) => {
                 if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {
                     Some(value)
