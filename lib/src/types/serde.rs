@@ -183,6 +183,37 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         }
     }
 
+    fn deserialize_newtype_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        match self.value {
+            BoltRef::Type(BoltType::Node(v)) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            BoltRef::Node(v) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            BoltRef::Type(BoltType::Relation(v)) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            BoltRef::Rel(v) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            BoltRef::URel(v) => {
+                AdditionalDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
+            }
+            _ => self.unexpected(visitor),
+        }
+    }
+
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -383,7 +414,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char option newtype_struct enum identifier
+        char option enum identifier
     }
 }
 
@@ -1549,6 +1580,29 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    #[test]
+    fn test_just_extract_node_extra() {
+        let node = test_node();
+
+        let id = node.to::<Id>().unwrap();
+        let labels = node.to::<Labels>().unwrap();
+        let keys = node.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(labels, Labels(vec!["Person".to_owned()]));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
+
+        let BoltType::Node(node) = node else { unreachable!() };
+
+        let id = node.to::<Id>().unwrap();
+        let labels = node.to::<Labels>().unwrap();
+        let keys = node.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(labels, Labels(vec!["Person".to_owned()]));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
+    }
+
     fn test_relation() -> BoltType {
         let id = BoltInteger::new(1337);
         let start_node_id = BoltInteger::new(21);
@@ -1841,6 +1895,37 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    #[test]
+    fn test_just_extract_relation_extra() {
+        let relation = test_relation();
+
+        let id = relation.to::<Id>().unwrap();
+        let start_node_id = relation.to::<StartNodeId>().unwrap();
+        let end_node_id = relation.to::<EndNodeId>().unwrap();
+        let typ = relation.to::<Type>().unwrap();
+        let keys = relation.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(start_node_id, StartNodeId(21));
+        assert_eq!(end_node_id, EndNodeId(84));
+        assert_eq!(typ, Type("Person".to_owned()));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
+
+        let BoltType::Relation(relation) = relation else { unreachable!() };
+
+        let id = relation.to::<Id>().unwrap();
+        let start_node_id = relation.to::<StartNodeId>().unwrap();
+        let end_node_id = relation.to::<EndNodeId>().unwrap();
+        let typ = relation.to::<Type>().unwrap();
+        let keys = relation.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(start_node_id, StartNodeId(21));
+        assert_eq!(end_node_id, EndNodeId(84));
+        assert_eq!(typ, Type("Person".to_owned()));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
+    }
+
     fn test_unbounded_relation() -> BoltType {
         let id = BoltInteger::new(1337);
         let typ = "Person".into();
@@ -2071,6 +2156,29 @@ mod tests {
         let BoltType::UnboundedRelation(relation) = relation else { unreachable!() };
         let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_just_extract_unbounded_relation_extra() {
+        let relation = test_unbounded_relation();
+
+        let id = relation.to::<Id>().unwrap();
+        let typ = relation.to::<Type>().unwrap();
+        let keys = relation.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(typ, Type("Person".to_owned()));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
+
+        let BoltType::UnboundedRelation(relation) = relation else { unreachable!() };
+
+        let id = relation.to::<Id>().unwrap();
+        let typ = relation.to::<Type>().unwrap();
+        let keys = relation.to::<Keys>().unwrap();
+
+        assert_eq!(id, Id(1337));
+        assert_eq!(typ, Type("Person".to_owned()));
+        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
     }
 
     #[test]
