@@ -44,13 +44,40 @@ impl BoltMap {
     }
 }
 
-impl BoltType {
-    #[allow(unused)]
+impl BoltNode {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
     where
         T: Deserialize<'this>,
     {
-        T::deserialize(BoltTypeDeserializer::new(self))
+        T::deserialize(self.into_deserializer())
+    }
+}
+
+impl BoltRelation {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(self.into_deserializer())
+    }
+}
+
+impl BoltUnboundedRelation {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(self.into_deserializer())
+    }
+}
+
+#[cfg(test)]
+impl BoltType {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(self.into_deserializer())
     }
 }
 
@@ -64,7 +91,7 @@ pub enum DeError {
 }
 
 pub struct BoltTypeDeserializer<'de> {
-    value: &'de BoltType,
+    value: BoltRef<'de>,
 }
 
 impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
@@ -75,8 +102,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         match self.value {
-            BoltType::List(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter())),
-            BoltType::Bytes(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter().copied())),
+            BoltRef::Type(BoltType::List(v)) => {
+                visitor.visit_seq(SeqDeserializer::new(v.value.iter()))
+            }
+            BoltRef::Type(BoltType::Bytes(v)) => {
+                visitor.visit_seq(SeqDeserializer::new(v.value.iter().copied()))
+            }
             _ => self.unexpected(visitor),
         }
     }
@@ -86,14 +117,21 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         match self.value {
-            BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
-            BoltType::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
-            BoltType::Relation(v) => {
+            BoltRef::Type(BoltType::Map(v)) => {
+                visitor.visit_map(MapDeserializer::new(v.value.iter()))
+            }
+            BoltRef::Type(BoltType::Node(v)) => {
                 visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
             }
-            BoltType::UnboundedRelation(v) => {
+            BoltRef::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltRef::Type(BoltType::Relation(v)) => {
                 visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
             }
+            BoltRef::Rel(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
+                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+            }
+            BoltRef::URel(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
             _ => self.unexpected(visitor),
         }
     }
@@ -130,10 +168,17 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         }
 
         match self.value {
-            BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
-            BoltType::Node(v) => struct_with_additional(fields, v, visitor),
-            BoltType::Relation(v) => struct_with_additional(fields, v, visitor),
-            BoltType::UnboundedRelation(v) => struct_with_additional(fields, v, visitor),
+            BoltRef::Type(BoltType::Map(v)) => {
+                visitor.visit_map(MapDeserializer::new(v.value.iter()))
+            }
+            BoltRef::Type(BoltType::Node(v)) => struct_with_additional(fields, v, visitor),
+            BoltRef::Node(v) => struct_with_additional(fields, v, visitor),
+            BoltRef::Type(BoltType::Relation(v)) => struct_with_additional(fields, v, visitor),
+            BoltRef::Rel(v) => struct_with_additional(fields, v, visitor),
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
+                struct_with_additional(fields, v, visitor)
+            }
+            BoltRef::URel(v) => struct_with_additional(fields, v, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -143,7 +188,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         match self.value {
-            BoltType::List(v) if v.len() == len => {
+            BoltRef::Type(BoltType::List(v)) if v.len() == len => {
                 visitor.visit_seq(SeqDeserializer::new(v.value.iter()))
             }
             _ => self.unexpected(visitor),
@@ -166,7 +211,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::String(v) = self.value {
+        if let BoltRef::Type(BoltType::String(v)) = self.value {
             visitor.visit_borrowed_str(&v.value)
         } else {
             self.unexpected(visitor)
@@ -177,7 +222,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::String(v) = self.value {
+        if let BoltRef::Type(BoltType::String(v)) = self.value {
             visitor.visit_string(v.value.clone())
         } else {
             self.unexpected(visitor)
@@ -188,7 +233,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::Bytes(v) = self.value {
+        if let BoltRef::Type(BoltType::Bytes(v)) = self.value {
             visitor.visit_borrowed_bytes(&v.value)
         } else {
             self.unexpected(visitor)
@@ -199,7 +244,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::Bytes(v) = self.value {
+        if let BoltRef::Type(BoltType::Bytes(v)) = self.value {
             visitor.visit_byte_buf(v.value.to_vec())
         } else {
             self.unexpected(visitor)
@@ -210,7 +255,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::Boolean(v) = self.value {
+        if let BoltRef::Type(BoltType::Boolean(v)) = self.value {
             visitor.visit_bool(v.value)
         } else {
             self.unexpected(visitor)
@@ -301,7 +346,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::Null(_) = self.value {
+        if let BoltRef::Type(BoltType::Null(_)) = self.value {
             visitor.visit_unit()
         } else {
             self.unexpected(visitor)
@@ -316,7 +361,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::Null(_) = self.value {
+        if let BoltRef::Type(BoltType::Null(_)) = self.value {
             visitor.visit_unit()
         } else {
             self.unexpected(visitor)
@@ -343,7 +388,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
 }
 
 impl<'de> BoltTypeDeserializer<'de> {
-    fn new(value: &'de BoltType) -> Self {
+    fn new(value: BoltRef<'de>) -> Self {
         Self { value }
     }
 
@@ -353,7 +398,7 @@ impl<'de> BoltTypeDeserializer<'de> {
         i64: TryInto<T, Error = E>,
         E: Into<std::num::TryFromIntError>,
     {
-        if let BoltType::Integer(v) = self.value {
+        if let BoltRef::Type(BoltType::Integer(v)) = self.value {
             match v.value.try_into() {
                 Ok(v) => Ok((v, visitor)),
                 Err(e) => Err(DeError::IntegerOutOfBounds(
@@ -372,7 +417,7 @@ impl<'de> BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
         T: FromFloat,
     {
-        if let BoltType::Float(v) = self.value {
+        if let BoltRef::Type(BoltType::Float(v)) = self.value {
             Ok((T::from_float(v.value), visitor))
         } else {
             self.unexpected(visitor)
@@ -384,31 +429,42 @@ impl<'de> BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         let typ = match self.value {
-            BoltType::String(v) => Unexpected::Str(&v.value),
-            BoltType::Boolean(v) => Unexpected::Bool(v.value),
-            BoltType::Map(_) => Unexpected::Map,
-            BoltType::Null(_) => Unexpected::Unit,
-            BoltType::Integer(v) => Unexpected::Signed(v.value),
-            BoltType::Float(v) => Unexpected::Float(v.value),
-            BoltType::List(_) => Unexpected::Seq,
-            BoltType::Node(_) => Unexpected::Map,
-            BoltType::Relation(_) => Unexpected::Map,
-            BoltType::UnboundedRelation(_) => Unexpected::Map,
-            BoltType::Point2D(_) => Unexpected::Other("Point2D"),
-            BoltType::Point3D(_) => Unexpected::Other("Point3D"),
-            BoltType::Bytes(v) => Unexpected::Bytes(&v.value),
-            BoltType::Path(_) => Unexpected::Other("Path"),
-            BoltType::Duration(_) => Unexpected::Other("Duration"),
-            BoltType::Date(_) => Unexpected::Other("Date"),
-            BoltType::Time(_) => Unexpected::Other("Time"),
-            BoltType::LocalTime(_) => Unexpected::Other("LocalTime"),
-            BoltType::DateTime(_) => Unexpected::Other("DateTime"),
-            BoltType::LocalDateTime(_) => Unexpected::Other("LocalDateTime"),
-            BoltType::DateTimeZoneId(_) => Unexpected::Other("DateTimeZoneId"),
+            BoltRef::Type(BoltType::String(v)) => Unexpected::Str(&v.value),
+            BoltRef::Type(BoltType::Boolean(v)) => Unexpected::Bool(v.value),
+            BoltRef::Type(BoltType::Map(_)) => Unexpected::Map,
+            BoltRef::Type(BoltType::Null(_)) => Unexpected::Unit,
+            BoltRef::Type(BoltType::Integer(v)) => Unexpected::Signed(v.value),
+            BoltRef::Type(BoltType::Float(v)) => Unexpected::Float(v.value),
+            BoltRef::Type(BoltType::List(_)) => Unexpected::Seq,
+            BoltRef::Type(BoltType::Node(_)) => Unexpected::Map,
+            BoltRef::Node(_) => Unexpected::Map,
+            BoltRef::Type(BoltType::Relation(_)) => Unexpected::Map,
+            BoltRef::Rel(_) => Unexpected::Map,
+            BoltRef::Type(BoltType::UnboundedRelation(_)) => Unexpected::Map,
+            BoltRef::URel(_) => Unexpected::Map,
+            BoltRef::Type(BoltType::Point2D(_)) => Unexpected::Other("Point2D"),
+            BoltRef::Type(BoltType::Point3D(_)) => Unexpected::Other("Point3D"),
+            BoltRef::Type(BoltType::Bytes(v)) => Unexpected::Bytes(&v.value),
+            BoltRef::Type(BoltType::Path(_)) => Unexpected::Other("Path"),
+            BoltRef::Type(BoltType::Duration(_)) => Unexpected::Other("Duration"),
+            BoltRef::Type(BoltType::Date(_)) => Unexpected::Other("Date"),
+            BoltRef::Type(BoltType::Time(_)) => Unexpected::Other("Time"),
+            BoltRef::Type(BoltType::LocalTime(_)) => Unexpected::Other("LocalTime"),
+            BoltRef::Type(BoltType::DateTime(_)) => Unexpected::Other("DateTime"),
+            BoltRef::Type(BoltType::LocalDateTime(_)) => Unexpected::Other("LocalDateTime"),
+            BoltRef::Type(BoltType::DateTimeZoneId(_)) => Unexpected::Other("DateTimeZoneId"),
         };
 
         Err(Error::invalid_type(typ, &visitor))
     }
+}
+
+#[derive(Copy, Clone)]
+enum BoltRef<'de> {
+    Type(&'de BoltType),
+    Node(&'de BoltNode),
+    Rel(&'de BoltRelation),
+    URel(&'de BoltUnboundedRelation),
 }
 
 #[allow(unused)]
@@ -751,7 +807,31 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
     type Deserializer = BoltTypeDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
-        BoltTypeDeserializer::new(self)
+        BoltTypeDeserializer::new(BoltRef::Type(self))
+    }
+}
+
+impl<'de> IntoDeserializer<'de, DeError> for &'de BoltNode {
+    type Deserializer = BoltTypeDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BoltTypeDeserializer::new(BoltRef::Node(self))
+    }
+}
+
+impl<'de> IntoDeserializer<'de, DeError> for &'de BoltRelation {
+    type Deserializer = BoltTypeDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BoltTypeDeserializer::new(BoltRef::Rel(self))
+    }
+}
+
+impl<'de> IntoDeserializer<'de, DeError> for &'de BoltUnboundedRelation {
+    type Deserializer = BoltTypeDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BoltTypeDeserializer::new(BoltRef::URel(self))
     }
 }
 
@@ -768,9 +848,7 @@ impl<'de, T: AdditionalData<'de>> IntoDeserializer<'de, DeError> for ElementData
 
     fn into_deserializer(self) -> Self::Deserializer {
         match self {
-            ElementData::Property(v) => {
-                ElementDataDeserializer::Property(BoltTypeDeserializer::new(v))
-            }
+            ElementData::Property(v) => ElementDataDeserializer::Property(v.into_deserializer()),
             ElementData::Additional(v) => {
                 ElementDataDeserializer::Additional(AdditionalDataDeserializer::new(v))
             }

@@ -154,6 +154,13 @@ impl Node {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
     }
+
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.to::<T>()
+    }
 }
 
 impl Relation {
@@ -180,6 +187,13 @@ impl Relation {
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
     }
+
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.to::<T>()
+    }
 }
 
 impl UnboundedRelation {
@@ -197,6 +211,13 @@ impl UnboundedRelation {
 
     pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         self.inner.get(key)
+    }
+
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.to::<T>()
     }
 }
 
