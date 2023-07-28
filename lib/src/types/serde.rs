@@ -1541,9 +1541,11 @@ mod tests {
 
     fn test_extract_node<Person: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: Person) {
         let node = test_node();
-
         let actual = node.to::<Person>().unwrap();
+        assert_eq!(actual, expected);
 
+        let BoltType::Node(node) = node else { unreachable!() };
+        let actual = node.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -1831,9 +1833,11 @@ mod tests {
         expected: Person,
     ) {
         let relation = test_relation();
-
         let actual = relation.to::<Person>().unwrap();
+        assert_eq!(actual, expected);
 
+        let BoltType::Relation(relation) = relation else { unreachable!() };
+        let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -2061,9 +2065,11 @@ mod tests {
         expected: Person,
     ) {
         let relation = test_unbounded_relation();
-
         let actual = relation.to::<Person>().unwrap();
+        assert_eq!(actual, expected);
 
+        let BoltType::UnboundedRelation(relation) = relation else { unreachable!() };
+        let actual = relation.to::<Person>().unwrap();
         assert_eq!(actual, expected);
     }
 
