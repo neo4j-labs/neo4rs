@@ -7,7 +7,7 @@ use serde::{
     },
     forward_to_deserialize_any, Deserialize,
 };
-use std::iter;
+use std::{collections::HashSet, iter};
 
 /// Newtype to extract the node id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
@@ -16,6 +16,10 @@ pub struct Id(pub u64);
 /// Newtype to extract the node labels during deserialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
 pub struct Labels(pub Vec<String>);
+
+/// Newtype to extract the node property keys during deserialization.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+pub struct Keys(pub HashSet<String>);
 
 impl BoltMap {
     pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
@@ -540,9 +544,22 @@ impl<'de, T: AdditionalData> AdditionalDataDeserializer<'de, T> {
                     ))?),
                 }
             }
+            "Keys" => {
+                let keys = self.data.keys();
+                match visitation {
+                    Visitation::Newtype => visitor.visit_newtype_struct(SeqDeserializer::new(keys)),
+                    Visitation::Tuple => {
+                        Ok(visitor
+                            .visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(keys)))))?
+                    }
+                    Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(keys))),
+                    ))?),
+                }
+            }
             _ => Err(Error::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
-                &"struct `Id` or struct `Labels`",
+                &"one of `Id`, `Labels`, or `Keys`",
             )),
         }
     }
@@ -555,6 +572,11 @@ trait AdditionalData {
     where
         Self: 'a;
     fn labels(&self) -> Option<Self::Labels<'_>>;
+
+    type Keys<'a>: Iterator<Item = &'a BoltString>
+    where
+        Self: 'a;
+    fn keys(&self) -> Self::Keys<'_>;
 }
 
 impl AdditionalData for BoltNode {
@@ -566,6 +588,12 @@ impl AdditionalData for BoltNode {
 
     fn labels(&self) -> Option<Self::Labels<'_>> {
         Some(self.labels.value.iter())
+    }
+
+    type Keys<'a> = std::collections::hash_map::Keys<'a, BoltString, BoltType>;
+
+    fn keys(&self) -> Self::Keys<'_> {
+        self.properties.value.keys()
     }
 }
 
@@ -1178,6 +1206,92 @@ mod tests {
             name: "Alice".to_owned(),
             age: 42,
         };
+
+        let id = BoltInteger::new(1337);
+        let labels = vec!["Person".into()].into();
+        let properties = vec![
+            ("name".into(), "Alice".into()),
+            ("age".into(), 42_u16.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let node = BoltNode {
+            id,
+            labels,
+            properties,
+        };
+        let node = BoltType::Node(node);
+
+        let actual = node.to::<Person>().unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn extract_node_property_keys() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            keys: Keys,
+        }
+
+        let expected = Person {
+            keys: Keys(["name".to_owned(), "age".to_owned()].into()),
+        };
+
+        test_extract_node(expected);
+    }
+
+    #[test]
+    fn extract_node_property_keys_custom_struct() {
+        #[derive(Clone, Debug, Eq, Deserialize)]
+        struct Keys {
+            keys: Vec<String>,
+        }
+
+        impl PartialEq for Keys {
+            fn eq(&self, other: &Self) -> bool {
+                // since we cannot gurantee the order of the keys
+                // we have to sort them before comparing
+                let mut lhs = self.keys.clone();
+                lhs.sort();
+
+                let mut rhs = other.keys.clone();
+                rhs.sort();
+
+                lhs == rhs
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            property_keys: Keys,
+        }
+
+        let expected = Person {
+            property_keys: Keys {
+                keys: vec!["name".to_owned(), "age".to_owned()],
+            },
+        };
+
+        test_extract_node(expected);
+    }
+
+    #[test]
+    fn extract_node_property_keys_borrowed() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Keys<'a>(#[serde(borrow)] HashSet<&'a str>);
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person<'a> {
+            #[serde(borrow)]
+            keys: Keys<'a>,
+        }
+
+        let expected = Person {
+            keys: Keys(["age", "name"].into()),
+        };
+
         let id = BoltInteger::new(1337);
         let labels = vec!["Person".into()].into();
         let properties = vec![
