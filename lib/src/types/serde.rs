@@ -1,13 +1,11 @@
 use crate::types::{BoltMap, BoltNode, BoltString, BoltType};
 
 use ::serde::{
-    de::{
-        self,
-        value::{I64Deserializer, MapDeserializer, SeqDeserializer, StrDeserializer},
-    },
+    de::value::{I64Deserializer, MapDeserializer, SeqDeserializer, StrDeserializer},
     forward_to_deserialize_any, Deserialize,
 };
 use std::iter;
+use serde::de::{Deserializer, Error, IntoDeserializer, Unexpected, Visitor};
 
 /// Newtype to extract the node id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
@@ -49,12 +47,12 @@ pub struct BoltTypeDeserializer<'de> {
     value: &'de BoltType,
 }
 
-impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
+impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     type Error = DeError;
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self.value {
             BoltType::List(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter())),
@@ -65,7 +63,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
@@ -87,7 +85,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self.value {
             BoltType::Map(v) => visitor.visit_map(MapDeserializer::new(v.value.iter())),
@@ -117,7 +115,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self.value {
             BoltType::List(v) if v.len() == len => {
@@ -134,14 +132,14 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         self.deserialize_tuple(len, visitor)
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::String(v) = self.value {
             visitor.visit_borrowed_str(&v.value)
@@ -152,7 +150,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::String(v) = self.value {
             visitor.visit_string(v.value.clone())
@@ -163,7 +161,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::Bytes(v) = self.value {
             visitor.visit_borrowed_bytes(&v.value)
@@ -174,7 +172,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::Bytes(v) = self.value {
             visitor.visit_byte_buf(v.value.to_vec())
@@ -185,7 +183,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::Boolean(v) = self.value {
             visitor.visit_bool(v.value)
@@ -196,7 +194,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_i8(v)
@@ -204,7 +202,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_i16(v)
@@ -212,7 +210,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_i32(v)
@@ -220,7 +218,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_i64(v)
@@ -228,7 +226,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_u8(v)
@@ -236,7 +234,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_u16(v)
@@ -244,7 +242,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_u32(v)
@@ -252,7 +250,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_integer(visitor)?;
         visitor.visit_u64(v)
@@ -260,7 +258,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_float(visitor)?;
         visitor.visit_f32(v)
@@ -268,7 +266,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let (v, visitor) = self.read_float(visitor)?;
         visitor.visit_f64(v)
@@ -276,7 +274,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::Null(_) = self.value {
             visitor.visit_unit()
@@ -291,7 +289,7 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if let BoltType::Null(_) = self.value {
             visitor.visit_unit()
@@ -302,14 +300,14 @@ impl<'de> de::Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         visitor.visit_unit()
     }
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         self.unexpected(visitor)
     }
@@ -326,7 +324,7 @@ impl<'de> BoltTypeDeserializer<'de> {
 
     fn read_integer<T, E, V>(self, visitor: V) -> Result<(T, V), DeError>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
         i64: TryInto<T, Error = E>,
         E: Into<std::num::TryFromIntError>,
     {
@@ -346,7 +344,7 @@ impl<'de> BoltTypeDeserializer<'de> {
 
     fn read_float<T, V>(self, visitor: V) -> Result<(T, V), DeError>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
         T: FromFloat,
     {
         if let BoltType::Float(v) = self.value {
@@ -358,33 +356,33 @@ impl<'de> BoltTypeDeserializer<'de> {
 
     fn unexpected<V, T>(self, visitor: V) -> Result<T, DeError>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         let typ = match self.value {
-            BoltType::String(v) => de::Unexpected::Str(&v.value),
-            BoltType::Boolean(v) => de::Unexpected::Bool(v.value),
-            BoltType::Map(_) => de::Unexpected::Map,
-            BoltType::Null(_) => de::Unexpected::Unit,
-            BoltType::Integer(v) => de::Unexpected::Signed(v.value),
-            BoltType::Float(v) => de::Unexpected::Float(v.value),
-            BoltType::List(_) => de::Unexpected::Seq,
-            BoltType::Node(_) => de::Unexpected::Map,
-            BoltType::Relation(_) => de::Unexpected::Map,
-            BoltType::UnboundedRelation(_) => de::Unexpected::Map,
-            BoltType::Point2D(_) => de::Unexpected::Other("Point2D"),
-            BoltType::Point3D(_) => de::Unexpected::Other("Point3D"),
-            BoltType::Bytes(v) => de::Unexpected::Bytes(&v.value),
-            BoltType::Path(_) => de::Unexpected::Other("Path"),
-            BoltType::Duration(_) => de::Unexpected::Other("Duration"),
-            BoltType::Date(_) => de::Unexpected::Other("Date"),
-            BoltType::Time(_) => de::Unexpected::Other("Time"),
-            BoltType::LocalTime(_) => de::Unexpected::Other("LocalTime"),
-            BoltType::DateTime(_) => de::Unexpected::Other("DateTime"),
-            BoltType::LocalDateTime(_) => de::Unexpected::Other("LocalDateTime"),
-            BoltType::DateTimeZoneId(_) => de::Unexpected::Other("DateTimeZoneId"),
+            BoltType::String(v) => Unexpected::Str(&v.value),
+            BoltType::Boolean(v) => Unexpected::Bool(v.value),
+            BoltType::Map(_) => Unexpected::Map,
+            BoltType::Null(_) => Unexpected::Unit,
+            BoltType::Integer(v) => Unexpected::Signed(v.value),
+            BoltType::Float(v) => Unexpected::Float(v.value),
+            BoltType::List(_) => Unexpected::Seq,
+            BoltType::Node(_) => Unexpected::Map,
+            BoltType::Relation(_) => Unexpected::Map,
+            BoltType::UnboundedRelation(_) => Unexpected::Map,
+            BoltType::Point2D(_) => Unexpected::Other("Point2D"),
+            BoltType::Point3D(_) => Unexpected::Other("Point3D"),
+            BoltType::Bytes(v) => Unexpected::Bytes(&v.value),
+            BoltType::Path(_) => Unexpected::Other("Path"),
+            BoltType::Duration(_) => Unexpected::Other("Duration"),
+            BoltType::Date(_) => Unexpected::Other("Date"),
+            BoltType::Time(_) => Unexpected::Other("Time"),
+            BoltType::LocalTime(_) => Unexpected::Other("LocalTime"),
+            BoltType::DateTime(_) => Unexpected::Other("DateTime"),
+            BoltType::LocalDateTime(_) => Unexpected::Other("LocalDateTime"),
+            BoltType::DateTimeZoneId(_) => Unexpected::Other("DateTimeZoneId"),
         };
 
-        Err(de::Error::invalid_type(typ, &visitor))
+        Err(Error::invalid_type(typ, &visitor))
     }
 }
 
@@ -394,7 +392,7 @@ struct AddidtionalNodeDataDeserializer<'de> {
 }
 
 #[allow(unused)]
-impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
+impl<'de> Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
     type Error = DeError;
 
     fn deserialize_newtype_struct<V>(
@@ -403,7 +401,7 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         self.deserialize_any_struct(name, visitor, Visitation::Newtype)
     }
@@ -415,12 +413,12 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         if len == 1 {
             self.deserialize_any_struct(name, visitor, Visitation::Tuple)
         } else {
-            Err(de::Error::invalid_length(
+            Err(Error::invalid_length(
                 len,
                 &format!("tuple struct {} with 1 element", name).as_str(),
             ))
@@ -434,17 +432,17 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match fields {
             [field] => self.deserialize_any_struct(name, visitor, Visitation::Struct(field)),
-            _ => Err(de::Error::invalid_length(fields.len(), &"1")),
+            _ => Err(Error::invalid_length(fields.len(), &"1")),
         }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         visitor.visit_unit()
     }
@@ -455,14 +453,14 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         visitor.visit_unit()
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         visitor.visit_unit()
     }
@@ -474,9 +472,9 @@ impl<'de> de::Deserializer<'de> for AddidtionalNodeDataDeserializer<'de> {
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
-        Err(de::Error::custom(
+        Err(Error::custom(
             "deserializing node id or labels requires a struct",
         ))
     }
@@ -490,11 +488,11 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
         visitation: Visitation,
     ) -> Result<V::Value, DeError>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         struct LabelsDeserializer<'de>(std::slice::Iter<'de, BoltType>);
 
-        impl<'de> de::IntoDeserializer<'de, DeError> for LabelsDeserializer<'de> {
+        impl<'de> IntoDeserializer<'de, DeError> for LabelsDeserializer<'de> {
             type Deserializer = SeqDeserializer<std::slice::Iter<'de, BoltType>, DeError>;
 
             fn into_deserializer(self) -> Self::Deserializer {
@@ -524,15 +522,15 @@ impl<'de> AddidtionalNodeDataDeserializer<'de> {
                     iter::once((field, LabelsDeserializer(self.node.labels.value.iter()))),
                 ))?),
             },
-            _ => Err(de::Error::invalid_type(
-                de::Unexpected::Other(&format!("struct {}", name)),
+            _ => Err(Error::invalid_type(
+                Unexpected::Other(&format!("struct `{}`", name)),
                 &"struct `Id` or struct `Labels`",
             )),
         }
     }
 }
 
-impl de::Error for DeError {
+impl Error for DeError {
     fn custom<T>(msg: T) -> Self
     where
         T: std::fmt::Display,
@@ -541,7 +539,7 @@ impl de::Error for DeError {
     }
 }
 
-impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltType {
+impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
     type Deserializer = BoltTypeDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -549,7 +547,7 @@ impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltType {
     }
 }
 
-impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltString {
+impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
     type Deserializer = StrDeserializer<'de, DeError>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -557,7 +555,7 @@ impl<'de> de::IntoDeserializer<'de, DeError> for &'de BoltString {
     }
 }
 
-impl<'de> de::IntoDeserializer<'de, DeError> for NodeData<'de> {
+impl<'de> IntoDeserializer<'de, DeError> for NodeData<'de> {
     type Deserializer = NodeDataDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -586,12 +584,12 @@ enum NodeDataDeserializer<'de> {
     Additional(AddidtionalNodeDataDeserializer<'de>),
 }
 
-impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
+impl<'de> Deserializer<'de> for NodeDataDeserializer<'de> {
     type Error = DeError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_any(visitor),
@@ -601,7 +599,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_bool(visitor),
@@ -611,7 +609,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_i8(visitor),
@@ -621,7 +619,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_i16(visitor),
@@ -631,7 +629,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_i32(visitor),
@@ -641,7 +639,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_i64(visitor),
@@ -651,7 +649,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_u8(visitor),
@@ -661,7 +659,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_u16(visitor),
@@ -671,7 +669,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_u32(visitor),
@@ -681,7 +679,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_u64(visitor),
@@ -691,7 +689,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_f32(visitor),
@@ -701,7 +699,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_f64(visitor),
@@ -711,7 +709,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_char(visitor),
@@ -721,7 +719,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_str(visitor),
@@ -731,7 +729,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_string(visitor),
@@ -741,7 +739,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_bytes(visitor),
@@ -751,7 +749,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_byte_buf(visitor),
@@ -761,7 +759,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_option(visitor),
@@ -771,7 +769,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_unit(visitor),
@@ -785,7 +783,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_unit_struct(name, visitor),
@@ -799,7 +797,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_newtype_struct(name, visitor),
@@ -809,7 +807,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_seq(visitor),
@@ -819,7 +817,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_tuple(len, visitor),
@@ -834,7 +832,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_tuple_struct(name, len, visitor),
@@ -844,7 +842,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_map(visitor),
@@ -859,7 +857,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_struct(name, fields, visitor),
@@ -874,7 +872,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_enum(name, variants, visitor),
@@ -884,7 +882,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_identifier(visitor),
@@ -894,7 +892,7 @@ impl<'de> de::Deserializer<'de> for NodeDataDeserializer<'de> {
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: Visitor<'de>,
     {
         match self {
             Self::Property(v) => v.deserialize_ignored_any(visitor),
