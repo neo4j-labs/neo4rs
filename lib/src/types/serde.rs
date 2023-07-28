@@ -9,7 +9,7 @@ use serde::{
     },
     forward_to_deserialize_any, Deserialize,
 };
-use std::{collections::HashSet, iter};
+use std::{collections::HashSet, iter, marker::PhantomData};
 
 /// Newtype to extract the node id or relationship id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
@@ -109,11 +109,11 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         fn struct_with_additional<'de, T, V>(
             fields: &'static [&'static str],
-            element: &'de T,
+            element: T,
             visitor: V,
         ) -> Result<V::Value, DeError>
         where
-            T: AdditionalData,
+            T: Copy + AdditionalData<'de>,
             V: Visitor<'de>,
         {
             let properties = &element.properties().value;
@@ -413,11 +413,12 @@ impl<'de> BoltTypeDeserializer<'de> {
 
 #[allow(unused)]
 struct AdditionalDataDeserializer<'de, T> {
-    data: &'de T,
+    data: T,
+    _lifetime: PhantomData<&'de ()>,
 }
 
 #[allow(unused)]
-impl<'de, T: AdditionalData> Deserializer<'de> for AdditionalDataDeserializer<'de, T> {
+impl<'de, T: AdditionalData<'de>> Deserializer<'de> for AdditionalDataDeserializer<'de, T> {
     type Error = DeError;
 
     fn deserialize_newtype_struct<V>(
@@ -505,9 +506,12 @@ impl<'de, T: AdditionalData> Deserializer<'de> for AdditionalDataDeserializer<'d
     }
 }
 
-impl<'de, T: AdditionalData> AdditionalDataDeserializer<'de, T> {
-    fn new(data: &'de T) -> Self {
-        Self { data }
+impl<'de, T: AdditionalData<'de>> AdditionalDataDeserializer<'de, T> {
+    fn new(data: T) -> Self {
+        Self {
+            data,
+            _lifetime: PhantomData,
+        }
     }
 
     fn deserialize_any_struct<V>(
@@ -635,103 +639,101 @@ impl<'de, T: AdditionalData> AdditionalDataDeserializer<'de, T> {
     }
 }
 
-trait AdditionalData {
-    fn id(&self) -> &BoltInteger;
+trait AdditionalData<'de> {
+    fn id(self) -> &'de BoltInteger;
 
-    fn start_node_id(&self) -> Option<&BoltInteger>;
+    fn start_node_id(self) -> Option<&'de BoltInteger>;
 
-    fn end_node_id(&self) -> Option<&BoltInteger>;
+    fn end_node_id(self) -> Option<&'de BoltInteger>;
 
-    type Labels<'a>: Iterator<Item = &'a BoltType>
-    where
-        Self: 'a;
-    fn labels(&self) -> Option<Self::Labels<'_>>;
+    type Labels: Iterator<Item = &'de BoltType>;
+    fn labels(self) -> Option<Self::Labels>;
 
-    fn typ(&self) -> Option<&BoltString>;
+    fn typ(self) -> Option<&'de BoltString>;
 
-    fn properties(&self) -> &BoltMap;
+    fn properties(self) -> &'de BoltMap;
 }
 
-impl AdditionalData for BoltNode {
-    fn id(&self) -> &BoltInteger {
+impl<'de> AdditionalData<'de> for &'de BoltNode {
+    fn id(self) -> &'de BoltInteger {
         &self.id
     }
 
-    fn start_node_id(&self) -> Option<&BoltInteger> {
+    fn start_node_id(self) -> Option<&'de BoltInteger> {
         None
     }
 
-    fn end_node_id(&self) -> Option<&BoltInteger> {
+    fn end_node_id(self) -> Option<&'de BoltInteger> {
         None
     }
 
-    type Labels<'a> = std::slice::Iter<'a, BoltType>;
+    type Labels = std::slice::Iter<'de, BoltType>;
 
-    fn labels(&self) -> Option<Self::Labels<'_>> {
+    fn labels(self) -> Option<Self::Labels> {
         Some(self.labels.value.iter())
     }
 
-    fn typ(&self) -> Option<&BoltString> {
+    fn typ(self) -> Option<&'de BoltString> {
         None
     }
 
-    fn properties(&self) -> &BoltMap {
+    fn properties(self) -> &'de BoltMap {
         &self.properties
     }
 }
 
-impl AdditionalData for BoltRelation {
-    fn id(&self) -> &BoltInteger {
+impl<'de> AdditionalData<'de> for &'de BoltRelation {
+    fn id(self) -> &'de BoltInteger {
         &self.id
     }
 
-    fn start_node_id(&self) -> Option<&BoltInteger> {
+    fn start_node_id(self) -> Option<&'de BoltInteger> {
         Some(&self.start_node_id)
     }
 
-    fn end_node_id(&self) -> Option<&BoltInteger> {
+    fn end_node_id(self) -> Option<&'de BoltInteger> {
         Some(&self.end_node_id)
     }
 
-    type Labels<'a> = std::iter::Empty<&'a BoltType>;
+    type Labels = std::iter::Empty<&'de BoltType>;
 
-    fn labels(&self) -> Option<Self::Labels<'_>> {
+    fn labels(self) -> Option<Self::Labels> {
         None
     }
 
-    fn typ(&self) -> Option<&BoltString> {
+    fn typ(self) -> Option<&'de BoltString> {
         Some(&self.typ)
     }
 
-    fn properties(&self) -> &BoltMap {
+    fn properties(self) -> &'de BoltMap {
         &self.properties
     }
 }
 
-impl AdditionalData for BoltUnboundedRelation {
-    fn id(&self) -> &BoltInteger {
+impl<'de> AdditionalData<'de> for &'de BoltUnboundedRelation {
+    fn id(self) -> &'de BoltInteger {
         &self.id
     }
 
-    fn start_node_id(&self) -> Option<&BoltInteger> {
+    fn start_node_id(self) -> Option<&'de BoltInteger> {
         None
     }
 
-    fn end_node_id(&self) -> Option<&BoltInteger> {
+    fn end_node_id(self) -> Option<&'de BoltInteger> {
         None
     }
 
-    type Labels<'a> = std::iter::Empty<&'a BoltType>;
+    type Labels = std::iter::Empty<&'de BoltType>;
 
-    fn labels(&self) -> Option<Self::Labels<'_>> {
+    fn labels(self) -> Option<Self::Labels> {
         None
     }
 
-    fn typ(&self) -> Option<&BoltString> {
+    fn typ(self) -> Option<&'de BoltString> {
         Some(&self.typ)
     }
 
-    fn properties(&self) -> &BoltMap {
+    fn properties(self) -> &'de BoltMap {
         &self.properties
     }
 }
@@ -761,7 +763,7 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
     }
 }
 
-impl<'de, T: AdditionalData> IntoDeserializer<'de, DeError> for ElementData<'de, T> {
+impl<'de, T: AdditionalData<'de>> IntoDeserializer<'de, DeError> for ElementData<'de, T> {
     type Deserializer = ElementDataDeserializer<'de, T>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -784,7 +786,7 @@ enum Visitation {
 
 enum ElementData<'de, T> {
     Property(&'de BoltType),
-    Additional(&'de T),
+    Additional(T),
 }
 
 enum ElementDataDeserializer<'de, T> {
@@ -792,7 +794,7 @@ enum ElementDataDeserializer<'de, T> {
     Additional(AdditionalDataDeserializer<'de, T>),
 }
 
-impl<'de, T: AdditionalData> Deserializer<'de> for ElementDataDeserializer<'de, T> {
+impl<'de, T: AdditionalData<'de>> Deserializer<'de> for ElementDataDeserializer<'de, T> {
     type Error = DeError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
