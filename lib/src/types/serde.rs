@@ -1,11 +1,13 @@
 use crate::types::{BoltInteger, BoltMap, BoltNode, BoltString, BoltType};
 
-use ::serde::{
-    de::value::{I64Deserializer, MapDeserializer, SeqDeserializer, StrDeserializer},
+use serde::{
+    de::{
+        value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
+        Deserializer, Error, IntoDeserializer, Unexpected, Visitor,
+    },
     forward_to_deserialize_any, Deserialize,
 };
 use std::iter;
-use serde::de::{Deserializer, Error, IntoDeserializer, Unexpected, Visitor};
 
 /// Newtype to extract the node id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
@@ -585,10 +587,10 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
 }
 
 impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
-    type Deserializer = StrDeserializer<'de, DeError>;
+    type Deserializer = BorrowedStrDeserializer<'de, DeError>;
 
     fn into_deserializer(self) -> Self::Deserializer {
-        StrDeserializer::new(&self.value)
+        BorrowedStrDeserializer::new(&self.value)
     }
 }
 
