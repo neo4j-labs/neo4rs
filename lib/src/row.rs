@@ -145,8 +145,8 @@ impl Node {
     }
 
     /// various labels attached to this node
-    pub fn labels(&self) -> Vec<String> {
-        self.inner.labels.iter().map(|l| l.to_string()).collect()
+    pub fn labels(&self) -> Vec<&str> {
+        self.to::<crate::Labels<_>>().unwrap().0
     }
 
     /// Get the names of the attributes of this node
@@ -185,8 +185,8 @@ impl Relation {
         self.inner.end_node_id.value
     }
 
-    pub fn typ(&self) -> String {
-        self.inner.typ.value.clone()
+    pub fn typ(&self) -> &str {
+        self.to::<crate::Type<_>>().unwrap().0
     }
 
     /// Get the names of the attributes of this relationship
@@ -216,8 +216,8 @@ impl UnboundedRelation {
         self.inner.id.value
     }
 
-    pub fn typ(&self) -> String {
-        self.inner.typ.value.clone()
+    pub fn typ(&self) -> &str {
+        self.to::<crate::Type<_>>().unwrap().0
     }
 
     /// Get the names of the attributes of this relationship
