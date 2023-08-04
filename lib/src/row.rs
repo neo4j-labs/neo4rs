@@ -1,6 +1,6 @@
 use crate::types::{
     serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation,
-    BoltType, BoltUnboundedRelation,
+    BoltUnboundedRelation,
 };
 
 use serde::Deserialize;
@@ -15,7 +15,8 @@ pub struct Row {
 }
 
 /// Snapshot of a node within a graph database
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(transparent)]
 pub struct Node {
     inner: BoltNode,
 }
@@ -122,8 +123,12 @@ impl Row {
         Row { attributes }
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.attributes.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.attributes.get::<T>(key)
     }
 
     pub fn to<'this, T>(&'this self) -> Result<T, DeError>
@@ -154,9 +159,12 @@ impl Node {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    /// Get the attributes of the node
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this node and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the node into custom type that implements [`serde::Deserialize`]
@@ -194,8 +202,12 @@ impl Relation {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
@@ -225,8 +237,12 @@ impl UnboundedRelation {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
@@ -242,7 +258,7 @@ impl UnboundedRelation {
 mod tests {
     use serde::Deserialize;
 
-    use crate::types::BoltString;
+    use crate::types::{BoltString, BoltType};
 
     use super::*;
 

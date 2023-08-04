@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
@@ -9,7 +10,8 @@ pub const SMALL: u8 = 0xCC;
 pub const MEDIUM: u8 = 0xCD;
 pub const LARGE: u8 = 0xCE;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltBytes {
     pub value: Bytes,
 }

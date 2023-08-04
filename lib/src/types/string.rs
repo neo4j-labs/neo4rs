@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::Deserialize;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::convert::From;
@@ -13,7 +14,8 @@ pub const SMALL: u8 = 0xD0;
 pub const MEDIUM: u8 = 0xD1;
 pub const LARGE: u8 = 0xD2;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltString {
     pub value: String,
 }

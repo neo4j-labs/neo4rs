@@ -1,26 +1,30 @@
-use crate::errors::*;
-use crate::types::*;
-use crate::version::Version;
-use bytes::*;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::iter::FromIterator;
-
-use std::mem;
-use std::rc::Rc;
+use crate::{
+    errors::{Error, Result},
+    types::{serde::DeError, BoltString, BoltType, Bytes},
+    version::Version,
+};
+use ::serde::Deserialize;
+use bytes::{Buf, BufMut, BytesMut};
+use std::{cell::RefCell, collections::HashMap, iter::FromIterator, mem, rc::Rc};
 
 pub const TINY: u8 = 0xA0;
 pub const SMALL: u8 = 0xD8;
 pub const MEDIUM: u8 = 0xD9;
 pub const LARGE: u8 = 0xDA;
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltMap {
     pub value: HashMap<BoltString, BoltType>,
 }
 
 impl BoltMap {
+    pub fn new() -> Self {
+        BoltMap {
+            value: HashMap::new(),
+        }
+    }
+
     pub fn with_capacity(capacity: usize) -> Self {
         BoltMap {
             value: HashMap::with_capacity(capacity),
@@ -39,7 +43,18 @@ impl BoltMap {
         self.value.insert(key, value);
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+        Self: Sized,
+    {
+        match self.value.get(key) {
+            Some(v) => v.to(),
+            None => Err(DeError::NoSuchProperty),
+        }
+    }
+
+    pub(crate) fn read<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
         match self.value.get(key) {
             Some(bolt_type) => {
                 if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {

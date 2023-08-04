@@ -7,6 +7,7 @@ use serde::{
 };
 use std::{collections::HashSet, result::Result};
 
+mod de;
 mod deser;
 mod error;
 

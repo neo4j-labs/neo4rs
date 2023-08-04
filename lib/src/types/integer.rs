@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::mem;
 use std::ops::{Add, Sub};
@@ -11,7 +12,8 @@ pub const INT_16: u8 = 0xC9;
 pub const INT_32: u8 = 0xCA;
 pub const INT_64: u8 = 0xCB;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltInteger {
     pub value: i64,
 }

@@ -1,12 +1,17 @@
 use super::DeError;
 use crate::types::{
-    BoltInteger, BoltMap, BoltNode, BoltRelation, BoltString, BoltType, BoltUnboundedRelation,
+    BoltInteger, BoltKind, BoltList, BoltMap, BoltNode, BoltRelation, BoltString, BoltType,
+    BoltUnboundedRelation,
 };
 
 use serde::{
     de::{
-        value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
-        Deserializer, Error, IntoDeserializer, Unexpected as Unexp, Visitor,
+        value::{
+            BorrowedBytesDeserializer, BorrowedStrDeserializer, I64Deserializer, MapDeserializer,
+            SeqDeserializer, UnitDeserializer,
+        },
+        DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer, MapAccess,
+        Unexpected as Unexp, VariantAccess, Visitor,
     },
     forward_to_deserialize_any,
 };
@@ -85,7 +90,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             let property_fields = properties
                 .iter()
                 .map(|(k, v)| (k.value.as_str(), ElementData::Property(v)));
-            let node_fields = property_fields.chain(additional_fields);
+            let node_fields = property_fields
+                .chain(additional_fields)
+                .map(|(k, v)| (BorrowedStr(k), v));
             visitor.visit_map(MapDeserializer::new(node_fields))
         }
 
@@ -321,6 +328,22 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         }
     }
 
+    fn deserialize_enum<V>(
+        self,
+        name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if name != std::any::type_name::<BoltType>() {
+            return Err(DeError::invalid_type(Unexp::Str(name), &"BoltType"));
+        }
+
+        visitor.visit_enum(BoltEnum { value: self.value })
+    }
+
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -336,7 +359,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char option enum identifier
+        char option identifier
     }
 }
 
@@ -409,6 +432,258 @@ impl<'de> BoltTypeDeserializer<'de> {
         };
 
         Err(DeError::invalid_type(typ, &visitor))
+    }
+}
+
+struct BoltKindDeserializer<'de> {
+    value: BoltKind,
+    _lifetime: PhantomData<&'de ()>,
+}
+
+impl<'de> BoltKindDeserializer<'de> {
+    fn new(value: BoltKind) -> Self {
+        Self {
+            value,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
+impl<'de> Deserializer<'de> for BoltKindDeserializer<'de> {
+    type Error = DeError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_u8(self.value.into())
+    }
+
+    forward_to_deserialize_any! {
+        char str string bytes byte_buf option unit unit_struct newtype_struct
+        seq tuple tuple_struct map struct enum identifier ignored_any
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 f32 f64
+    }
+}
+
+struct BoltEnum<'de> {
+    value: BoltRef<'de>,
+}
+
+impl<'de> EnumAccess<'de> for BoltEnum<'de> {
+    type Error = DeError;
+
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        let kind = match self.value {
+            BoltRef::Type(value) => match value {
+                BoltType::String(_) => BoltKind::String,
+                BoltType::Boolean(_) => BoltKind::Boolean,
+                BoltType::Map(_) => BoltKind::Map,
+                BoltType::Null(_) => BoltKind::Null,
+                BoltType::Integer(_) => BoltKind::Integer,
+                BoltType::Float(_) => BoltKind::Float,
+                BoltType::List(_) => BoltKind::List,
+                BoltType::Node(_) => BoltKind::Node,
+                BoltType::Relation(_) => BoltKind::Relation,
+                BoltType::UnboundedRelation(_) => BoltKind::UnboundedRelation,
+                BoltType::Point2D(_) => BoltKind::Point2D,
+                BoltType::Point3D(_) => BoltKind::Point3D,
+                BoltType::Bytes(_) => BoltKind::Bytes,
+                BoltType::Path(_) => BoltKind::Path,
+                BoltType::Duration(_) => BoltKind::Duration,
+                BoltType::Date(_) => BoltKind::Date,
+                BoltType::Time(_) => BoltKind::Time,
+                BoltType::LocalTime(_) => BoltKind::LocalTime,
+                BoltType::DateTime(_) => BoltKind::DateTime,
+                BoltType::LocalDateTime(_) => BoltKind::LocalDateTime,
+                BoltType::DateTimeZoneId(_) => BoltKind::DateTimeZoneId,
+            },
+            BoltRef::Node(_) => BoltKind::Node,
+            BoltRef::Rel(_) => BoltKind::Relation,
+            BoltRef::URel(_) => BoltKind::UnboundedRelation,
+        };
+        let val = seed.deserialize(BoltKindDeserializer::new(kind))?;
+        Ok((val, self))
+    }
+}
+
+impl<'de> VariantAccess<'de> for BoltEnum<'de> {
+    type Error = DeError;
+
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        Err(DeError::invalid_type(Unexp::TupleVariant, &"unit variant"))
+    }
+
+    fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: DeserializeSeed<'de>,
+    {
+        Err(DeError::invalid_type(
+            Unexp::TupleVariant,
+            &"newtype variant",
+        ))
+    }
+
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        match self.value {
+            BoltRef::Type(value) => match value {
+                BoltType::String(s) => visitor.visit_borrowed_str(&s.value),
+                BoltType::Boolean(b) => visitor.visit_bool(b.value),
+                BoltType::Map(m) => visitor.visit_map(MapDeserializer::new(m.value.iter())),
+                BoltType::Null(_) => visitor.visit_unit(),
+                BoltType::Integer(i) => visitor.visit_i64(i.value),
+                BoltType::Float(f) => visitor.visit_f64(f.value),
+                BoltType::List(l) => visitor.visit_seq(SeqDeserializer::new(l.value.iter())),
+                BoltType::Node(n) => visitor.visit_map(ElementMapAccess::new([
+                    (ElementDataKey::Id, ElementDataValue::Int(&n.id)),
+                    (ElementDataKey::Labels, ElementDataValue::Lst(&n.labels)),
+                    (
+                        ElementDataKey::Properties,
+                        ElementDataValue::Map(&n.properties),
+                    ),
+                ])),
+                BoltType::Relation(_) => todo!("relation as mapaccess visit_map"),
+                BoltType::UnboundedRelation(_) => {
+                    todo!("unbounded relation as mapaccess visit_map")
+                }
+                BoltType::Point2D(_) => todo!("point2d as mapaccess visit_map"),
+                BoltType::Point3D(_) => todo!("point3d as mapaccess visit_map"),
+                BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
+                BoltType::Path(_) => todo!("path as mapaccess visit_map"),
+                BoltType::Duration(_) => todo!("duration as mapaccess visit_map"),
+                BoltType::Date(_) => todo!("date as mapaccess visit_map"),
+                BoltType::Time(_) => todo!("time as mapaccess visit_map"),
+                BoltType::LocalTime(_) => todo!("localtime as mapaccess visit_map"),
+                BoltType::DateTime(_) => todo!("datetime as mapaccess visit_map"),
+                BoltType::LocalDateTime(_) => todo!("localdatetime as mapaccess visit_map"),
+                BoltType::DateTimeZoneId(_) => todo!("datetimezoneid as mapaccess visit_map"),
+            },
+            BoltRef::Node(n) => visitor.visit_map(ElementMapAccess::new([
+                (ElementDataKey::Id, ElementDataValue::Int(&n.id)),
+                (ElementDataKey::Labels, ElementDataValue::Lst(&n.labels)),
+                (
+                    ElementDataKey::Properties,
+                    ElementDataValue::Map(&n.properties),
+                ),
+            ])),
+            BoltRef::Rel(_) => todo!("relation as mapaccess visit_map"),
+            BoltRef::URel(_) => todo!("unbounded relation as mapaccess visit_map"),
+        }
+    }
+
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        _visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        Err(DeError::invalid_type(
+            Unexp::TupleVariant,
+            &"struct variant",
+        ))
+    }
+}
+
+struct ElementMapAccess<'de, I> {
+    elements: I,
+    value: Option<ElementDataValue<'de>>,
+}
+
+impl<'de, I> ElementMapAccess<'de, I>
+where
+    I: Iterator<Item = (ElementDataKey, ElementDataValue<'de>)>,
+{
+    fn new<II>(elements: II) -> Self
+    where
+        II: IntoIterator<IntoIter = I>,
+    {
+        Self {
+            elements: elements.into_iter(),
+            value: None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum ElementDataKey {
+    Id,
+    StartNodeId,
+    EndNodeId,
+    Type,
+    Labels,
+    Properties,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum ElementDataValue<'de> {
+    Int(&'de BoltInteger),
+    Str(&'de BoltString),
+    Lst(&'de BoltList),
+    Map(&'de BoltMap),
+}
+
+impl<'de, I> MapAccess<'de> for ElementMapAccess<'de, I>
+where
+    I: Iterator<Item = (ElementDataKey, ElementDataValue<'de>)>,
+{
+    type Error = DeError;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: DeserializeSeed<'de>,
+    {
+        self.elements
+            .next()
+            .map(|(key, value)| {
+                self.value = Some(value);
+                // TODO: serialize key as enum
+                let key = match key {
+                    ElementDataKey::Id => "id",
+                    ElementDataKey::StartNodeId => "start_node_id",
+                    ElementDataKey::EndNodeId => "end_node_id",
+                    ElementDataKey::Type => "type",
+                    ElementDataKey::Labels => "labels",
+                    ElementDataKey::Properties => "properties",
+                };
+                seed.deserialize(BorrowedStrDeserializer::new(key))
+            })
+            .transpose()
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        let value = self
+            .value
+            .take()
+            .expect("next_value_seed called before next_key_seed");
+        match value {
+            ElementDataValue::Int(id) => seed.deserialize(id.value.into_deserializer()),
+            ElementDataValue::Str(typ) => {
+                seed.deserialize(BorrowedStrDeserializer::new(&typ.value))
+            }
+            ElementDataValue::Lst(labels) => {
+                seed.deserialize(SeqDeserializer::new(labels.value.iter()))
+            }
+            ElementDataValue::Map(properties) => {
+                seed.deserialize(MapDeserializer::new(properties.value.iter()))
+            }
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        self.elements.size_hint().1
     }
 }
 
@@ -784,6 +1059,16 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
 
     fn into_deserializer(self) -> Self::Deserializer {
         BorrowedStrDeserializer::new(&self.value)
+    }
+}
+
+struct BorrowedStr<'de>(&'de str);
+
+impl<'de> IntoDeserializer<'de, DeError> for BorrowedStr<'de> {
+    type Deserializer = BorrowedStrDeserializer<'de, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BorrowedStrDeserializer::new(self.0)
     }
 }
 

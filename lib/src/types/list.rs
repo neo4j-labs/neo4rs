@@ -1,17 +1,15 @@
-use crate::errors::*;
-use crate::types::*;
-use crate::version::Version;
+use crate::{errors::*, types::*, version::Version};
+use ::serde::Deserialize;
 use bytes::*;
-use std::cell::RefCell;
-use std::mem;
-use std::rc::Rc;
+use std::{cell::RefCell, mem, rc::Rc};
 
 pub const TINY: u8 = 0x90;
 pub const SMALL: u8 = 0xD4;
 pub const MEDIUM: u8 = 0xD5;
 pub const LARGE: u8 = 0xD6;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltList {
     pub value: Vec<BoltType>,
 }

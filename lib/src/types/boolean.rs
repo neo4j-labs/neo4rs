@@ -1,13 +1,15 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub const FALSE: u8 = 0xC2;
 pub const TRUE: u8 = 0xC3;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct BoltBoolean {
     pub value: bool,
 }
