@@ -424,6 +424,17 @@ mod tests {
     }
 
     #[test]
+    fn convert_into_map() {
+        let map = HashMap::from([(BoltString::new("42"), BoltType::Null(BoltNull {})), 
+            (BoltString::new("1337"), BoltType::Integer(BoltInteger::new(1337)))]);
+        let value = BoltType::Map(BoltMap {
+            value: map,
+        });
+        let value = HashMap::<String, i64>::try_from(value).unwrap();
+        assert_eq!(value, HashMap::from([("1337".to_owned(), 1337_i64)]));
+    }
+
+    #[test]
     fn convert_propagates_error() {
         let value = BoltType::List(BoltList {
             value: vec![
@@ -446,6 +457,18 @@ mod tests {
                     BoltType::Integer(BoltInteger::new(42)),
                     BoltType::Integer(BoltInteger::new(1337)),
                 ],
+            })
+        );
+    }
+
+    #[test]
+    fn convert_from_map() {
+        let map = HashMap::from([("1337".to_owned(), 1337_i64)]);
+        let value: BoltType = map.into();
+        assert_eq!(
+            value,
+            BoltType::Map(BoltMap {
+                value: HashMap::from([(BoltString::new("1337"), BoltType::Integer(BoltInteger::new(1337)))]),
             })
         );
     }
