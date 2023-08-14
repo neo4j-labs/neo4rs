@@ -415,7 +415,7 @@ pub use crate::config::{Config, ConfigBuilder};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;
-pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
+pub use crate::row::{Map, Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
 pub use crate::stream::RowStream;
 pub use crate::txn::Txn;
 pub use crate::types::serde::{EndNodeId, Id, Keys, Labels, StartNodeId, Type};

@@ -165,6 +165,17 @@ impl TryFrom<BoltType> for Node {
     }
 }
 
+impl TryFrom<BoltType> for Map {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<Map> {
+        match input {
+            BoltType::Map(n) => Ok(Map::new(n)),
+            _ => Err(Error::ConversionError),
+        }
+    }
+}
+
 impl TryFrom<BoltType> for Path {
     type Error = Error;
 
