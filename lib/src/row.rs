@@ -14,12 +14,6 @@ pub struct Row {
     attributes: BoltMap,
 }
 
-/// A map very similar to a `HashMap` that implements `TryFrom<BoltType>` to allow for retrieval.
-#[derive(Debug)]
-pub struct Map {
-    inner: BoltMap,
-}
-
 /// Snapshot of a node within a graph database
 #[derive(Debug)]
 pub struct Node {
@@ -52,16 +46,6 @@ pub struct Point2D {
 /// Represents a single location in 3-dimensional space
 pub struct Point3D {
     inner: BoltPoint3D,
-}
-
-impl Map {
-    pub fn new(inner: BoltMap) -> Self {
-        Map { inner }
-    }
-  
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
-    }
 }
 
 impl Path {

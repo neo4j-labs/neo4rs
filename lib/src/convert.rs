@@ -1,7 +1,9 @@
 use crate::errors::*;
 use crate::row::*;
 use crate::types::*;
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::hash::Hash;
 
 impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     type Error = Error;
@@ -9,6 +11,27 @@ impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     fn try_from(input: BoltType) -> Result<Vec<A>> {
         match input {
             BoltType::List(l) => l.value.iter().map(|x| A::try_from(x.clone())).collect(),
+            _ => Err(Error::ConversionError),
+        }
+    }
+}
+
+impl<A: From<BoltString> + Eq + PartialEq + Hash, B: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for HashMap<A, B> {
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<HashMap<A, B>> {
+        match input {
+            BoltType::Map(l) => {
+                let mut map = HashMap::new();
+                for (key, val) in l.value {
+                    if let BoltType::Null(_) = val {
+                        ()
+                    } else {
+                        map.insert(A::from(key.clone()), B::try_from(val.clone())?);
+                    }
+                }
+                Ok(map)
+            },
             _ => Err(Error::ConversionError),
         }
     }
@@ -165,17 +188,6 @@ impl TryFrom<BoltType> for Node {
     }
 }
 
-impl TryFrom<BoltType> for Map {
-    type Error = Error;
-
-    fn try_from(input: BoltType) -> Result<Map> {
-        match input {
-            BoltType::Map(n) => Ok(Map::new(n)),
-            _ => Err(Error::ConversionError),
-        }
-    }
-}
-
 impl TryFrom<BoltType> for Path {
     type Error = Error;
 
@@ -294,6 +306,15 @@ impl<A: Into<BoltType> + Clone> From<&[A]> for BoltType {
         BoltType::List(BoltList {
             value: value.iter().map(|v| v.clone().into()).collect(),
         })
+    }
+}
+
+impl<A: Into<BoltString> + Clone, B: Into<BoltType> + Clone> From<HashMap<A, B>> for BoltType {
+    fn from(value: HashMap<A, B>) -> Self {
+        BoltType::Map(BoltMap { value: value.iter().fold(HashMap::new(), |mut accum, (k, v)| {
+            accum.insert(k.clone().into(), v.clone().into());
+            accum
+        })})
     }
 }
 
