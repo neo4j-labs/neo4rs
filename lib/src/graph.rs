@@ -7,8 +7,7 @@ use crate::txn::Txn;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// A neo4j database abstraction
-pub struct Graph {
+struct Inner {
     config: Config,
     pool: ConnectionPool,
 }
@@ -18,17 +17,13 @@ pub fn query(q: &str) -> Query {
     Query::new(q.to_owned())
 }
 
-impl Graph {
-    /// Connects to the database with configurations provided.
-    ///
-    /// You can build a config using [`ConfigBuilder::default()`].
-    pub async fn connect(config: Config) -> Result<Self> {
+impl Inner {
+    async fn connect(config: Config) -> Result<Self> {
         let pool = create_pool(&config).await?;
-        Ok(Graph { config, pool })
+        Ok(Self { config, pool })
     }
 
-    /// Connects to the database with default configurations
-    pub async fn new(
+    async fn new(
         uri: impl Into<String>,
         user: impl Into<String>,
         password: impl Into<String>,
@@ -41,11 +36,55 @@ impl Graph {
         Self::connect(config).await
     }
 
+    async fn start_txn(&self) -> Result<Txn<'_>> {
+        let connection = self.pool.get().await?;
+        Txn::new(&self.config, connection).await
+    }
+
+    async fn run(&self, q: Query) -> Result<()> {
+        let connection = Arc::new(Mutex::new(self.pool.get().await?));
+        q.run(&self.config, connection).await
+    }
+
+    async fn execute(&self, q: Query) -> Result<RowStream> {
+        let connection = Arc::new(Mutex::new(self.pool.get().await?));
+        q.execute(&self.config, connection).await
+    }
+}
+
+/// A neo4j database abstraction
+#[derive(Clone)]
+pub struct Graph {
+    inner: Arc<Inner>,
+}
+
+impl Graph { 
+    /// Connects to the database with configurations provided.
+    ///
+    /// You can build a config using [`ConfigBuilder::default()`].
+    pub async fn connect(config: Config) -> Result<Self> {
+        let inner = Inner::connect(config).await?;
+        Ok(Graph {
+            inner: Arc::new(inner),
+        })
+    }
+
+    /// Connects to the database with default configurations
+    pub async fn new(
+        uri: impl Into<String>,
+        user: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let inner = Inner::new(uri, user, password).await?;
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
     /// Starts a new transaction, all queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
     pub async fn start_txn(&self) -> Result<Txn> {
-        let connection = self.pool.get().await?;
-        Txn::new(self.config.clone(), connection).await
+        self.inner.start_txn().await
     }
 
     /// Runs a query using a connection from the connection pool, it doesn't return any
@@ -55,13 +94,11 @@ impl Graph {
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run(&self, q: Query) -> Result<()> {
-        let connection = Arc::new(Mutex::new(self.pool.get().await?));
-        q.run(&self.config, connection).await
+        self.inner.run(q).await
     }
 
     /// Executes a query and returns a [`RowStream`]
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
-        let connection = Arc::new(Mutex::new(self.pool.get().await?));
-        q.execute(&self.config, connection).await
+        self.inner.execute(q).await
     }
 }

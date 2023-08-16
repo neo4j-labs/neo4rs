@@ -11,13 +11,13 @@ use tokio::sync::Mutex;
 ///
 /// When a transation is started, a dedicated connection is resered and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
-pub struct Txn {
-    config: Config,
+pub struct Txn<'a> {
+    config: &'a Config,
     connection: Arc<Mutex<ManagedConnection>>,
 }
 
-impl Txn {
-    pub(crate) async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
+impl Txn<'_> {
+    pub(crate) async fn new(config: &Config, mut connection: ManagedConnection) -> Result<Txn<'_>> {
         let begin = BoltRequest::begin();
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => Ok(Txn {
@@ -38,12 +38,12 @@ impl Txn {
 
     /// Runs a single query and discards the stream.
     pub async fn run(&self, q: Query) -> Result<()> {
-        q.run(&self.config, self.connection.clone()).await
+        q.run(self.config, self.connection.clone()).await
     }
 
     /// Executes a query and returns a [`RowStream`]
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
-        q.execute(&self.config, self.connection.clone()).await
+        q.execute(self.config, self.connection.clone()).await
     }
 
     /// Commits the transaction in progress
