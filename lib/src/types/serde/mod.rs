@@ -1,15 +1,20 @@
 use crate::types::{BoltMap, BoltNode, BoltRelation, BoltType, BoltUnboundedRelation};
 
-pub use error::{DeError, Unexpected};
+use std::{collections::HashSet, result::Result};
+
 use serde::{
     de::{value::MapDeserializer, IntoDeserializer},
     Deserialize,
 };
-use std::{collections::HashSet, result::Result};
 
+pub use error::{DeError, Unexpected};
+pub use kind::BoltKind;
+
+mod cenum;
 mod de;
 mod deser;
 mod error;
+mod kind;
 
 /// Newtype to extract the node id or relationship id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]

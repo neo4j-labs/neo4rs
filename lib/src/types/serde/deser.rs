@@ -6,10 +6,7 @@ use crate::types::{
 
 use serde::{
     de::{
-        value::{
-            BorrowedBytesDeserializer, BorrowedStrDeserializer, I64Deserializer, MapDeserializer,
-            SeqDeserializer, UnitDeserializer,
-        },
+        value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
         DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer, MapAccess,
         Unexpected as Unexp, VariantAccess, Visitor,
     },
@@ -435,37 +432,6 @@ impl<'de> BoltTypeDeserializer<'de> {
     }
 }
 
-struct BoltKindDeserializer<'de> {
-    value: BoltKind,
-    _lifetime: PhantomData<&'de ()>,
-}
-
-impl<'de> BoltKindDeserializer<'de> {
-    fn new(value: BoltKind) -> Self {
-        Self {
-            value,
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl<'de> Deserializer<'de> for BoltKindDeserializer<'de> {
-    type Error = DeError;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        visitor.visit_u8(self.value.into())
-    }
-
-    forward_to_deserialize_any! {
-        char str string bytes byte_buf option unit unit_struct newtype_struct
-        seq tuple tuple_struct map struct enum identifier ignored_any
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 f32 f64
-    }
-}
-
 struct BoltEnum<'de> {
     value: BoltRef<'de>,
 }
@@ -507,7 +473,7 @@ impl<'de> EnumAccess<'de> for BoltEnum<'de> {
             BoltRef::Rel(_) => BoltKind::Relation,
             BoltRef::URel(_) => BoltKind::UnboundedRelation,
         };
-        let val = seed.deserialize(BoltKindDeserializer::new(kind))?;
+        let val = seed.deserialize(kind.into_deserializer())?;
         Ok((val, self))
     }
 }

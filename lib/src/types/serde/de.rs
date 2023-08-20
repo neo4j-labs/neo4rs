@@ -251,8 +251,7 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             }
         }
 
-        let (kind, variant): (u8, _) = data.variant()?;
-        let kind = BoltKind::from(kind);
+        let (kind, variant): (BoltKind, _) = data.variant()?;
         match kind {
             BoltKind::Null => variant.tuple_variant(1, self),
             BoltKind::String => variant.tuple_variant(1, self),

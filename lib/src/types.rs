@@ -15,6 +15,7 @@ pub mod relation;
 pub(crate) mod serde;
 pub mod string;
 pub mod time;
+pub use self::serde::BoltKind;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;
@@ -169,66 +170,5 @@ impl BoltType {
             _ => return Err(Error::UnknownType(format!("{:#04X?}", input.borrow()))),
         };
         Ok(bolt_type)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub(crate) enum BoltKind {
-    Null = 0,
-    String,
-    Boolean,
-    Map,
-    Integer,
-    Float,
-    List,
-    Node,
-    Relation,
-    UnboundedRelation,
-    Point2D,
-    Point3D,
-    Bytes,
-    Path,
-    Duration,
-    Date,
-    Time,
-    LocalTime,
-    DateTime,
-    LocalDateTime,
-    DateTimeZoneId,
-}
-
-impl From<BoltKind> for u8 {
-    fn from(kind: BoltKind) -> Self {
-        kind as u8
-    }
-}
-
-impl From<u8> for BoltKind {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => BoltKind::Null,
-            1 => BoltKind::String,
-            2 => BoltKind::Boolean,
-            3 => BoltKind::Map,
-            4 => BoltKind::Integer,
-            5 => BoltKind::Float,
-            6 => BoltKind::List,
-            7 => BoltKind::Node,
-            8 => BoltKind::Relation,
-            9 => BoltKind::UnboundedRelation,
-            10 => BoltKind::Point2D,
-            11 => BoltKind::Point3D,
-            12 => BoltKind::Bytes,
-            13 => BoltKind::Path,
-            14 => BoltKind::Duration,
-            15 => BoltKind::Date,
-            16 => BoltKind::Time,
-            17 => BoltKind::LocalTime,
-            18 => BoltKind::DateTime,
-            19 => BoltKind::LocalDateTime,
-            20 => BoltKind::DateTimeZoneId,
-            _ => panic!("Unknown kind: {}", value),
-        }
     }
 }
