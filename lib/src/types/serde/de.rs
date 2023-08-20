@@ -1,7 +1,7 @@
 use crate::{
     types::{
-        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNode,
-        BoltNull, BoltString, BoltType,
+        serde::element::ElementDataKey, BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind,
+        BoltList, BoltMap, BoltNode, BoltNull, BoltString, BoltType,
     },
     Id, Labels,
 };
@@ -42,16 +42,16 @@ impl<'de> Deserialize<'de> for BoltNode {
             {
                 let mut builder = BoltNodeBuilder::default();
 
-                while let Some(key) = dbg!(map.next_key::<&str>())? {
+                while let Some(key) = map.next_key::<&str>()? {
                     match key {
-                        "::id" => builder
-                            .id(|| Ok(BoltInteger::new(dbg!(map.next_value::<Id>())?.0 as i64)))?,
-                        "::labels" => {
-                            builder.labels(|| Ok(dbg!(map.next_value::<Labels<BoltList>>())?.0))?
+                        "::id" => {
+                            builder.id(|| Ok(BoltInteger::new(map.next_value::<Id>()?.0 as i64)))?
                         }
-                        otherwise => builder.insert(|| {
-                            Ok((BoltString::from(otherwise), dbg!(map.next_value())?))
-                        })?,
+                        "::labels" => {
+                            builder.labels(|| Ok(map.next_value::<Labels<BoltList>>()?.0))?
+                        }
+                        otherwise => builder
+                            .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
                     }
                 }
 
@@ -232,15 +232,15 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             {
                 let mut builder = BoltNodeBuilder::default();
 
-                while let Some(key) = dbg!(map.next_key::<&str>())? {
+                while let Some(key) = map.next_key::<ElementDataKey>()? {
                     match key {
-                        "id" => builder.id(|| map.next_value())?,
-                        "labels" => builder.labels(|| map.next_value())?,
-                        "properties" => builder.properties(|| map.next_value())?,
+                        ElementDataKey::Id => builder.id(|| map.next_value())?,
+                        ElementDataKey::Labels => builder.labels(|| map.next_value())?,
+                        ElementDataKey::Properties => builder.properties(|| map.next_value())?,
                         otherwise => {
                             return Err(Error::unknown_field(
-                                otherwise,
-                                &["id", "labels", "properties"],
+                                otherwise.name(),
+                                &["Id", "Labels", "Properties"],
                             ))
                         }
                     }

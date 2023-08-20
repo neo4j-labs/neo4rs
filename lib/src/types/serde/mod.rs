@@ -13,6 +13,7 @@ pub use kind::BoltKind;
 mod cenum;
 mod de;
 mod deser;
+mod element;
 mod error;
 mod kind;
 

@@ -30,6 +30,15 @@ macro_rules! cenum {
             fn from_discriminant(discriminant: u8) -> Option<Self> {
                 Self::VARIANTS.get(usize::from(discriminant)).copied()
             }
+
+            #[allow(unused)]
+            pub const fn name(self) -> &'static str {
+                match self {
+                    $(
+                        Self::$variants => stringify!($variants),
+                    )+
+                }
+            }
         }
 
 
