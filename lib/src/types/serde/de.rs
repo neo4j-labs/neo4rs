@@ -1,13 +1,6 @@
-use crate::{
-    types::{
-        serde::{
-            builder::{BoltNodeBuilder, Id},
-            element::ElementDataKey,
-        },
-        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNode,
-        BoltNull, BoltString, BoltType,
-    },
-    Labels,
+use crate::types::{
+    serde::node::BoltNodeVisitor, BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind,
+    BoltList, BoltMap, BoltNull, BoltString, BoltType,
 };
 
 use bytes::Bytes;
@@ -23,49 +16,6 @@ impl<'de> Deserialize<'de> for BoltType {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_enum(std::any::type_name::<BoltType>(), &[], BoltTypeVisitor)
-    }
-}
-
-impl<'de> Deserialize<'de> for BoltNode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        const ID: &str = "42.<id>";
-        const LABELS: &str = "42.<labels>";
-
-        struct BoltNodeVisitor;
-
-        impl<'de> Visitor<'de> for BoltNodeVisitor {
-            type Value = BoltNode;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct BoltNode")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: ::serde::de::MapAccess<'de>,
-            {
-                let mut builder = BoltNodeBuilder::default();
-
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
-                        ID => builder.id(|| map.next_value::<Id>().map(|i| i.0))?,
-                        LABELS => {
-                            builder.labels(|| map.next_value::<Labels<BoltList>>().map(|l| l.0))?
-                        }
-                        otherwise => builder
-                            .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
-                    }
-                }
-
-                let node = builder.build()?;
-                Ok(node)
-            }
-        }
-
-        deserializer.deserialize_struct("BoltNode", &[ID, LABELS], BoltNodeVisitor)
     }
 }
 
@@ -223,40 +173,6 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
     where
         A: serde::de::EnumAccess<'de>,
     {
-        struct BoltNodeVisitor;
-
-        impl<'de> Visitor<'de> for BoltNodeVisitor {
-            type Value = BoltNode;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct BoltNode")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: ::serde::de::MapAccess<'de>,
-            {
-                let mut builder = BoltNodeBuilder::default();
-
-                while let Some(key) = map.next_key::<ElementDataKey>()? {
-                    match key {
-                        ElementDataKey::Id => builder.id(|| map.next_value())?,
-                        ElementDataKey::Labels => builder.labels(|| map.next_value())?,
-                        ElementDataKey::Properties => builder.properties(|| map.next_value())?,
-                        otherwise => {
-                            return Err(Error::unknown_field(
-                                otherwise.name(),
-                                &["Id", "Labels", "Properties"],
-                            ))
-                        }
-                    }
-                }
-
-                let node = builder.build()?;
-                Ok(node)
-            }
-        }
-
         let (kind, variant): (BoltKind, _) = data.variant()?;
         match kind {
             BoltKind::Null => variant.tuple_variant(1, self),
@@ -288,14 +204,10 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
 
 #[cfg(test)]
 mod tests {
-    use tap::Tap;
+    use crate::types::{BoltMap, BoltNull, BoltType};
 
-    use crate::{
-        types::{BoltMap, BoltNode, BoltNull, BoltType},
-        Node,
-    };
-
-    fn test_node() -> BoltNode {
+    #[test]
+    fn roundtrips() {
         let map = [
             ("age".into(), 42.into()),
             ("awesome".into(), true.into()),
@@ -305,53 +217,9 @@ mod tests {
         ]
         .into_iter()
         .collect::<BoltMap>();
+        let map = BoltType::Map(map);
 
-        BoltNode::new(42.into(), vec!["Person".into()].into(), map)
+        let actual = map.to::<BoltType>().unwrap();
+        assert_eq!(actual, map);
     }
-
-    #[test]
-    fn node_to_bolt_type() {
-        let node = test_node();
-        let actual = node.to::<BoltType>().unwrap();
-        assert_eq!(actual, BoltType::Node(node));
-    }
-
-    #[test]
-    fn node_to_bolt_node() {
-        let node = test_node();
-        let actual = node.to::<BoltNode>().unwrap();
-        assert_eq!(actual, node);
-    }
-
-    #[test]
-    fn node_to_node() {
-        let node = test_node();
-        let actual = node.to::<Node>().unwrap();
-        assert_eq!(actual.id(), node.id.value);
-        assert_eq!(
-            actual.labels().tap_mut(|v| v.sort_unstable()),
-            node.labels
-                .iter()
-                .map(|l| l.to_string())
-                .collect::<Vec<_>>()
-                .tap_mut(|v| v.sort_unstable())
-        );
-        assert_eq!(
-            actual.keys().tap_mut(|v| v.sort_unstable()),
-            node.properties
-                .value
-                .keys()
-                .map(|k| k.to_string())
-                .collect::<Vec<_>>()
-                .tap_mut(|v| v.sort_unstable())
-        );
-    }
-    //
-    // let rel = BoltRelation {
-    //     id: 84.into(),
-    //     start_node_id: 13.into(),
-    //     end_node_id: 37.into(),
-    //     typ: "KNOWS".into(),
-    //     properties: map.clone(),
-    // };
 }

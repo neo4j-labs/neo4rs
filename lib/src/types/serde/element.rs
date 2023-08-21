@@ -1,11 +1,12 @@
 use super::DeError;
 use crate::types::{
-    BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation, BoltString, BoltType,
-    BoltUnboundedRelation,
+    serde::deser::BoltTypeDeserializer, BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation,
+    BoltString, BoltType, BoltUnboundedRelation,
 };
 
 use std::{iter, marker::PhantomData, result::Result};
 
+use delegate::delegate;
 use serde::{
     de::{
         value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
@@ -57,28 +58,37 @@ pub struct ElementDataDeserializer<'de, T> {
     _lifetime: PhantomData<&'de ()>,
 }
 
-// pub struct AsElement<'de, T: ElementData<'de>>(T, PhantomData<&'de ()>);
-//
-// impl<'de, T: ElementData<'de>> AsElement<'de, T> {
-//     pub fn new(data: T) -> Self {
-//         Self(data, PhantomData)
-//     }
-// }
-//
-// impl<'de, T: ElementData<'de>> IntoDeserializer<'de, DeError> for AsElement<'de, T> {
-//     type Deserializer = ElementDataDeserializer<'de, T>;
-//
-//     fn into_deserializer(self) -> Self::Deserializer {
-//         ElementDataDeserializer::new(self.0)
-//     }
-// }
-
 impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
     pub fn new(data: T) -> Self {
         Self {
             data,
             _lifetime: PhantomData,
         }
+    }
+
+    pub fn deserialize_outer_struct<V>(
+        self,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, DeError>
+    where
+        V: Visitor<'de>,
+        T: Copy,
+    {
+        let properties = &self.data.properties().value;
+        let additional_fields = fields
+            .iter()
+            .copied()
+            .filter(|f| !properties.contains_key(*f))
+            .map(|f| (f, AdditionalData::Element(self.data)));
+        let property_fields = properties
+            .iter()
+            .map(|(k, v)| (k.value.as_str(), AdditionalData::Property(v)));
+        let node_fields = property_fields
+            .chain(additional_fields)
+            .map(|(k, v)| (BorrowedStr(k), v));
+
+        visitor.visit_map(MapDeserializer::new(node_fields))
     }
 
     fn deserialize_any_struct<V>(
@@ -427,6 +437,79 @@ impl<'de> Deserializer<'de> for NoEnumBorrowedStrDeserializer<'de> {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct identifier ignored_any enum
+    }
+}
+
+struct BorrowedStr<'de>(&'de str);
+
+impl<'de> IntoDeserializer<'de, DeError> for BorrowedStr<'de> {
+    type Deserializer = BorrowedStrDeserializer<'de, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        BorrowedStrDeserializer::new(self.0)
+    }
+}
+
+enum AdditionalData<'de, T> {
+    Property(&'de BoltType),
+    Element(T),
+}
+
+enum AdditionalDataDeserializer<'de, T> {
+    Property(BoltTypeDeserializer<'de>),
+    Element(ElementDataDeserializer<'de, T>),
+}
+
+impl<'de, T: ElementData<'de>> Deserializer<'de> for AdditionalDataDeserializer<'de, T> {
+    type Error = DeError;
+
+    delegate! {
+        to match self { Self::Property(v) => v, Self::Element(v) => v } {
+            fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_i8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_i16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_i32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_char<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_unit_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_newtype_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_tuple<V: Visitor<'de>>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_tuple_struct<V: Visitor<'de>>(self, name: &'static str, len: usize, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_struct<V: Visitor<'de>>(self, name: &'static str, fields: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_enum<V: Visitor<'de>>(self, name: &'static str, variants: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+            fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
+        }
+    }
+}
+
+impl<'de, T: ElementData<'de>> IntoDeserializer<'de, DeError> for AdditionalData<'de, T> {
+    type Deserializer = AdditionalDataDeserializer<'de, T>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        match self {
+            AdditionalData::Property(v) => {
+                AdditionalDataDeserializer::Property(v.into_deserializer())
+            }
+            AdditionalData::Element(v) => {
+                AdditionalDataDeserializer::Element(ElementDataDeserializer::new(v))
+            }
+        }
     }
 }
 

@@ -10,7 +10,6 @@
 
     #[derive(serde::Deserialize)]
     struct Person {
-        id: Id,
         labels: Labels,
         keys: Keys<Vec<String>>,
         name: String,
@@ -22,8 +21,6 @@
         assert_eq!(friend.name, "Mr Mark");
         assert_eq!(friend.labels.0, vec!["Person"]);
         assert_eq!(friend.keys.0, vec!["name"]);
-        assert!(friend.id.0 >= 0);
-
 
         // or use the neo4rs::Relation type
         let node: Node = row.get("friend").unwrap();

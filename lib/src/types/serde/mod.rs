@@ -17,6 +17,7 @@ mod deser;
 mod element;
 mod error;
 mod kind;
+mod node;
 
 /// Newtype to extract the node id or relationship id during deserialization.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize)]

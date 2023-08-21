@@ -15,8 +15,7 @@ pub struct Row {
 }
 
 /// Snapshot of a node within a graph database
-#[derive(Debug, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug)]
 pub struct Node {
     inner: BoltNode,
 }

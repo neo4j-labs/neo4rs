@@ -1,14 +1,13 @@
 use crate::{
     types::{
-        serde::element::{ElementData, ElementDataDeserializer, ElementMapAccess},
-        BoltKind, BoltNode, BoltRelation, BoltString, BoltType, BoltUnboundedRelation,
+        serde::element::ElementDataDeserializer, BoltKind, BoltRelation, BoltString, BoltType,
+        BoltUnboundedRelation,
     },
     DeError,
 };
 
 use std::result::Result;
 
-use delegate::delegate;
 use serde::{
     de::{
         value::{BorrowedStrDeserializer, MapDeserializer, SeqDeserializer},
@@ -48,10 +47,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Map(v)) => {
                 visitor.visit_map(MapDeserializer::new(v.value.iter()))
             }
-            BoltRef::Type(BoltType::Node(v)) => {
-                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
-            }
-            BoltRef::Node(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
+            BoltRef::Type(BoltType::Node(v)) => v.into_deserializer().deserialize_map(visitor),
             BoltRef::Type(BoltType::Relation(v)) => {
                 visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
             }
@@ -66,49 +62,32 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
 
     fn deserialize_struct<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        fn struct_with_additional<'de, T, V>(
-            fields: &'static [&'static str],
-            element: T,
-            visitor: V,
-        ) -> Result<V::Value, DeError>
-        where
-            T: Copy + ElementData<'de>,
-            V: Visitor<'de>,
-        {
-            let properties = &element.properties().value;
-            let additional_fields = fields
-                .iter()
-                .copied()
-                .filter(|f| !properties.contains_key(*f))
-                .map(|f| (f, AdditionalData::Element(element)));
-            let property_fields = properties
-                .iter()
-                .map(|(k, v)| (k.value.as_str(), AdditionalData::Property(v)));
-            let node_fields = property_fields
-                .chain(additional_fields)
-                .map(|(k, v)| (BorrowedStr(k), v));
-            visitor.visit_map(MapDeserializer::new(node_fields))
-        }
-
         match self.value {
             BoltRef::Type(BoltType::Map(v)) => {
                 visitor.visit_map(MapDeserializer::new(v.value.iter()))
             }
-            BoltRef::Type(BoltType::Node(v)) => struct_with_additional(fields, v, visitor),
-            BoltRef::Node(v) => struct_with_additional(fields, v, visitor),
-            BoltRef::Type(BoltType::Relation(v)) => struct_with_additional(fields, v, visitor),
-            BoltRef::Rel(v) => struct_with_additional(fields, v, visitor),
-            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
-                struct_with_additional(fields, v, visitor)
+            BoltRef::Type(BoltType::Node(v)) => v
+                .into_deserializer()
+                .deserialize_struct(name, fields, visitor),
+            BoltRef::Type(BoltType::Relation(v)) => {
+                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
             }
-            BoltRef::URel(v) => struct_with_additional(fields, v, visitor),
+            BoltRef::Rel(v) => {
+                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
+            }
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
+                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
+            }
+            BoltRef::URel(v) => {
+                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
+            }
             _ => self.unexpected(visitor),
         }
     }
@@ -122,12 +101,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         match self.value {
-            BoltRef::Type(BoltType::Node(v)) => {
-                ElementDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
-            }
-            BoltRef::Node(v) => {
-                ElementDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
-            }
+            BoltRef::Type(BoltType::Node(v)) => v
+                .into_deserializer()
+                .deserialize_newtype_struct(name, visitor),
             BoltRef::Type(BoltType::Relation(v)) => {
                 ElementDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
             }
@@ -414,7 +390,6 @@ impl<'de> BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Float(v)) => Unexp::Float(v.value),
             BoltRef::Type(BoltType::List(_)) => Unexp::Seq,
             BoltRef::Type(BoltType::Node(_)) => Unexp::Map,
-            BoltRef::Node(_) => Unexp::Map,
             BoltRef::Type(BoltType::Relation(_)) => Unexp::Map,
             BoltRef::Rel(_) => Unexp::Map,
             BoltRef::Type(BoltType::UnboundedRelation(_)) => Unexp::Map,
@@ -473,7 +448,6 @@ impl<'de> EnumAccess<'de> for BoltEnum<'de> {
                 BoltType::LocalDateTime(_) => BoltKind::LocalDateTime,
                 BoltType::DateTimeZoneId(_) => BoltKind::DateTimeZoneId,
             },
-            BoltRef::Node(_) => BoltKind::Node,
             BoltRef::Rel(_) => BoltKind::Relation,
             BoltRef::URel(_) => BoltKind::UnboundedRelation,
         };
@@ -499,7 +473,7 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
         ))
     }
 
-    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -512,7 +486,7 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
                 BoltType::Integer(i) => visitor.visit_i64(i.value),
                 BoltType::Float(f) => visitor.visit_f64(f.value),
                 BoltType::List(l) => visitor.visit_seq(SeqDeserializer::new(l.value.iter())),
-                BoltType::Node(n) => visitor.visit_map(ElementMapAccess::new(n.items())),
+                BoltType::Node(n) => ElementDataDeserializer::new(n).tuple_variant(len, visitor),
                 BoltType::Relation(_) => todo!("relation as mapaccess visit_map"),
                 BoltType::UnboundedRelation(_) => {
                     todo!("unbounded relation as mapaccess visit_map")
@@ -529,7 +503,6 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
                 BoltType::LocalDateTime(_) => todo!("localdatetime as mapaccess visit_map"),
                 BoltType::DateTimeZoneId(_) => todo!("datetimezoneid as mapaccess visit_map"),
             },
-            BoltRef::Node(n) => visitor.visit_map(ElementMapAccess::new(n.items())),
             BoltRef::Rel(_) => todo!("relation as mapaccess visit_map"),
             BoltRef::URel(_) => todo!("unbounded relation as mapaccess visit_map"),
         }
@@ -553,57 +526,8 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
 #[derive(Copy, Clone)]
 enum BoltRef<'de> {
     Type(&'de BoltType),
-    Node(&'de BoltNode),
     Rel(&'de BoltRelation),
     URel(&'de BoltUnboundedRelation),
-}
-
-enum AdditionalData<'de, T> {
-    Property(&'de BoltType),
-    Element(T),
-}
-
-enum AdditionalDataDeserializer<'de, T> {
-    Property(BoltTypeDeserializer<'de>),
-    Element(ElementDataDeserializer<'de, T>),
-}
-
-impl<'de, T: ElementData<'de>> Deserializer<'de> for AdditionalDataDeserializer<'de, T> {
-    type Error = DeError;
-
-    delegate! {
-        to match self { Self::Property(v) => v, Self::Element(v) => v } {
-            fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_i8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_i16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_i32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_char<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_unit_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_newtype_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_tuple<V: Visitor<'de>>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_tuple_struct<V: Visitor<'de>>(self, name: &'static str, len: usize, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_struct<V: Visitor<'de>>(self, name: &'static str, fields: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_enum<V: Visitor<'de>>(self, name: &'static str, variants: &'static [&'static str], visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-            fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error>;
-        }
-    }
 }
 
 impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
@@ -611,14 +535,6 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
 
     fn into_deserializer(self) -> Self::Deserializer {
         BoltTypeDeserializer::new(BoltRef::Type(self))
-    }
-}
-
-impl<'de> IntoDeserializer<'de, DeError> for &'de BoltNode {
-    type Deserializer = BoltTypeDeserializer<'de>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        BoltTypeDeserializer::new(BoltRef::Node(self))
     }
 }
 
@@ -643,31 +559,6 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltString {
 
     fn into_deserializer(self) -> Self::Deserializer {
         BorrowedStrDeserializer::new(&self.value)
-    }
-}
-
-struct BorrowedStr<'de>(&'de str);
-
-impl<'de> IntoDeserializer<'de, DeError> for BorrowedStr<'de> {
-    type Deserializer = BorrowedStrDeserializer<'de, DeError>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        BorrowedStrDeserializer::new(self.0)
-    }
-}
-
-impl<'de, T: ElementData<'de>> IntoDeserializer<'de, DeError> for AdditionalData<'de, T> {
-    type Deserializer = AdditionalDataDeserializer<'de, T>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        match self {
-            AdditionalData::Property(v) => {
-                AdditionalDataDeserializer::Property(v.into_deserializer())
-            }
-            AdditionalData::Element(v) => {
-                AdditionalDataDeserializer::Element(ElementDataDeserializer::new(v))
-            }
-        }
     }
 }
 
@@ -804,7 +695,17 @@ mod tests {
         assert!(map.to::<Person>().is_err());
     }
 
-    fn test_node() -> BoltType {
+    #[test]
+    fn node() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            id: Id,
+            labels: Labels,
+            keys: Keys,
+            name: String,
+            age: u8,
+        }
+
         let id = BoltInteger::new(1337);
         let labels = vec!["Person".into()].into();
         let properties = vec![
@@ -819,283 +720,17 @@ mod tests {
             labels,
             properties,
         };
-        BoltType::Node(node)
-    }
+        let node = BoltType::Node(node);
 
-    #[test]
-    fn node() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            name: String,
-            age: u8,
-        }
-
-        test_extract_node(Person {
+        let actual = node.to::<Person>().unwrap();
+        let expected = Person {
+            id: Id(1337),
+            labels: Labels(vec!["Person".into()]),
+            keys: Keys(["name".into(), "age".into()].into()),
             name: "Alice".into(),
             age: 42,
-        });
-    }
-
-    #[test]
-    fn extract_node_with_unit_types() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<T> {
-            name: String,
-            age: u8,
-            _t: PhantomData<T>,
-            _u: (),
-        }
-
-        test_extract_node(Person {
-            name: "Alice".to_owned(),
-            age: 42,
-            _t: PhantomData::<i32>,
-            _u: (),
-        });
-    }
-
-    #[test]
-    fn extract_node_id() {
-        test_extract_node_extra(Id(1337));
-    }
-
-    #[test]
-    fn extract_node_id_with_custom_newtype() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Id(i16);
-
-        test_extract_node_extra(Id(1337));
-    }
-
-    #[test]
-    fn extract_node_id_with_custom_struct() {
-        #[derive(Debug, Deserialize)]
-        struct Id {
-            id: AtomicU32,
-        }
-
-        impl PartialEq for Id {
-            fn eq(&self, other: &Self) -> bool {
-                self.id.load(Ordering::SeqCst) == other.id.load(Ordering::SeqCst)
-            }
-        }
-
-        test_extract_node_extra(Id { id: 1337.into() });
-    }
-
-    #[test]
-    fn extract_node_labels() {
-        test_extract_node_extra(Labels(vec!["Person".to_owned()]));
-    }
-
-    #[test]
-    fn extract_node_property_custom_labels_collection() {
-        test_extract_node_extra(Labels([String::from("Person")]));
-    }
-
-    #[test]
-    fn extract_node_labels_with_custom_newtype() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Labels([String; 1]);
-
-        test_extract_node_extra(Labels(["Person".to_owned()]));
-    }
-
-    #[test]
-    fn extract_node_labels_with_custom_struct() {
-        #[derive(Debug, PartialEq, Deserialize)]
-        struct Labels {
-            labels: Vec<String>,
-        }
-
-        test_extract_node_extra(Labels {
-            labels: vec!["Person".to_owned()],
-        });
-    }
-
-    #[test]
-    fn extract_node_labels_borrowed() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Labels<'a>(#[serde(borrow)] Vec<&'a str>);
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<'a> {
-            #[serde(borrow)]
-            labels: Labels<'a>,
-            name: String,
-            age: u8,
-        }
-
-        let expected = Person {
-            labels: Labels(vec!["Person"]),
-            name: "Alice".to_owned(),
-            age: 42,
         };
-
-        let node = test_node();
-
-        let actual = node.to::<Person>().unwrap();
-
         assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn extract_node_property_keys() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            keys: Keys,
-        }
-
-        let expected = Person {
-            keys: Keys(["name".to_owned(), "age".to_owned()].into()),
-        };
-
-        test_extract_node(expected);
-    }
-
-    #[test]
-    fn extract_node_property_keys_custom_vec() {
-        #[derive(Clone, Debug, Eq, Deserialize)]
-        #[serde(transparent)]
-        struct UnorderedVec(Vec<String>);
-
-        impl PartialEq for UnorderedVec {
-            fn eq(&self, other: &Self) -> bool {
-                // compare on sorted vectors to ignore
-                // order on comparison
-                let mut lhs = self.0.clone();
-                lhs.sort();
-
-                let mut rhs = other.0.clone();
-                rhs.sort();
-
-                lhs == rhs
-            }
-        }
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            keys: Keys<UnorderedVec>,
-        }
-
-        let expected = Person {
-            keys: Keys(UnorderedVec(vec!["name".to_owned(), "age".to_owned()])),
-        };
-
-        test_extract_node(expected);
-    }
-
-    #[test]
-    fn extract_node_property_keys_custom_struct() {
-        #[derive(Clone, Debug, Eq, Deserialize)]
-        struct Keys {
-            keys: Vec<String>,
-        }
-
-        impl PartialEq for Keys {
-            fn eq(&self, other: &Self) -> bool {
-                // since we cannot gurantee the order of the keys
-                // we have to sort them before comparing
-                let mut lhs = self.keys.clone();
-                lhs.sort();
-
-                let mut rhs = other.keys.clone();
-                rhs.sort();
-
-                lhs == rhs
-            }
-        }
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            property_keys: Keys,
-        }
-
-        let expected = Person {
-            property_keys: Keys {
-                keys: vec!["name".to_owned(), "age".to_owned()],
-            },
-        };
-
-        test_extract_node(expected);
-    }
-
-    #[test]
-    fn extract_node_property_keys_borrowed() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Keys<'a>(#[serde(borrow)] HashSet<&'a str>);
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<'a> {
-            #[serde(borrow)]
-            keys: Keys<'a>,
-        }
-
-        let expected = Person {
-            keys: Keys(["age", "name"].into()),
-        };
-
-        let node = test_node();
-
-        let actual = node.to::<Person>().unwrap();
-
-        assert_eq!(actual, expected);
-    }
-
-    fn test_extract_node_extra<T: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: T) {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<T> {
-            extra: T,
-            name: String,
-            age: u8,
-        }
-
-        let expected = Person {
-            extra: expected,
-            name: "Alice".to_owned(),
-            age: 42,
-        };
-
-        test_extract_node(expected);
-    }
-
-    fn test_extract_node<Person: Debug + PartialEq + for<'a> Deserialize<'a>>(expected: Person) {
-        let node = test_node();
-        let actual = node.to::<Person>().unwrap();
-        assert_eq!(actual, expected);
-
-        let node = match node {
-            BoltType::Node(node) => node,
-            _ => unreachable!(),
-        };
-        let actual = node.to::<Person>().unwrap();
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_just_extract_node_extra() {
-        let node = test_node();
-
-        let id = node.to::<Id>().unwrap();
-        let labels = node.to::<Labels>().unwrap();
-        let keys = node.to::<Keys>().unwrap();
-
-        assert_eq!(id, Id(1337));
-        assert_eq!(labels, Labels(vec!["Person".to_owned()]));
-        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
-
-        let node = match node {
-            BoltType::Node(node) => node,
-            _ => unreachable!(),
-        };
-
-        let id = node.to::<Id>().unwrap();
-        let labels = node.to::<Labels>().unwrap();
-        let keys = node.to::<Keys>().unwrap();
-
-        assert_eq!(id, Id(1337));
-        assert_eq!(labels, Labels(vec!["Person".to_owned()]));
-        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
     }
 
     fn test_relation() -> BoltType {
