@@ -1,8 +1,5 @@
 use crate::{
-    types::{
-        serde::element::ElementDataDeserializer, BoltKind, BoltString, BoltType,
-        BoltUnboundedRelation,
-    },
+    types::{serde::element::ElementDataDeserializer, BoltKind, BoltString, BoltType},
     DeError,
 };
 
@@ -50,9 +47,8 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Node(v)) => v.into_deserializer().deserialize_map(visitor),
             BoltRef::Type(BoltType::Relation(v)) => v.into_deserializer().deserialize_map(visitor),
             BoltRef::Type(BoltType::UnboundedRelation(v)) => {
-                visitor.visit_map(MapDeserializer::new(v.properties.value.iter()))
+                v.into_deserializer().deserialize_map(visitor)
             }
-            BoltRef::URel(v) => visitor.visit_map(MapDeserializer::new(v.properties.value.iter())),
             _ => self.unexpected(visitor),
         }
     }
@@ -76,12 +72,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Relation(v)) => v
                 .into_deserializer()
                 .deserialize_struct(name, fields, visitor),
-            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
-                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
-            }
-            BoltRef::URel(v) => {
-                ElementDataDeserializer::new(v).deserialize_outer_struct(fields, visitor)
-            }
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => v
+                .into_deserializer()
+                .deserialize_struct(name, fields, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -101,12 +94,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Relation(v)) => v
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
-            BoltRef::Type(BoltType::UnboundedRelation(v)) => {
-                ElementDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
-            }
-            BoltRef::URel(v) => {
-                ElementDataDeserializer::new(v).deserialize_newtype_struct(name, visitor)
-            }
+            BoltRef::Type(BoltType::UnboundedRelation(v)) => v
+                .into_deserializer()
+                .deserialize_newtype_struct(name, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -383,7 +373,6 @@ impl<'de> BoltTypeDeserializer<'de> {
             BoltRef::Type(BoltType::Node(_)) => Unexp::Map,
             BoltRef::Type(BoltType::Relation(_)) => Unexp::Map,
             BoltRef::Type(BoltType::UnboundedRelation(_)) => Unexp::Map,
-            BoltRef::URel(_) => Unexp::Map,
             BoltRef::Type(BoltType::Point2D(_)) => Unexp::Other("Point2D"),
             BoltRef::Type(BoltType::Point3D(_)) => Unexp::Other("Point3D"),
             BoltRef::Type(BoltType::Bytes(v)) => Unexp::Bytes(&v.value),
@@ -438,7 +427,6 @@ impl<'de> EnumAccess<'de> for BoltEnum<'de> {
                 BoltType::LocalDateTime(_) => BoltKind::LocalDateTime,
                 BoltType::DateTimeZoneId(_) => BoltKind::DateTimeZoneId,
             },
-            BoltRef::URel(_) => BoltKind::UnboundedRelation,
         };
         let val = seed.deserialize(kind.into_deserializer())?;
         Ok((val, self))
@@ -479,8 +467,8 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
                 BoltType::Relation(r) => {
                     ElementDataDeserializer::new(r).tuple_variant(len, visitor)
                 }
-                BoltType::UnboundedRelation(_) => {
-                    todo!("unbounded relation as mapaccess visit_map")
+                BoltType::UnboundedRelation(r) => {
+                    ElementDataDeserializer::new(r).tuple_variant(len, visitor)
                 }
                 BoltType::Point2D(_) => todo!("point2d as mapaccess visit_map"),
                 BoltType::Point3D(_) => todo!("point3d as mapaccess visit_map"),
@@ -494,7 +482,6 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
                 BoltType::LocalDateTime(_) => todo!("localdatetime as mapaccess visit_map"),
                 BoltType::DateTimeZoneId(_) => todo!("datetimezoneid as mapaccess visit_map"),
             },
-            BoltRef::URel(_) => todo!("unbounded relation as mapaccess visit_map"),
         }
     }
 
@@ -516,7 +503,6 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
 #[derive(Copy, Clone)]
 enum BoltRef<'de> {
     Type(&'de BoltType),
-    URel(&'de BoltUnboundedRelation),
 }
 
 impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
@@ -524,14 +510,6 @@ impl<'de> IntoDeserializer<'de, DeError> for &'de BoltType {
 
     fn into_deserializer(self) -> Self::Deserializer {
         BoltTypeDeserializer::new(BoltRef::Type(self))
-    }
-}
-
-impl<'de> IntoDeserializer<'de, DeError> for &'de BoltUnboundedRelation {
-    type Deserializer = BoltTypeDeserializer<'de>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        BoltTypeDeserializer::new(BoltRef::URel(self))
     }
 }
 
@@ -561,18 +539,12 @@ impl FromFloat for f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        borrow::Cow,
-        collections::HashSet,
-        fmt::Debug,
-        marker::PhantomData,
-        sync::atomic::{AtomicU32, Ordering},
-    };
+    use std::{borrow::Cow, fmt::Debug};
 
     use super::*;
 
     use crate::{
-        types::{BoltInteger, BoltMap, BoltNode, BoltNull, BoltRelation},
+        types::{BoltInteger, BoltMap, BoltNode, BoltNull, BoltRelation, BoltUnboundedRelation},
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
 
@@ -765,7 +737,17 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn test_unbounded_relation() -> BoltType {
+    #[test]
+    fn unbounded_relation() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            id: Id,
+            typ: Type,
+            keys: Keys,
+            name: String,
+            age: u8,
+        }
+
         let id = BoltInteger::new(1337);
         let typ = "Person".into();
         let properties = vec![
@@ -780,287 +762,17 @@ mod tests {
             properties,
             typ,
         };
-        BoltType::UnboundedRelation(relation)
-    }
+        let relation = BoltType::UnboundedRelation(relation);
 
-    #[test]
-    fn unbounded_relation() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            name: String,
-            age: u8,
-        }
-
-        test_extract_unbounded_relation(Person {
+        let actual = relation.to::<Person>().unwrap();
+        let expected = Person {
+            id: Id(1337),
+            typ: Type("Person".into()),
+            keys: Keys(["name".into(), "age".into()].into()),
             name: "Alice".into(),
             age: 42,
-        });
-    }
-
-    #[test]
-    fn extract_unbounded_relation_with_unit_types() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<T> {
-            name: String,
-            age: u8,
-            _t: PhantomData<T>,
-            _u: (),
-        }
-
-        test_extract_unbounded_relation(Person {
-            name: "Alice".to_owned(),
-            age: 42,
-            _t: PhantomData::<i32>,
-            _u: (),
-        });
-    }
-
-    #[test]
-    fn extract_unbounded_relation_id() {
-        test_extract_unbounded_relation_extra(Id(1337));
-    }
-
-    #[test]
-    fn extract_unbounded_relation_id_with_custom_newtype() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Id(i16);
-
-        test_extract_unbounded_relation_extra(Id(1337));
-    }
-
-    #[test]
-    fn extract_unbounded_relation_id_with_custom_struct() {
-        #[derive(Debug, Deserialize)]
-        struct Id {
-            id: AtomicU32,
-        }
-
-        impl PartialEq for Id {
-            fn eq(&self, other: &Self) -> bool {
-                self.id.load(Ordering::SeqCst) == other.id.load(Ordering::SeqCst)
-            }
-        }
-
-        test_extract_unbounded_relation_extra(Id { id: 1337.into() });
-    }
-
-    #[test]
-    fn extract_unbounded_relation_type() {
-        test_extract_unbounded_relation_extra(Type("Person".to_owned()));
-    }
-
-    #[test]
-    fn extract_unbounded_relation_type_custom_inner() {
-        test_extract_unbounded_relation_extra(Type::<Box<str>>("Person".into()));
-    }
-
-    #[test]
-    fn extract_unbounded_relation_type_with_custom_newtype() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Type(String);
-
-        test_extract_unbounded_relation_extra(Type("Person".to_owned()));
-    }
-
-    #[test]
-    fn extract_unbounded_relation_type_with_custom_struct() {
-        #[derive(Debug, PartialEq, Deserialize)]
-        struct Type {
-            types: String,
-        }
-
-        test_extract_unbounded_relation_extra(Type {
-            types: "Person".to_owned(),
-        });
-    }
-
-    #[test]
-    fn extract_unbounded_relation_type_borrowed() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Type<'a>(#[serde(borrow)] &'a str);
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<'a> {
-            #[serde(borrow)]
-            type_: Type<'a>,
-            name: String,
-            age: u8,
-        }
-
-        let expected = Person {
-            type_: Type("Person"),
-            name: "Alice".to_owned(),
-            age: 42,
         };
-
-        let relation = test_unbounded_relation();
-
-        let actual = relation.to::<Person>().unwrap();
-
         assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn extract_unbounded_relation_property_keys() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            keys: Keys,
-        }
-
-        let expected = Person {
-            keys: Keys(["name".to_owned(), "age".to_owned()].into()),
-        };
-
-        test_extract_unbounded_relation(expected);
-    }
-
-    #[test]
-    fn extract_unbounded_relation_property_keys_custom_vec() {
-        #[derive(Clone, Debug, Eq, Deserialize)]
-        #[serde(transparent)]
-        struct UnorderedVec(Vec<String>);
-
-        impl PartialEq for UnorderedVec {
-            fn eq(&self, other: &Self) -> bool {
-                // compare on sorted vectors to ignore
-                // order on comparison
-                let mut lhs = self.0.clone();
-                lhs.sort();
-
-                let mut rhs = other.0.clone();
-                rhs.sort();
-
-                lhs == rhs
-            }
-        }
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            keys: Keys<UnorderedVec>,
-        }
-
-        let expected = Person {
-            keys: Keys(UnorderedVec(vec!["name".to_owned(), "age".to_owned()])),
-        };
-
-        test_extract_unbounded_relation(expected);
-    }
-
-    #[test]
-    fn extract_unbounded_relation_property_keys_custom_struct() {
-        #[derive(Clone, Debug, Eq, Deserialize)]
-        struct Keys {
-            keys: Vec<String>,
-        }
-
-        impl PartialEq for Keys {
-            fn eq(&self, other: &Self) -> bool {
-                // since we cannot gurantee the order of the keys
-                // we have to sort them before comparing
-                let mut lhs = self.keys.clone();
-                lhs.sort();
-
-                let mut rhs = other.keys.clone();
-                rhs.sort();
-
-                lhs == rhs
-            }
-        }
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person {
-            property_keys: Keys,
-        }
-
-        let expected = Person {
-            property_keys: Keys {
-                keys: vec!["name".to_owned(), "age".to_owned()],
-            },
-        };
-
-        test_extract_unbounded_relation(expected);
-    }
-
-    #[test]
-    fn extract_unbounded_relation_property_keys_borrowed() {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Keys<'a>(#[serde(borrow)] HashSet<&'a str>);
-
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<'a> {
-            #[serde(borrow)]
-            keys: Keys<'a>,
-        }
-
-        let expected = Person {
-            keys: Keys(["age", "name"].into()),
-        };
-
-        let relation = test_unbounded_relation();
-
-        let actual = relation.to::<Person>().unwrap();
-
-        assert_eq!(actual, expected);
-    }
-
-    fn test_extract_unbounded_relation_extra<T: Debug + PartialEq + for<'a> Deserialize<'a>>(
-        expected: T,
-    ) {
-        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-        struct Person<T> {
-            extra: T,
-            name: String,
-            age: u8,
-        }
-
-        let expected = Person {
-            extra: expected,
-            name: "Alice".to_owned(),
-            age: 42,
-        };
-
-        test_extract_unbounded_relation(expected);
-    }
-
-    fn test_extract_unbounded_relation<Person: Debug + PartialEq + for<'a> Deserialize<'a>>(
-        expected: Person,
-    ) {
-        let relation = test_unbounded_relation();
-        let actual = relation.to::<Person>().unwrap();
-        assert_eq!(actual, expected);
-
-        let relation = match relation {
-            BoltType::UnboundedRelation(relation) => relation,
-            _ => unreachable!(),
-        };
-        let actual = relation.to::<Person>().unwrap();
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_just_extract_unbounded_relation_extra() {
-        let relation = test_unbounded_relation();
-
-        let id = relation.to::<Id>().unwrap();
-        let typ = relation.to::<Type>().unwrap();
-        let keys = relation.to::<Keys>().unwrap();
-
-        assert_eq!(id, Id(1337));
-        assert_eq!(typ, Type("Person".to_owned()));
-        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
-
-        let relation = match relation {
-            BoltType::UnboundedRelation(relation) => relation,
-            _ => unreachable!(),
-        };
-
-        let id = relation.to::<Id>().unwrap();
-        let typ = relation.to::<Type>().unwrap();
-        let keys = relation.to::<Keys>().unwrap();
-
-        assert_eq!(id, Id(1337));
-        assert_eq!(typ, Type("Person".to_owned()));
-        assert_eq!(keys, Keys(["name".to_owned(), "age".to_owned()].into()));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use crate::types::{
-    serde::{node::BoltNodeVisitor, rel::BoltRelationVisitor},
+    serde::{node::BoltNodeVisitor, rel::BoltRelationVisitor, urel::BoltUnboundedRelationVisitor},
     BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNull,
     BoltString, BoltType,
 };
@@ -189,7 +189,9 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::Relation => variant
                 .tuple_variant(1, BoltRelationVisitor)
                 .map(BoltType::Relation),
-            BoltKind::UnboundedRelation => variant.tuple_variant(1, self),
+            BoltKind::UnboundedRelation => variant
+                .tuple_variant(1, BoltUnboundedRelationVisitor)
+                .map(BoltType::UnboundedRelation),
             BoltKind::Point2D => variant.tuple_variant(1, self),
             BoltKind::Point3D => variant.tuple_variant(1, self),
             BoltKind::Bytes => variant.tuple_variant(1, self),
