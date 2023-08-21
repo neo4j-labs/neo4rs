@@ -1,5 +1,4 @@
 use crate::{errors::*, types::*, version::Version};
-use ::serde::Deserialize;
 use bytes::*;
 use std::{cell::RefCell, mem, rc::Rc};
 
@@ -8,8 +7,7 @@ pub const SMALL: u8 = 0xD4;
 pub const MEDIUM: u8 = 0xD5;
 pub const LARGE: u8 = 0xD6;
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoltList {
     pub value: Vec<BoltType>,
 }

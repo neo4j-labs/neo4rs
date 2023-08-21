@@ -1,15 +1,13 @@
 use crate::errors::*;
 use crate::version::Version;
 use bytes::*;
-use serde::Deserialize;
 use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
 
 pub const MARKER: u8 = 0xC1;
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoltFloat {
     pub value: f64,
 }
