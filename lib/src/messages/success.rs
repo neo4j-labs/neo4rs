@@ -1,4 +1,3 @@
-use crate::types::BoltType;
 use crate::types::{serde::DeError, BoltMap};
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
@@ -15,10 +14,6 @@ impl Success {
         T: Deserialize<'this>,
     {
         self.metadata.get::<T>(key)
-    }
-
-    pub(crate) fn read<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.metadata.read::<T>(key)
     }
 }
 

@@ -54,19 +54,6 @@ impl BoltMap {
         }
     }
 
-    pub(crate) fn read<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        match self.value.get(key) {
-            Some(bolt_type) => {
-                if let Ok(value) = TryInto::<T>::try_into(bolt_type.clone()) {
-                    Some(value)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
     pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
         let marker = input.borrow()[0];
         (TINY..=(TINY | 0x0F)).contains(&marker)
