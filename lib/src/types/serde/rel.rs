@@ -28,6 +28,15 @@ impl<'de> Deserialize<'de> for Relation {
     }
 }
 
+impl BoltRelation {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(self.into_deserializer())
+    }
+}
+
 impl<'de> Deserialize<'de> for BoltRelation {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

@@ -1,17 +1,12 @@
-use crate::types::{BoltMap, BoltNode, BoltRelation, BoltType, BoltUnboundedRelation};
-
-use std::{collections::HashSet, result::Result};
-
-use serde::{
-    de::{value::MapDeserializer, IntoDeserializer},
-    Deserialize,
-};
+use std::collections::HashSet;
+use serde::Deserialize;
 
 pub use error::{DeError, Unexpected};
 pub use kind::BoltKind;
 
 mod builder;
 mod cenum;
+mod de;
 mod element;
 mod error;
 mod kind;
@@ -43,48 +38,3 @@ pub struct Type<T = String>(pub T);
 /// Newtype to extract the node property keys during deserialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 pub struct Keys<Coll = HashSet<String>>(pub Coll);
-
-impl BoltMap {
-    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
-    where
-        T: Deserialize<'this>,
-    {
-        T::deserialize(MapDeserializer::new(self.value.iter()))
-    }
-}
-
-impl BoltNode {
-    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
-    where
-        T: Deserialize<'this>,
-    {
-        T::deserialize(self.into_deserializer())
-    }
-}
-
-impl BoltRelation {
-    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
-    where
-        T: Deserialize<'this>,
-    {
-        T::deserialize(self.into_deserializer())
-    }
-}
-
-impl BoltUnboundedRelation {
-    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
-    where
-        T: Deserialize<'this>,
-    {
-        T::deserialize(self.into_deserializer())
-    }
-}
-
-impl BoltType {
-    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
-    where
-        T: Deserialize<'this>,
-    {
-        T::deserialize(self.into_deserializer())
-    }
-}

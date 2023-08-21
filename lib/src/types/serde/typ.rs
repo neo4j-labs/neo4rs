@@ -31,6 +31,24 @@ impl<'de> Deserialize<'de> for BoltType {
     }
 }
 
+impl BoltType {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(self.into_deserializer())
+    }
+}
+
+impl BoltMap {
+    pub(crate) fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        T::deserialize(MapDeserializer::new(self.value.iter()))
+    }
+}
+
 struct BoltTypeVisitor;
 
 impl<'de> Visitor<'de> for BoltTypeVisitor {
