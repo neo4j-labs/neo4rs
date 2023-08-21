@@ -18,6 +18,7 @@ async-trait = "0.1.0"
 bytes = { version = "1.0.0", features = ["serde"] }
 chrono = "0.4.27"
 deadpool = "0.9.0"
+delegate = "0.10.0"
 futures = { version = "0.3.0" }
 log = "0.4"
 neo4rs-macros = { version = "0.2.1", path = "../macros" }

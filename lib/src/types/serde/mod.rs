@@ -10,6 +10,7 @@ use serde::{
 pub use error::{DeError, Unexpected};
 pub use kind::BoltKind;
 
+mod builder;
 mod cenum;
 mod de;
 mod deser;

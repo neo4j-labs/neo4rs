@@ -1,9 +1,13 @@
 use crate::{
     types::{
-        serde::element::ElementDataKey, BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind,
-        BoltList, BoltMap, BoltNode, BoltNull, BoltString, BoltType,
+        serde::{
+            builder::{BoltNodeBuilder, Id},
+            element::ElementDataKey,
+        },
+        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNode,
+        BoltNull, BoltString, BoltType,
     },
-    Id, Labels,
+    Labels,
 };
 
 use bytes::Bytes;
@@ -27,6 +31,9 @@ impl<'de> Deserialize<'de> for BoltNode {
     where
         D: Deserializer<'de>,
     {
+        const ID: &str = "42.<id>";
+        const LABELS: &str = "42.<labels>";
+
         struct BoltNodeVisitor;
 
         impl<'de> Visitor<'de> for BoltNodeVisitor {
@@ -44,11 +51,9 @@ impl<'de> Deserialize<'de> for BoltNode {
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
-                        "::id" => {
-                            builder.id(|| Ok(BoltInteger::new(map.next_value::<Id>()?.0 as i64)))?
-                        }
-                        "::labels" => {
-                            builder.labels(|| Ok(map.next_value::<Labels<BoltList>>()?.0))?
+                        ID => builder.id(|| map.next_value::<Id>().map(|i| i.0))?,
+                        LABELS => {
+                            builder.labels(|| map.next_value::<Labels<BoltList>>().map(|l| l.0))?
                         }
                         otherwise => builder
                             .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
@@ -59,7 +64,8 @@ impl<'de> Deserialize<'de> for BoltNode {
                 Ok(node)
             }
         }
-        deserializer.deserialize_struct("BoltNode", &["::id", "::labels"], BoltNodeVisitor)
+
+        deserializer.deserialize_struct("BoltNode", &[ID, LABELS], BoltNodeVisitor)
     }
 }
 
@@ -277,131 +283,6 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::LocalDateTime => variant.tuple_variant(1, self),
             BoltKind::DateTimeZoneId => variant.tuple_variant(1, self),
         }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum SetOnce<T> {
-    Empty,
-    Set(T),
-}
-
-impl<T> Default for SetOnce<T> {
-    fn default() -> Self {
-        Self::Empty
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct SetOnceError;
-
-impl<T> SetOnce<T> {
-    fn insert(&mut self, value: T) -> Result<&mut T, SetOnceError> {
-        self.insert_with(move || value)
-    }
-
-    fn get_or_insert_with(&mut self, value: impl FnOnce() -> T) -> &mut T {
-        match self {
-            SetOnce::Empty => self.insert_with(value).unwrap(),
-            SetOnce::Set(value) => value,
-        }
-    }
-
-    fn insert_default(&mut self) -> Result<&mut T, SetOnceError>
-    where
-        T: Default,
-    {
-        self.insert_with(Default::default)
-    }
-
-    fn insert_with(&mut self, value: impl FnOnce() -> T) -> Result<&mut T, SetOnceError> {
-        match self {
-            SetOnce::Empty => *self = Self::Set(value()),
-            SetOnce::Set(_) => return Err(SetOnceError),
-        };
-        match self {
-            SetOnce::Empty => unreachable!("value was just set"),
-            SetOnce::Set(value) => Ok(value),
-        }
-    }
-
-    fn try_insert_with<E>(
-        &mut self,
-        value: impl FnOnce() -> Result<T, E>,
-    ) -> Result<Result<&mut T, SetOnceError>, E> {
-        match self {
-            SetOnce::Empty => *self = Self::Set(value()?),
-            SetOnce::Set(_) => return Ok(Err(SetOnceError)),
-        };
-        match self {
-            SetOnce::Empty => unreachable!("value was just set"),
-            SetOnce::Set(value) => Ok(Ok(value)),
-        }
-    }
-
-    fn ok_or_else<E>(self, missing: impl FnOnce() -> E) -> Result<T, E> {
-        match self {
-            SetOnce::Empty => Err(missing()),
-            SetOnce::Set(value) => Ok(value),
-        }
-    }
-
-    fn or_else(self, missing: impl FnOnce() -> T) -> T {
-        match self {
-            SetOnce::Empty => missing(),
-            SetOnce::Set(value) => value,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct BoltNodeBuilder {
-    id: SetOnce<BoltInteger>,
-    labels: SetOnce<BoltList>,
-    properties: SetOnce<BoltMap>,
-}
-
-impl BoltNodeBuilder {
-    fn id<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E> {
-        match self.id.try_insert_with(read) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Error::duplicate_field("id")),
-        }
-    }
-
-    fn labels<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E> {
-        match self.labels.try_insert_with(read)? {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Error::duplicate_field("labels")),
-        }
-    }
-
-    fn properties<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltMap, E>) -> Result<(), E> {
-        match self.properties.try_insert_with(read)? {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Error::duplicate_field("properties")),
-        }
-    }
-
-    fn insert<E: Error>(
-        &mut self,
-        entry: impl FnOnce() -> Result<(BoltString, BoltType), E>,
-    ) -> Result<(), E> {
-        let props = self.properties.get_or_insert_with(Default::default);
-        let (key, value) = entry()?;
-        props.put(key, value);
-        Ok(())
-    }
-
-    fn build<E: Error>(self) -> Result<BoltNode, E> {
-        let id = self.id.ok_or_else(|| Error::missing_field("id"))?;
-        let labels = self.labels.ok_or_else(|| Error::missing_field("labels"))?;
-        let properties = self.properties.or_else(Default::default);
-        Ok(BoltNode {
-            id,
-            labels,
-            properties,
-        })
     }
 }
 
