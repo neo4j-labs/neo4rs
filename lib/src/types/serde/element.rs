@@ -1,7 +1,7 @@
 use super::DeError;
 use crate::types::{
-    serde::deser::BoltTypeDeserializer, BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation,
-    BoltString, BoltType, BoltUnboundedRelation,
+    BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation, BoltString, BoltType,
+    BoltUnboundedRelation,
 };
 
 use std::{iter, marker::PhantomData, result::Result};
@@ -456,7 +456,7 @@ enum AdditionalData<'de, T> {
 }
 
 enum AdditionalDataDeserializer<'de, T> {
-    Property(BoltTypeDeserializer<'de>),
+    Property(<&'de BoltType as IntoDeserializer<'de, DeError>>::Deserializer),
     Element(ElementDataDeserializer<'de, T>),
 }
 

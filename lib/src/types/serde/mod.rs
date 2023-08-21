@@ -12,13 +12,12 @@ pub use kind::BoltKind;
 
 mod builder;
 mod cenum;
-mod de;
-mod deser;
 mod element;
 mod error;
 mod kind;
 mod node;
 mod rel;
+mod typ;
 mod urel;
 
 /// Newtype to extract the node id or relationship id during deserialization.
