@@ -16,7 +16,7 @@ rust-version = "1.63"
 [dependencies]
 async-trait = "0.1.0"
 bytes = { version = "1.0.0", features = ["serde"] }
-chrono = "0.4.27"
+chrono = { version = "0.4.27", features = ["serde"], default_features = false }
 deadpool = "0.9.0"
 delegate = "0.10.0"
 futures = { version = "0.3.0" }

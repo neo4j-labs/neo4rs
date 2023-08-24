@@ -5,6 +5,7 @@ pub use kind::BoltKind;
 
 mod builder;
 mod cenum;
+mod date_time;
 mod de;
 mod element;
 mod error;

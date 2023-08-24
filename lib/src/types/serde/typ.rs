@@ -1,8 +1,8 @@
 use crate::{
     types::{
         serde::{
-            element::ElementDataDeserializer, node::BoltNodeVisitor, rel::BoltRelationVisitor,
-            urel::BoltUnboundedRelationVisitor,
+            date_time::BoltDateTimeVisitor, element::ElementDataDeserializer,
+            node::BoltNodeVisitor, rel::BoltRelationVisitor, urel::BoltUnboundedRelationVisitor,
         },
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNull,
         BoltString, BoltType,
@@ -13,6 +13,7 @@ use crate::{
 use std::{fmt, result::Result};
 
 use bytes::Bytes;
+use chrono::{DateTime, FixedOffset};
 use serde::{
     de::{
         value::{BorrowedStrDeserializer, MapDeserializer, SeqDeserializer},
@@ -229,7 +230,9 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::Date => variant.tuple_variant(1, self),
             BoltKind::Time => variant.tuple_variant(1, self),
             BoltKind::LocalTime => variant.tuple_variant(1, self),
-            BoltKind::DateTime => variant.tuple_variant(1, self),
+            BoltKind::DateTime => variant
+                .tuple_variant(1, BoltDateTimeVisitor)
+                .map(BoltType::DateTime),
             BoltKind::LocalDateTime => variant.tuple_variant(1, self),
             BoltKind::DateTimeZoneId => variant.tuple_variant(1, self),
         }
@@ -341,10 +344,10 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::String(v) = self.value {
-            visitor.visit_borrowed_str(&v.value)
-        } else {
-            self.unexpected(visitor)
+        match self.value {
+            BoltType::String(v) => visitor.visit_borrowed_str(&v.value),
+            BoltType::DateTime(_) => self.deserialize_string(visitor),
+            _ => self.unexpected(visitor),
         }
     }
 
@@ -352,10 +355,15 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let BoltType::String(v) = self.value {
-            visitor.visit_string(v.value.clone())
-        } else {
-            self.unexpected(visitor)
+        match self.value {
+            BoltType::String(v) => visitor.visit_string(v.value.clone()),
+            BoltType::DateTime(datetime) => {
+                let datetime = datetime.try_to_chrono().map_err(|_| {
+                    Error::custom("Could not convert Neo4j DateTime into chrono::DateTime")
+                })?;
+                visitor.visit_string(datetime.to_rfc3339())
+            }
+            _ => self.unexpected(visitor),
         }
     }
 
@@ -472,6 +480,13 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         visitor.visit_f64(v)
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_some(self)
+    }
+
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -528,9 +543,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         self.unexpected(visitor)
     }
 
-    forward_to_deserialize_any! {
-        char option identifier
-    }
+    forward_to_deserialize_any! { char identifier }
 }
 
 impl<'de> BoltTypeDeserializer<'de> {
@@ -544,17 +557,31 @@ impl<'de> BoltTypeDeserializer<'de> {
         i64: TryInto<T, Error = E>,
         E: Into<std::num::TryFromIntError>,
     {
-        if let BoltType::Integer(v) = self.value {
-            match v.value.try_into() {
-                Ok(v) => Ok((v, visitor)),
-                Err(e) => Err(DeError::IntegerOutOfBounds(
-                    e.into(),
-                    v.value,
-                    std::any::type_name::<T>(),
-                )),
-            }
-        } else {
-            self.unexpected(visitor)
+        let integer = match self.value {
+            BoltType::Integer(v) => v.value,
+            BoltType::DateTime(datetime) => match datetime.try_to_chrono() {
+                Ok(datetime) => match std::any::type_name::<V>() {
+                    "chrono::datetime::serde::MicroSecondsTimestampVisitor" => {
+                        datetime.timestamp_micros()
+                    }
+                    "chrono::datetime::serde::MilliSecondsTimestampVisitor" => {
+                        datetime.timestamp_millis()
+                    }
+                    "chrono::datetime::serde::SecondsTimestampVisitor" => datetime.timestamp(),
+                    _ => datetime.timestamp_nanos(),
+                },
+                Err(_) => return Err(DeError::DateTImeOutOfBounds(std::any::type_name::<T>())),
+            },
+            _ => return self.unexpected(visitor),
+        };
+
+        match integer.try_into() {
+            Ok(v) => Ok((v, visitor)),
+            Err(e) => Err(DeError::IntegerOutOfBounds(
+                e.into(),
+                integer,
+                std::any::type_name::<T>(),
+            )),
         }
     }
 
@@ -685,7 +712,7 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Date(_) => todo!("date as mapaccess visit_map"),
             BoltType::Time(_) => todo!("time as mapaccess visit_map"),
             BoltType::LocalTime(_) => todo!("localtime as mapaccess visit_map"),
-            BoltType::DateTime(_) => todo!("datetime as mapaccess visit_map"),
+            BoltType::DateTime(datetime) => visitor.visit_map(datetime.map_access()),
             BoltType::LocalDateTime(_) => todo!("localdatetime as mapaccess visit_map"),
             BoltType::DateTimeZoneId(_) => todo!("datetimezoneid as mapaccess visit_map"),
         }
@@ -745,10 +772,14 @@ mod tests {
     use super::*;
 
     use crate::{
-        types::{BoltInteger, BoltMap, BoltNode, BoltNull, BoltRelation, BoltUnboundedRelation},
+        types::{
+            BoltDateTime, BoltInteger, BoltMap, BoltNode, BoltNull, BoltRelation,
+            BoltUnboundedRelation,
+        },
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
 
+    use chrono::Utc;
     use serde::Deserialize;
 
     #[test]
@@ -1254,6 +1285,161 @@ mod tests {
     }
 
     #[test]
+    fn datetime() {
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<DateTime<FixedOffset>>().unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_nanoseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_nanoseconds")]
+            datetime: DateTime<Utc>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_opt_nanoseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_nanoseconds_option")]
+            datetime: Option<DateTime<Utc>>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_microseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_microseconds")]
+            datetime: DateTime<Utc>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_opt_microseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_microseconds_option")]
+            datetime: Option<DateTime<Utc>>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_milliseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_milliseconds")]
+            datetime: DateTime<Utc>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_opt_milliseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_milliseconds_option")]
+            datetime: Option<DateTime<Utc>>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_seconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_seconds")]
+            datetime: DateTime<Utc>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_opt_seconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::serde::ts_seconds_option")]
+            datetime: Option<DateTime<Utc>>,
+        }
+
+        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn type_convert() {
         let i = BoltType::from(42);
 
@@ -1278,9 +1464,16 @@ mod tests {
             ("values".into(), vec![13.37, 42.84].into()),
             ("payload".into(), b"Hello, World!".as_slice().into()),
             ("secret".into(), BoltType::Null(BoltNull)),
+            (
+                "event".into(),
+                DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00")
+                    .unwrap()
+                    .into(),
+            ),
         ]
         .into_iter()
         .collect::<BoltMap>();
+
         let map = BoltType::Map(map);
 
         let actual = map.to::<BoltType>().unwrap();
