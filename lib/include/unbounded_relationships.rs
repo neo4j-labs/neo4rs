@@ -10,7 +10,7 @@
         start_node_id: StartNodeId,
         end_node_id: EndNodeId,
         typ: Type,
-        keys: Keys,
+        keys: Keys<Vec<String>>,
         #[serde(rename = "as")]
         related_as: String,
     }
