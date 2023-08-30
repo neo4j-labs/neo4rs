@@ -1,14 +1,17 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use bytes::Bytes;
-use serde::de::{Deserialize, Deserializer, Error, SeqAccess, Visitor};
+use serde::{
+    de::{Error, SeqAccess, Visitor},
+    Deserialize, Deserializer,
+};
 
 use crate::{
     types::{
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap, BoltNull, BoltString,
         BoltType,
     },
-    EndNodeId, Id, Keys, Labels, StartNodeId, Type,
+    EndNodeId, Id, Ids, Keys, Labels, Nodes, Relationships, StartNodeId, Type,
 };
 
 impl<'de> Deserialize<'de> for BoltString {
@@ -134,4 +137,7 @@ newtype_deser!(
     Labels<Coll>(Coll) => Labels<Coll>,
     Type<T>(T) => Type<T>,
     Keys<Coll>(Coll) => Keys<Coll>,
+    Nodes<T>(Vec<T>) => Nodes<T>,
+    Relationships<T>(Vec<T>) => Relationships<T>,
+    Ids<T>(Vec<T>) => Ids<T>,
 );

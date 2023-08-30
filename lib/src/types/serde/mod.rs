@@ -38,3 +38,15 @@ pub struct Type<T = String>(pub T);
 /// Newtype to extract the node property keys during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keys<Coll = HashSet<String>>(pub Coll);
+
+/// Newtype to extract the nodes of a path during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Nodes<T>(pub Vec<T>);
+
+/// Newtype to extract the relationships of a path during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Relationships<T>(pub Vec<T>);
+
+/// Newtype to extract the IDs of a path during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ids<T = u64>(pub Vec<T>);

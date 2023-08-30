@@ -31,6 +31,9 @@ crate::cenum!(ElementDataKey {
     Type,
     Labels,
     Properties,
+    Nodes,
+    Relationships,
+    Ids,
 } element_data_key_tests);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -203,9 +206,63 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                     )),
                 }
             }
+            "Nodes" => {
+                let Some(ElementDataValue::Lst(BoltList { value: nodes })) =
+                    self.data.value(ElementDataKey::Nodes)
+                else {
+                    return Err(DeError::missing_field("nodes"));
+                };
+                match visitation {
+                    Visitation::Newtype => {
+                        visitor.visit_newtype_struct(SeqDeserializer::new(nodes.iter()))
+                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
+                        IterDeserializer(nodes.iter()),
+                    ))),
+                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(nodes.iter()))),
+                    )),
+                }
+            }
+            "Relationships" => {
+                let Some(ElementDataValue::Lst(BoltList { value: rels })) =
+                    self.data.value(ElementDataKey::Relationships)
+                else {
+                    return Err(DeError::missing_field("relationships"));
+                };
+                match visitation {
+                    Visitation::Newtype => {
+                        visitor.visit_newtype_struct(SeqDeserializer::new(rels.iter()))
+                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
+                        IterDeserializer(rels.iter()),
+                    ))),
+                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(rels.iter()))),
+                    )),
+                }
+            }
+            "Ids" => {
+                let Some(ElementDataValue::Lst(BoltList { value: ids })) =
+                    self.data.value(ElementDataKey::Ids)
+                else {
+                    return Err(DeError::missing_field("ids"));
+                };
+                match visitation {
+                    Visitation::Newtype => {
+                        visitor.visit_newtype_struct(SeqDeserializer::new(ids.iter()))
+                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
+                        IterDeserializer(ids.iter()),
+                    ))),
+                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(ids.iter()))),
+                    )),
+                }
+            }
             _ => Err(DeError::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
-                &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, or `Keys`",
+                &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Ids`",
             )),
         }
     }
@@ -598,7 +655,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::types::{BoltInteger, BoltList, BoltString};
-    use crate::{EndNodeId, Id, Keys, Labels, StartNodeId, Type};
+    use crate::{EndNodeId, Id, Ids, Keys, Labels, Nodes, Relationships, StartNodeId, Type};
 
     #[test]
     fn node_impl() {
@@ -627,6 +684,9 @@ mod tests {
                 &[("name".into(), "Alice".into())].into_iter().collect()
             ))
         );
+        assert_eq!(node.value(ElementDataKey::Nodes), None);
+        assert_eq!(node.value(ElementDataKey::Relationships), None);
+        assert_eq!(node.value(ElementDataKey::Ids), None);
 
         let mut items = node.items().into_iter();
         assert_eq!(
@@ -686,6 +746,9 @@ mod tests {
                 &[("since".into(), 2017.into())].into_iter().collect()
             ))
         );
+        assert_eq!(rel.value(ElementDataKey::Nodes), None);
+        assert_eq!(rel.value(ElementDataKey::Relationships), None);
+        assert_eq!(rel.value(ElementDataKey::Ids), None);
 
         let mut items = rel.items().into_iter();
         assert_eq!(
@@ -748,6 +811,9 @@ mod tests {
                 &[("since".into(), 2017.into())].into_iter().collect()
             ))
         );
+        assert_eq!(unbounded_rel.value(ElementDataKey::StartNodeId), None);
+        assert_eq!(unbounded_rel.value(ElementDataKey::EndNodeId), None);
+        assert_eq!(unbounded_rel.value(ElementDataKey::Labels), None);
 
         let mut items = unbounded_rel.items().into_iter();
         assert_eq!(

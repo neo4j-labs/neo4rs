@@ -442,6 +442,8 @@ pub use crate::query::Query;
 pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
 pub use crate::stream::RowStream;
 pub use crate::txn::Txn;
-pub use crate::types::serde::{DeError, EndNodeId, Id, Keys, Labels, StartNodeId, Type};
+pub use crate::types::serde::{
+    DeError, EndNodeId, Id, Ids, Keys, Labels, Nodes, Relationships, StartNodeId, Type,
+};
 pub use crate::types::{BoltList, BoltMap, BoltString, BoltType};
 pub use crate::version::Version;
