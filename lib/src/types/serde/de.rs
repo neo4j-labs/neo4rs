@@ -84,7 +84,7 @@ impl<'de> Deserialize<'de> for BoltBytes {
 }
 
 macro_rules! newtype_deser {
-    ($($outer:ident$(<$param:ident>)?($inner:ident) => $typ:ty),+ $(,)?) => {
+    ($($outer:ident$(<$param:ident>)?($inner:ty) => $typ:ty),+ $(,)?) => {
         $(
 
             impl<'de$(, $param: Deserialize<'de>)?> Deserialize<'de> for $typ {
@@ -92,7 +92,7 @@ macro_rules! newtype_deser {
                 where
                     D: Deserializer<'de>,
                 {
-                    struct TheVisitor$(<$param>(::std::marker::PhantomData<$param>))?;
+                    struct TheVisitor$(<$param>(PhantomData<$param>))?;
 
                     impl<'de$(, $param: Deserialize<'de>)?> Visitor<'de> for TheVisitor$(<$param>)? {
                         type Value = $typ;
@@ -105,7 +105,7 @@ macro_rules! newtype_deser {
                         where
                             D: Deserializer<'de>,
                         {
-                            let value = $inner::deserialize(deserializer)?;
+                            let value = <$inner>::deserialize(deserializer)?;
                             Ok($outer(value))
                         }
 
