@@ -13,7 +13,6 @@ use crate::{
 use std::{fmt, result::Result};
 
 use bytes::Bytes;
-use chrono::{DateTime, FixedOffset};
 use serde::{
     de::{
         value::{BorrowedStrDeserializer, MapDeserializer, SeqDeserializer},
@@ -779,7 +778,7 @@ mod tests {
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
 
-    use chrono::Utc;
+    use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
 
     #[test]
