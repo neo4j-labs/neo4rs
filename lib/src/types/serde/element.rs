@@ -17,19 +17,7 @@ use serde::{
 };
 
 pub trait ElementData<'de> {
-    fn id(self) -> &'de BoltInteger;
-
-    fn start_node_id(self) -> Option<&'de BoltInteger>;
-
-    fn end_node_id(self) -> Option<&'de BoltInteger>;
-
-    type Labels: Iterator<Item = &'de BoltType>;
-
-    fn labels(self) -> Option<Self::Labels>;
-
-    fn typ(self) -> Option<&'de BoltString>;
-
-    fn properties(self) -> &'de BoltMap;
+    fn value(self, key: ElementDataKey) -> Option<ElementDataValue<'de>>;
 
     type Items: IntoIterator<Item = (ElementDataKey, ElementDataValue<'de>)>;
 
@@ -75,14 +63,21 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
         V: Visitor<'de>,
         T: Copy,
     {
-        let properties = &self.data.properties().value;
+        let properties = self
+            .data
+            .value(ElementDataKey::Properties)
+            .and_then(|v| match v {
+                ElementDataValue::Map(map) => Some(&map.value),
+                _ => None,
+            });
         let additional_fields = fields
             .iter()
             .copied()
-            .filter(|f| !properties.contains_key(*f))
+            .filter(|f| !properties.is_some_and(|p| p.contains_key(*f)))
             .map(|f| (f, AdditionalData::Element(self.data)));
         let property_fields = properties
-            .iter()
+            .into_iter()
+            .flatten()
             .map(|(k, v)| (k.value.as_str(), AdditionalData::Property(v)));
         let node_fields = property_fields
             .chain(additional_fields)
@@ -117,95 +112,95 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
 
         match name {
             "Id" => {
-                let id = self.data.id().value;
+                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
+                    self.data.value(ElementDataKey::Id)
+                else {
+                    return Err(DeError::missing_field("id"));
+                };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => {
-                        Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(id))))?
-                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
                     Visitation::Struct(field) => {
-                        Ok(visitor.visit_map(MapDeserializer::new(iter::once((field, id))))?)
+                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
                     }
                 }
             }
             "StartNodeId" => {
-                let id = self
-                    .data
-                    .start_node_id()
-                    .ok_or_else(|| DeError::missing_field("start_node_id"))?
-                    .value;
+                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
+                    self.data.value(ElementDataKey::StartNodeId)
+                else {
+                    return Err(DeError::missing_field("start_node_id"));
+                };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => {
-                        Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(id))))?
-                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
                     Visitation::Struct(field) => {
-                        Ok(visitor.visit_map(MapDeserializer::new(iter::once((field, id))))?)
+                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
                     }
                 }
             }
             "EndNodeId" => {
-                let id = self
-                    .data
-                    .end_node_id()
-                    .ok_or_else(|| DeError::missing_field("end_node_id"))?
-                    .value;
+                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
+                    self.data.value(ElementDataKey::EndNodeId)
+                else {
+                    return Err(DeError::missing_field("end_node_id"));
+                };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => {
-                        Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(id))))?
-                    }
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
                     Visitation::Struct(field) => {
-                        Ok(visitor.visit_map(MapDeserializer::new(iter::once((field, id))))?)
+                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
                     }
                 }
             }
             "Labels" => {
-                let labels = self
-                    .data
-                    .labels()
-                    .ok_or_else(|| DeError::missing_field("labels"))?;
+                let Some(ElementDataValue::Lst(BoltList { value: labels })) =
+                    self.data.value(ElementDataKey::Labels)
+                else {
+                    return Err(DeError::missing_field("labels"));
+                };
                 match visitation {
                     Visitation::Newtype => {
-                        visitor.visit_newtype_struct(SeqDeserializer::new(labels))
+                        visitor.visit_newtype_struct(SeqDeserializer::new(labels.iter()))
                     }
-                    Visitation::Tuple => Ok(visitor
-                        .visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(labels)))))?,
-                    Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(labels))),
-                    ))?),
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
+                        IterDeserializer(labels.iter()),
+                    ))),
+                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
+                        iter::once((field, IterDeserializer(labels.iter()))),
+                    )),
                 }
             }
             "Type" => {
-                let typ = self
-                    .data
-                    .typ()
-                    .ok_or_else(|| DeError::missing_field("type"))?
-                    .value
-                    .as_str();
+                let Some(ElementDataValue::Str(BoltString { value: typ })) =
+                    self.data.value(ElementDataKey::Type)
+                else {
+                    return Err(DeError::missing_field("type"));
+                };
+                let typ = BorrowedStr(typ);
                 match visitation {
-                    Visitation::Newtype => {
-                        visitor.visit_newtype_struct(BorrowedStrDeserializer::new(typ))
-                    }
-                    Visitation::Tuple => {
-                        Ok(visitor.visit_seq(SeqDeserializer::new(iter::once(typ))))?
-                    }
+                    Visitation::Newtype => visitor.visit_newtype_struct(typ.into_deserializer()),
+                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(typ))),
                     Visitation::Struct(field) => {
-                        Ok(visitor.visit_map(MapDeserializer::new(iter::once((field, typ))))?)
+                        visitor.visit_map(MapDeserializer::new(iter::once((field, typ))))
                     }
                 }
             }
             "Keys" => {
-                let keys = self.data.properties().value.keys();
+                let Some(ElementDataValue::Map(BoltMap { value: properties })) =
+                    self.data.value(ElementDataKey::Properties)
+                else {
+                    return Err(DeError::missing_field("properties"));
+                };
+                let keys = properties.keys();
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(SeqDeserializer::new(keys)),
                     Visitation::Tuple => {
-                        Ok(visitor
-                            .visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(keys)))))?
+                        visitor.visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(keys))))
                     }
-                    Visitation::Struct(field) => Ok(visitor.visit_map(MapDeserializer::new(
+                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
                         iter::once((field, IterDeserializer(keys))),
-                    ))?),
+                    )),
                 }
             }
             _ => Err(DeError::invalid_type(
@@ -514,30 +509,13 @@ impl<'de, T: ElementData<'de>> IntoDeserializer<'de, DeError> for AdditionalData
 }
 
 impl<'de> ElementData<'de> for &'de BoltNode {
-    fn id(self) -> &'de BoltInteger {
-        &self.id
-    }
-
-    fn start_node_id(self) -> Option<&'de BoltInteger> {
-        None
-    }
-
-    fn end_node_id(self) -> Option<&'de BoltInteger> {
-        None
-    }
-
-    type Labels = std::slice::Iter<'de, BoltType>;
-
-    fn labels(self) -> Option<Self::Labels> {
-        Some(self.labels.value.iter())
-    }
-
-    fn typ(self) -> Option<&'de BoltString> {
-        None
-    }
-
-    fn properties(self) -> &'de BoltMap {
-        &self.properties
+    fn value(self, key: ElementDataKey) -> Option<ElementDataValue<'de>> {
+        match key {
+            ElementDataKey::Id => Some(ElementDataValue::Int(&self.id)),
+            ElementDataKey::Labels => Some(ElementDataValue::Lst(&self.labels)),
+            ElementDataKey::Properties => Some(ElementDataValue::Map(&self.properties)),
+            _ => None,
+        }
     }
 
     type Items = [(ElementDataKey, ElementDataValue<'de>); 3];
@@ -555,30 +533,15 @@ impl<'de> ElementData<'de> for &'de BoltNode {
 }
 
 impl<'de> ElementData<'de> for &'de BoltRelation {
-    fn id(self) -> &'de BoltInteger {
-        &self.id
-    }
-
-    fn start_node_id(self) -> Option<&'de BoltInteger> {
-        Some(&self.start_node_id)
-    }
-
-    fn end_node_id(self) -> Option<&'de BoltInteger> {
-        Some(&self.end_node_id)
-    }
-
-    type Labels = std::iter::Empty<&'de BoltType>;
-
-    fn labels(self) -> Option<Self::Labels> {
-        None
-    }
-
-    fn typ(self) -> Option<&'de BoltString> {
-        Some(&self.typ)
-    }
-
-    fn properties(self) -> &'de BoltMap {
-        &self.properties
+    fn value(self, key: ElementDataKey) -> Option<ElementDataValue<'de>> {
+        match key {
+            ElementDataKey::Id => Some(ElementDataValue::Int(&self.id)),
+            ElementDataKey::StartNodeId => Some(ElementDataValue::Int(&self.start_node_id)),
+            ElementDataKey::EndNodeId => Some(ElementDataValue::Int(&self.end_node_id)),
+            ElementDataKey::Type => Some(ElementDataValue::Str(&self.typ)),
+            ElementDataKey::Properties => Some(ElementDataValue::Map(&self.properties)),
+            _ => None,
+        }
     }
 
     type Items = [(ElementDataKey, ElementDataValue<'de>); 5];
@@ -604,30 +567,13 @@ impl<'de> ElementData<'de> for &'de BoltRelation {
 }
 
 impl<'de> ElementData<'de> for &'de BoltUnboundedRelation {
-    fn id(self) -> &'de BoltInteger {
-        &self.id
-    }
-
-    fn start_node_id(self) -> Option<&'de BoltInteger> {
-        None
-    }
-
-    fn end_node_id(self) -> Option<&'de BoltInteger> {
-        None
-    }
-
-    type Labels = std::iter::Empty<&'de BoltType>;
-
-    fn labels(self) -> Option<Self::Labels> {
-        None
-    }
-
-    fn typ(self) -> Option<&'de BoltString> {
-        Some(&self.typ)
-    }
-
-    fn properties(self) -> &'de BoltMap {
-        &self.properties
+    fn value(self, key: ElementDataKey) -> Option<ElementDataValue<'de>> {
+        match key {
+            ElementDataKey::Id => Some(ElementDataValue::Int(&self.id)),
+            ElementDataKey::Type => Some(ElementDataValue::Str(&self.typ)),
+            ElementDataKey::Properties => Some(ElementDataValue::Map(&self.properties)),
+            _ => None,
+        }
     }
 
     type Items = [(ElementDataKey, ElementDataValue<'de>); 3];
@@ -662,17 +608,24 @@ mod tests {
             [("name".into(), "Alice".into())].into_iter().collect(),
         );
 
-        assert_eq!(node.id(), &BoltInteger::new(42));
-        assert_eq!(node.start_node_id(), None);
-        assert_eq!(node.end_node_id(), None);
         assert_eq!(
-            node.labels().unwrap().collect::<Vec<_>>(),
-            &[&BoltType::from("Person")]
+            node.value(ElementDataKey::Id),
+            Some(ElementDataValue::Int(&BoltInteger::new(42)))
         );
-        assert_eq!(node.typ(), None);
+        assert_eq!(node.value(ElementDataKey::StartNodeId), None);
+        assert_eq!(node.value(ElementDataKey::EndNodeId), None);
         assert_eq!(
-            node.properties(),
-            &[("name".into(), "Alice".into())].into_iter().collect()
+            node.value(ElementDataKey::Labels),
+            Some(ElementDataValue::Lst(&BoltList::from(vec![
+                BoltType::from("Person")
+            ])))
+        );
+        assert_eq!(node.value(ElementDataKey::Type), None);
+        assert_eq!(
+            node.value(ElementDataKey::Properties),
+            Some(ElementDataValue::Map(
+                &[("name".into(), "Alice".into())].into_iter().collect()
+            ))
         );
 
         let mut items = node.items().into_iter();
@@ -710,14 +663,28 @@ mod tests {
             properties: [("since".into(), 2017.into())].into_iter().collect(),
         };
 
-        assert_eq!(rel.id(), &BoltInteger::new(42));
-        assert_eq!(rel.start_node_id(), Some(&BoltInteger::new(1)));
-        assert_eq!(rel.end_node_id(), Some(&BoltInteger::new(2)));
-        assert!(rel.labels().is_none());
-        assert_eq!(rel.typ(), Some(&BoltString::from("KNOWS")));
         assert_eq!(
-            rel.properties(),
-            &[("since".into(), 2017.into())].into_iter().collect()
+            rel.value(ElementDataKey::Id),
+            Some(ElementDataValue::Int(&BoltInteger::new(42)))
+        );
+        assert_eq!(
+            rel.value(ElementDataKey::StartNodeId),
+            Some(ElementDataValue::Int(&BoltInteger::new(1)))
+        );
+        assert_eq!(
+            rel.value(ElementDataKey::EndNodeId),
+            Some(ElementDataValue::Int(&BoltInteger::new(2)))
+        );
+        assert_eq!(rel.value(ElementDataKey::Labels), None);
+        assert_eq!(
+            rel.value(ElementDataKey::Type),
+            Some(ElementDataValue::Str(&BoltString::from("KNOWS")))
+        );
+        assert_eq!(
+            rel.value(ElementDataKey::Properties),
+            Some(ElementDataValue::Map(
+                &[("since".into(), 2017.into())].into_iter().collect()
+            ))
         );
 
         let mut items = rel.items().into_iter();
@@ -767,14 +734,19 @@ mod tests {
             [("since".into(), 2017.into())].into_iter().collect(),
         );
 
-        assert_eq!(unbounded_rel.id(), &BoltInteger::new(42));
-        assert_eq!(unbounded_rel.start_node_id(), None);
-        assert_eq!(unbounded_rel.end_node_id(), None);
-        assert!(unbounded_rel.labels().is_none());
-        assert_eq!(unbounded_rel.typ(), Some(&BoltString::from("KNOWS")));
         assert_eq!(
-            unbounded_rel.properties(),
-            &[("since".into(), 2017.into())].into_iter().collect()
+            unbounded_rel.value(ElementDataKey::Id),
+            Some(ElementDataValue::Int(&BoltInteger::new(42)))
+        );
+        assert_eq!(
+            unbounded_rel.value(ElementDataKey::Type),
+            Some(ElementDataValue::Str(&BoltString::from("KNOWS")))
+        );
+        assert_eq!(
+            unbounded_rel.value(ElementDataKey::Properties),
+            Some(ElementDataValue::Map(
+                &[("since".into(), 2017.into())].into_iter().collect()
+            ))
         );
 
         let mut items = unbounded_rel.items().into_iter();
