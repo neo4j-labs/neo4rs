@@ -33,7 +33,7 @@ crate::cenum!(ElementDataKey {
     Properties,
     Nodes,
     Relationships,
-    Ids,
+    Indices,
 } element_data_key_tests);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -242,11 +242,11 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                     )),
                 }
             }
-            "Ids" => {
+            "Indices" => {
                 let Some(ElementDataValue::Lst(BoltList { value: ids })) =
-                    self.data.value(ElementDataKey::Ids)
+                    self.data.value(ElementDataKey::Indices)
                 else {
-                    return Err(DeError::missing_field("ids"));
+                    return Err(DeError::missing_field("indices"));
                 };
                 match visitation {
                     Visitation::Newtype => {
@@ -262,7 +262,7 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
             }
             _ => Err(DeError::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
-                &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Ids`",
+                &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Indices`",
             )),
         }
     }
@@ -655,7 +655,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::types::{BoltInteger, BoltList, BoltString};
-    use crate::{EndNodeId, Id, Ids, Keys, Labels, Nodes, Relationships, StartNodeId, Type};
+    use crate::{EndNodeId, Id, Indices, Keys, Labels, Nodes, Relationships, StartNodeId, Type};
 
     #[test]
     fn node_impl() {
@@ -686,7 +686,7 @@ mod tests {
         );
         assert_eq!(node.value(ElementDataKey::Nodes), None);
         assert_eq!(node.value(ElementDataKey::Relationships), None);
-        assert_eq!(node.value(ElementDataKey::Ids), None);
+        assert_eq!(node.value(ElementDataKey::Indices), None);
 
         let mut items = node.items().into_iter();
         assert_eq!(
@@ -748,7 +748,7 @@ mod tests {
         );
         assert_eq!(rel.value(ElementDataKey::Nodes), None);
         assert_eq!(rel.value(ElementDataKey::Relationships), None);
-        assert_eq!(rel.value(ElementDataKey::Ids), None);
+        assert_eq!(rel.value(ElementDataKey::Indices), None);
 
         let mut items = rel.items().into_iter();
         assert_eq!(

@@ -53,9 +53,14 @@ impl Path {
         Path { inner }
     }
 
+    #[deprecated(since = "0.7.0", note = "Please use `indices` instead.")]
     pub fn ids(&self) -> Vec<i64> {
-        let bolt_ids = self.inner.ids();
-        bolt_ids.into_iter().map(|id| id.value).collect()
+        self.indices()
+    }
+
+    pub fn indices(&self) -> Vec<i64> {
+        let indices = self.inner.indices();
+        indices.into_iter().map(|id| id.value).collect()
     }
 
     pub fn nodes(&self) -> Vec<Node> {

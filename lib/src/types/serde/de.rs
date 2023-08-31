@@ -11,7 +11,7 @@ use crate::{
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap, BoltNull, BoltString,
         BoltType,
     },
-    EndNodeId, Id, Ids, Keys, Labels, Nodes, Relationships, StartNodeId, Type,
+    EndNodeId, Id, Indices, Keys, Labels, Nodes, Relationships, StartNodeId, Type,
 };
 
 impl<'de> Deserialize<'de> for BoltString {
@@ -139,5 +139,5 @@ newtype_deser!(
     Keys<Coll>(Coll) => Keys<Coll>,
     Nodes<T>(Vec<T>) => Nodes<T>,
     Relationships<T>(Vec<T>) => Relationships<T>,
-    Ids<T>(Vec<T>) => Ids<T>,
+    Indices<T>(Vec<T>) => Indices<T>,
 );

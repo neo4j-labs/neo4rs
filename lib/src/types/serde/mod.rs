@@ -47,6 +47,6 @@ pub struct Nodes<T>(pub Vec<T>);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Relationships<T>(pub Vec<T>);
 
-/// Newtype to extract the IDs of a path during deserialization.
+/// Newtype to extract the indices of a path during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ids<T = u64>(pub Vec<T>);
+pub struct Indices<T = i64>(pub Vec<T>);
