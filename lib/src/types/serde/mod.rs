@@ -11,6 +11,7 @@ mod element;
 mod error;
 mod kind;
 mod node;
+mod path;
 mod rel;
 mod typ;
 mod urel;

@@ -1,5 +1,5 @@
 use crate::types::{
-    BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation, BoltString, BoltType,
+    BoltInteger, BoltList, BoltMap, BoltNode, BoltPath, BoltRelation, BoltString, BoltType,
     BoltUnboundedRelation,
 };
 
@@ -107,6 +107,42 @@ impl BoltUnboundedRelationBuilder {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BoltPathBuilder {
+    inner: ElementBuilder,
+}
+
+impl BoltPathBuilder {
+    delegate! {
+        to self.inner {
+            pub fn nodes<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E>;
+            pub fn relations<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E>;
+            pub fn indices<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E>;
+        }
+    }
+
+    pub fn build<E: Error>(self) -> Result<BoltPath, E> {
+        let nodes = self
+            .inner
+            .nodes
+            .ok_or_else(|| Error::missing_field("nodes"))?;
+        let rels = self
+            .inner
+            .rels
+            .ok_or_else(|| Error::missing_field("relations"))?;
+        let indices = self
+            .inner
+            .indices
+            .ok_or_else(|| Error::missing_field("indices"))?;
+
+        Ok(BoltPath {
+            nodes,
+            rels,
+            indices,
+        })
+    }
+}
+
 pub struct Id(pub BoltInteger);
 pub struct StartNodeId(pub BoltInteger);
 pub struct EndNodeId(pub BoltInteger);
@@ -147,6 +183,9 @@ struct ElementBuilder {
     labels: SetOnce<BoltList>,
     typ: SetOnce<BoltString>,
     properties: SetOnce<BoltMap>,
+    nodes: SetOnce<BoltList>,
+    rels: SetOnce<BoltList>,
+    indices: SetOnce<BoltList>,
 }
 
 impl ElementBuilder {
@@ -195,6 +234,27 @@ impl ElementBuilder {
         match self.properties.try_insert_with(read)? {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::duplicate_field("properties")),
+        }
+    }
+
+    fn nodes<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E> {
+        match self.nodes.try_insert_with(read)? {
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::duplicate_field("nodes")),
+        }
+    }
+
+    fn relations<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E> {
+        match self.rels.try_insert_with(read)? {
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::duplicate_field("relations")),
+        }
+    }
+
+    fn indices<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E> {
+        match self.indices.try_insert_with(read)? {
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::duplicate_field("indices")),
         }
     }
 

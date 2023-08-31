@@ -15,25 +15,25 @@ pub struct Row {
 }
 
 /// Snapshot of a node within a graph database
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     inner: BoltNode,
 }
 
 /// Alternating sequence of nodes and relationships
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Path {
     inner: BoltPath,
 }
 
 /// Snapshot of a relationship within a graph database
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Relation {
     inner: BoltRelation,
 }
 
 /// Relationship detail without start or end node information
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnboundedRelation {
     inner: BoltUnboundedRelation,
 }

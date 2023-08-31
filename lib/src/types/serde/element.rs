@@ -1,6 +1,6 @@
 use super::DeError;
 use crate::types::{
-    BoltInteger, BoltList, BoltMap, BoltNode, BoltRelation, BoltString, BoltType,
+    BoltInteger, BoltList, BoltMap, BoltNode, BoltPath, BoltRelation, BoltString, BoltType,
     BoltUnboundedRelation,
 };
 
@@ -647,6 +647,33 @@ impl<'de> ElementData<'de> for &'de BoltUnboundedRelation {
     }
 }
 
+impl<'de> ElementData<'de> for &'de BoltPath {
+    fn value(self, key: ElementDataKey) -> Option<ElementDataValue<'de>> {
+        match key {
+            ElementDataKey::Nodes => Some(ElementDataValue::Lst(&self.nodes)),
+            ElementDataKey::Relationships => Some(ElementDataValue::Lst(&self.rels)),
+            ElementDataKey::Indices => Some(ElementDataValue::Lst(&self.indices)),
+            _ => None,
+        }
+    }
+
+    type Items = [(ElementDataKey, ElementDataValue<'de>); 3];
+
+    fn items(self) -> Self::Items {
+        [
+            (ElementDataKey::Nodes, ElementDataValue::Lst(&self.nodes)),
+            (
+                ElementDataKey::Relationships,
+                ElementDataValue::Lst(&self.rels),
+            ),
+            (
+                ElementDataKey::Indices,
+                ElementDataValue::Lst(&self.indices),
+            ),
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -841,6 +868,90 @@ mod tests {
     }
 
     #[test]
+    fn path_impl() {
+        let alice = BoltNode::new(
+            BoltInteger::new(42),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Alice".into())].into_iter().collect(),
+        );
+        let bob = BoltNode::new(
+            BoltInteger::new(1337),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Bob".into())].into_iter().collect(),
+        );
+        let rel = BoltUnboundedRelation::new(
+            BoltInteger::new(84),
+            BoltString::from("KNOWS"),
+            [("since".into(), 2017.into())].into_iter().collect(),
+        );
+        let path = BoltPath {
+            nodes: BoltList::from(vec![
+                BoltType::Node(alice.clone()),
+                BoltType::Node(bob.clone()),
+            ]),
+            rels: BoltList::from(vec![BoltType::UnboundedRelation(rel.clone())]),
+            indices: BoltList::from(vec![BoltType::from(42), BoltType::from(1337)]),
+        };
+
+        assert_eq!(path.value(ElementDataKey::Id), None);
+        assert_eq!(path.value(ElementDataKey::StartNodeId), None);
+        assert_eq!(path.value(ElementDataKey::EndNodeId), None);
+        assert_eq!(path.value(ElementDataKey::Labels), None);
+        assert_eq!(path.value(ElementDataKey::Type), None);
+        assert_eq!(path.value(ElementDataKey::Properties), None);
+        assert_eq!(
+            path.value(ElementDataKey::Nodes),
+            Some(ElementDataValue::Lst(&BoltList::from(vec![
+                BoltType::Node(alice.clone()),
+                BoltType::Node(bob.clone())
+            ])))
+        );
+        assert_eq!(
+            path.value(ElementDataKey::Relationships),
+            Some(ElementDataValue::Lst(&BoltList::from(vec![
+                BoltType::UnboundedRelation(rel.clone())
+            ])))
+        );
+        assert_eq!(
+            path.value(ElementDataKey::Indices),
+            Some(ElementDataValue::Lst(&BoltList::from(vec![
+                BoltType::from(42),
+                BoltType::from(1337)
+            ])))
+        );
+
+        let mut items = path.items().into_iter();
+        assert_eq!(
+            items.next(),
+            Some((
+                ElementDataKey::Nodes,
+                ElementDataValue::Lst(&BoltList::from(vec![
+                    BoltType::Node(alice),
+                    BoltType::Node(bob)
+                ]))
+            ))
+        );
+        assert_eq!(
+            items.next(),
+            Some((
+                ElementDataKey::Relationships,
+                ElementDataValue::Lst(&BoltList::from(vec![BoltType::UnboundedRelation(rel)]))
+            ))
+        );
+        assert_eq!(
+            items.next(),
+            Some((
+                ElementDataKey::Indices,
+                ElementDataValue::Lst(&BoltList::from(vec![
+                    BoltType::from(42),
+                    BoltType::from(1337)
+                ]))
+            ))
+        );
+        assert_eq!(items.next(), None);
+    }
+
+    #[test]
     fn node_deser() {
         let node = BoltNode::new(
             BoltInteger::new(42),
@@ -900,6 +1011,39 @@ mod tests {
 
         let keys = Keys::deserialize(ElementDataDeserializer::new(&unbounded_rel)).unwrap();
         assert_eq!(keys, Keys(["since"]));
+    }
+
+    #[test]
+    fn path_deser() {
+        let alice = BoltNode::new(
+            BoltInteger::new(42),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Alice".into())].into_iter().collect(),
+        );
+        let bob = BoltNode::new(
+            BoltInteger::new(1337),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Bob".into())].into_iter().collect(),
+        );
+        let rel = BoltUnboundedRelation::new(
+            BoltInteger::new(84),
+            BoltString::from("KNOWS"),
+            [("since".into(), 2017.into())].into_iter().collect(),
+        );
+        let path = BoltPath {
+            nodes: BoltList::from(vec![BoltType::Node(alice), BoltType::Node(bob)]),
+            rels: BoltList::from(vec![BoltType::UnboundedRelation(rel)]),
+            indices: BoltList::from(vec![BoltType::from(42), BoltType::from(1337)]),
+        };
+
+        let nodes = Nodes::<Id>::deserialize(ElementDataDeserializer::new(&path)).unwrap();
+        assert_eq!(nodes, Nodes(vec![Id(42), Id(1337)]));
+
+        let rels = Relationships::<Id>::deserialize(ElementDataDeserializer::new(&path)).unwrap();
+        assert_eq!(rels, Relationships(vec![Id(84)]));
+
+        let ids = Indices::deserialize(ElementDataDeserializer::new(&path)).unwrap();
+        assert_eq!(ids, Indices(vec![42, 1337]));
     }
 
     #[test]
@@ -969,6 +1113,51 @@ mod tests {
         assert_eq!(
             knows[&ElementDataKey::Properties],
             BoltType::Map([("since".into(), 2017.into())].into_iter().collect())
+        );
+    }
+
+    #[test]
+    fn path_deser_map() {
+        let alice = BoltNode::new(
+            BoltInteger::new(42),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Alice".into())].into_iter().collect(),
+        );
+        let bob = BoltNode::new(
+            BoltInteger::new(1337),
+            BoltList::from(vec![BoltType::from("Person")]),
+            [("name".into(), "Bob".into())].into_iter().collect(),
+        );
+        let rel = BoltUnboundedRelation::new(
+            BoltInteger::new(84),
+            BoltString::from("KNOWS"),
+            [("since".into(), 2017.into())].into_iter().collect(),
+        );
+        let path = BoltPath {
+            nodes: BoltList::from(vec![
+                BoltType::Node(alice.clone()),
+                BoltType::Node(bob.clone()),
+            ]),
+            rels: BoltList::from(vec![BoltType::UnboundedRelation(rel.clone())]),
+            indices: BoltList::from(vec![BoltType::from(42), BoltType::from(1337)]),
+        };
+
+        let actual = HashMap::<ElementDataKey, BoltType>::deserialize(MapAccessDeserializer::new(
+            ElementMapAccess::new(path.items()),
+        ))
+        .unwrap();
+
+        assert_eq!(
+            actual[&ElementDataKey::Nodes],
+            BoltType::from(vec![alice, bob])
+        );
+        assert_eq!(
+            actual[&ElementDataKey::Relationships],
+            BoltType::from(vec![rel])
+        );
+        assert_eq!(
+            actual[&ElementDataKey::Indices],
+            BoltType::from(vec![42, 1337])
         );
     }
 }

@@ -2,7 +2,8 @@ use crate::{
     types::{
         serde::{
             date_time::BoltDateTimeVisitor, element::ElementDataDeserializer,
-            node::BoltNodeVisitor, rel::BoltRelationVisitor, urel::BoltUnboundedRelationVisitor,
+            node::BoltNodeVisitor, path::BoltPathVisitor, rel::BoltRelationVisitor,
+            urel::BoltUnboundedRelationVisitor,
         },
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNull,
         BoltString, BoltType,
@@ -224,7 +225,9 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::Point2D => variant.tuple_variant(1, self),
             BoltKind::Point3D => variant.tuple_variant(1, self),
             BoltKind::Bytes => variant.tuple_variant(1, self),
-            BoltKind::Path => variant.tuple_variant(1, self),
+            BoltKind::Path => variant
+                .tuple_variant(1, BoltPathVisitor)
+                .map(BoltType::Path),
             BoltKind::Duration => variant.tuple_variant(1, self),
             BoltKind::Date => variant.tuple_variant(1, self),
             BoltKind::Time => variant.tuple_variant(1, self),
@@ -265,6 +268,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Node(v) => v.into_deserializer().deserialize_map(visitor),
             BoltType::Relation(v) => v.into_deserializer().deserialize_map(visitor),
             BoltType::UnboundedRelation(v) => v.into_deserializer().deserialize_map(visitor),
+            BoltType::Path(p) => p.into_deserializer().deserialize_map(visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -289,6 +293,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::UnboundedRelation(v) => v
                 .into_deserializer()
                 .deserialize_struct(name, fields, visitor),
+            BoltType::Path(p) => p
+                .into_deserializer()
+                .deserialize_struct(name, fields, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -309,6 +316,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
             BoltType::UnboundedRelation(v) => v
+                .into_deserializer()
+                .deserialize_newtype_struct(name, visitor),
+            BoltType::Path(p) => p
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
             _ => self.unexpected(visitor),
@@ -706,7 +716,7 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Point2D(_) => todo!("point2d as mapaccess visit_map"),
             BoltType::Point3D(_) => todo!("point3d as mapaccess visit_map"),
             BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
-            BoltType::Path(_) => todo!("path as mapaccess visit_map"),
+            BoltType::Path(p) => ElementDataDeserializer::new(p).tuple_variant(len, visitor),
             BoltType::Duration(_) => todo!("duration as mapaccess visit_map"),
             BoltType::Date(_) => todo!("date as mapaccess visit_map"),
             BoltType::Time(_) => todo!("time as mapaccess visit_map"),
