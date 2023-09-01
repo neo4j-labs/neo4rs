@@ -1,9 +1,12 @@
 use core::fmt;
 
-use serde::de::{value::MapDeserializer, Error, MapAccess, Visitor};
+use serde::de::{
+    value::{MapDeserializer, SeqDeserializer},
+    Error, MapAccess, SeqAccess, Visitor,
+};
 
 use crate::{
-    types::{BoltDateTime, BoltInteger},
+    types::{BoltDateTime, BoltDuration, BoltInteger},
     DeError,
 };
 
@@ -61,5 +64,11 @@ impl BoltDateTime {
             ]
             .into_iter(),
         )
+    }
+}
+
+impl BoltDuration {
+    pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
+        SeqDeserializer::new([self.seconds(), self.nanoseconds()].into_iter())
     }
 }

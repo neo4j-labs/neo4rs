@@ -317,6 +317,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Point3D(p) => p
                 .into_deserializer()
                 .deserialize_struct(name, fields, visitor),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
             _ => self.unexpected(visitor),
         }
     }
@@ -348,6 +349,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Point3D(p) => p
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
             _ => self.unexpected(visitor),
         }
     }
@@ -362,6 +364,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             }
             BoltType::Point2D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
             BoltType::Point3D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
+            BoltType::Duration(d) if len == 2 => visitor.visit_seq(d.seq_access()),
             _ => self.unexpected(visitor),
         }
     }
@@ -582,6 +585,10 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! { char identifier }
+
+    fn is_human_readable(&self) -> bool {
+        false
+    }
 }
 
 impl<'de> BoltTypeDeserializer<'de> {
@@ -746,7 +753,7 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Point3D(p) => BoltPointDeserializer::new(p).deserialize_tuple(len, visitor),
             BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
             BoltType::Path(p) => ElementDataDeserializer::new(p).tuple_variant(len, visitor),
-            BoltType::Duration(_) => todo!("duration as mapaccess visit_map"),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
             BoltType::Date(_) => todo!("date as mapaccess visit_map"),
             BoltType::Time(_) => todo!("time as mapaccess visit_map"),
             BoltType::LocalTime(_) => todo!("localtime as mapaccess visit_map"),
@@ -805,14 +812,14 @@ impl FromFloat for f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, fmt::Debug};
+    use std::{borrow::Cow, fmt::Debug, time::Duration};
 
     use super::*;
 
     use crate::{
         types::{
-            BoltDateTime, BoltInteger, BoltMap, BoltNode, BoltNull, BoltPoint2D, BoltPoint3D,
-            BoltRelation, BoltUnboundedRelation,
+            BoltDateTime, BoltDuration, BoltInteger, BoltMap, BoltNode, BoltNull, BoltPoint2D,
+            BoltPoint3D, BoltRelation, BoltUnboundedRelation,
         },
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
@@ -1520,6 +1527,19 @@ mod tests {
         };
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn duration() {
+        let duration = Duration::new(42, 1337);
+
+        let bolt = BoltType::Duration(BoltDuration::from(duration));
+
+        let actual = bolt.to::<std::time::Duration>().unwrap();
+        assert_eq!(actual, duration);
+
+        let actual = bolt.to::<time::Duration>().unwrap();
+        assert_eq!(actual, duration);
     }
 
     #[test]
