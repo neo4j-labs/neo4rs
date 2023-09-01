@@ -59,18 +59,47 @@ impl Path {
     }
 
     pub fn indices(&self) -> Vec<i64> {
-        let indices = self.inner.indices();
-        indices.into_iter().map(|id| id.value).collect()
+        self.indices_as().unwrap()
     }
 
     pub fn nodes(&self) -> Vec<Node> {
-        let nodes = self.inner.nodes();
-        nodes.into_iter().map(Node::new).collect()
+        self.nodes_as().unwrap()
     }
 
     pub fn rels(&self) -> Vec<UnboundedRelation> {
-        let rels = self.inner.rels();
-        rels.into_iter().map(UnboundedRelation::new).collect()
+        self.relationships_as().unwrap()
+    }
+
+    /// Deserialize the path into a custom type that implements [`serde::Deserialize`]
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.to::<T>()
+    }
+
+    /// Deserialize the nodes of this path into custom type that implements [`serde::Deserialize`]
+    pub fn nodes_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Nodes<T>>()?.0)
+    }
+
+    /// Deserialize the relationships of this path into custom type that implements [`serde::Deserialize`]
+    pub fn relationships_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Relationships<T>>()?.0)
+    }
+
+    /// Deserialize the indices of this path into a custom type that implements [`serde::Deserialize`]
+    pub fn indices_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Indices<T>>()?.0)
     }
 }
 

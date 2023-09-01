@@ -5,7 +5,7 @@ use crate::{
             builder::BoltPathBuilder,
             element::{ElementDataDeserializer, ElementDataKey},
         },
-        BoltInteger, BoltKind, BoltList, BoltNode, BoltPath, BoltType, BoltUnboundedRelation,
+        BoltKind, BoltList, BoltPath, BoltType,
     },
     DeError, Indices, Nodes, Path, Relationships,
 };
@@ -244,7 +244,7 @@ mod tests {
     use std::fmt::Debug;
 
     use crate::{
-        types::{BoltInteger, BoltString, BoltType},
+        types::{BoltInteger, BoltNode, BoltString, BoltType, BoltUnboundedRelation},
         Node, UnboundedRelation,
     };
 
