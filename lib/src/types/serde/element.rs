@@ -34,7 +34,7 @@ crate::cenum!(ElementDataKey {
     Nodes,
     Relationships,
     Indices,
-} element_data_key_tests);
+});
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ElementDataValue<'de> {

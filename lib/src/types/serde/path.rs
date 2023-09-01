@@ -42,7 +42,7 @@ cenum!(Fields {
     Nodes,
     Relationships,
     Indices,
-} fields_tests);
+});
 
 impl<'de> Deserialize<'de> for BoltPath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
