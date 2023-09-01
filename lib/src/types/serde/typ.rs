@@ -1,8 +1,12 @@
 use crate::{
     types::{
         serde::{
-            date_time::BoltDateTimeVisitor, element::ElementDataDeserializer,
-            node::BoltNodeVisitor, path::BoltPathVisitor, rel::BoltRelationVisitor,
+            date_time::BoltDateTimeVisitor,
+            element::ElementDataDeserializer,
+            node::BoltNodeVisitor,
+            path::BoltPathVisitor,
+            point::{self, BoltPointDeserializer, BoltPointVisitor},
+            rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
         },
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNull,
@@ -222,8 +226,15 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::UnboundedRelation => variant
                 .tuple_variant(1, BoltUnboundedRelationVisitor)
                 .map(BoltType::UnboundedRelation),
-            BoltKind::Point2D => variant.tuple_variant(1, self),
-            BoltKind::Point3D => variant.tuple_variant(1, self),
+            BoltKind::Point2D => variant
+                .struct_variant(
+                    &point::Field::NAMES[..3],
+                    BoltPointVisitor::_2d::<A::Error>(),
+                )
+                .map(BoltType::Point2D),
+            BoltKind::Point3D => variant
+                .struct_variant(point::Field::NAMES, BoltPointVisitor::_3d::<A::Error>())
+                .map(BoltType::Point3D),
             BoltKind::Bytes => variant.tuple_variant(1, self),
             BoltKind::Path => variant
                 .tuple_variant(1, BoltPathVisitor)
@@ -255,6 +266,8 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         match self.value {
             BoltType::List(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter())),
             BoltType::Bytes(v) => visitor.visit_seq(SeqDeserializer::new(v.value.iter().copied())),
+            BoltType::Point2D(p) => p.into_deserializer().deserialize_seq(visitor),
+            BoltType::Point3D(p) => p.into_deserializer().deserialize_seq(visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -269,6 +282,8 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Relation(v) => v.into_deserializer().deserialize_map(visitor),
             BoltType::UnboundedRelation(v) => v.into_deserializer().deserialize_map(visitor),
             BoltType::Path(p) => p.into_deserializer().deserialize_map(visitor),
+            BoltType::Point2D(p) => p.into_deserializer().deserialize_map(visitor),
+            BoltType::Point3D(p) => p.into_deserializer().deserialize_map(visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -296,6 +311,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Path(p) => p
                 .into_deserializer()
                 .deserialize_struct(name, fields, visitor),
+            BoltType::Point2D(p) => p
+                .into_deserializer()
+                .deserialize_struct(name, fields, visitor),
+            BoltType::Point3D(p) => p
+                .into_deserializer()
+                .deserialize_struct(name, fields, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -321,6 +342,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Path(p) => p
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
+            BoltType::Point2D(p) => p
+                .into_deserializer()
+                .deserialize_newtype_struct(name, visitor),
+            BoltType::Point3D(p) => p
+                .into_deserializer()
+                .deserialize_newtype_struct(name, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -333,6 +360,8 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::List(v) if v.len() == len => {
                 visitor.visit_seq(SeqDeserializer::new(v.value.iter()))
             }
+            BoltType::Point2D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
+            BoltType::Point3D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -713,8 +742,8 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::UnboundedRelation(r) => {
                 ElementDataDeserializer::new(r).tuple_variant(len, visitor)
             }
-            BoltType::Point2D(_) => todo!("point2d as mapaccess visit_map"),
-            BoltType::Point3D(_) => todo!("point3d as mapaccess visit_map"),
+            BoltType::Point2D(p) => BoltPointDeserializer::new(p).deserialize_tuple(len, visitor),
+            BoltType::Point3D(p) => BoltPointDeserializer::new(p).deserialize_tuple(len, visitor),
             BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
             BoltType::Path(p) => ElementDataDeserializer::new(p).tuple_variant(len, visitor),
             BoltType::Duration(_) => todo!("duration as mapaccess visit_map"),
@@ -782,8 +811,8 @@ mod tests {
 
     use crate::{
         types::{
-            BoltDateTime, BoltInteger, BoltMap, BoltNode, BoltNull, BoltRelation,
-            BoltUnboundedRelation,
+            BoltDateTime, BoltInteger, BoltMap, BoltNode, BoltNull, BoltPoint2D, BoltPoint3D,
+            BoltRelation, BoltUnboundedRelation,
         },
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
@@ -1445,6 +1474,51 @@ mod tests {
         let datetime = BoltType::DateTime(datetime);
 
         let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn point_2d() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct P {
+            x: f64,
+            y: f64,
+        }
+
+        let point = BoltType::Point2D(BoltPoint2D {
+            sr_id: 420.into(),
+            x: BoltFloat::new(42.0),
+            y: BoltFloat::new(13.37),
+        });
+
+        let actual = point.to::<P>().unwrap();
+        let expected = P { x: 42.0, y: 13.37 };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn point_3d() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct P {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        let point = BoltType::Point3D(BoltPoint3D {
+            sr_id: 420.into(),
+            x: BoltFloat::new(42.0),
+            y: BoltFloat::new(13.37),
+            z: BoltFloat::new(84.0),
+        });
+        let actual = point.to::<P>().unwrap();
+        let expected = P {
+            x: 42.0,
+            y: 13.37,
+            z: 84.0,
+        };
+
         assert_eq!(actual, expected);
     }
 
