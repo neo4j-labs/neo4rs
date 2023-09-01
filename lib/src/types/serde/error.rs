@@ -61,7 +61,7 @@ pub enum DeError {
     IntegerOutOfBounds(#[source] std::num::TryFromIntError, i64, &'static str),
 
     #[error("Could not convert the DateTime to the target type {0}")]
-    DateTImeOutOfBounds(&'static str),
+    DateTimeOutOfBounds(&'static str),
 }
 
 /// `Unexpected` represents an unexpected invocation of any one of the `Visitor`

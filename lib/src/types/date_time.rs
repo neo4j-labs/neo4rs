@@ -33,6 +33,12 @@ impl BoltDateTime {
     }
 }
 
+impl BoltLocalDateTime {
+    pub(crate) fn try_to_chrono(&self) -> Result<NaiveDateTime> {
+        self.try_into()
+    }
+}
+
 impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
     fn from(value: (NaiveDateTime, &str)) -> Self {
         let seconds = value.0.timestamp().into();
@@ -55,6 +61,7 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     }
 }
 
+
 impl From<NaiveDateTime> for BoltLocalDateTime {
     fn from(value: NaiveDateTime) -> Self {
         let seconds = value.timestamp().into();
@@ -71,7 +78,15 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDateTime> {
-        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+        (&self).try_into()
+    }
+}
+
+impl TryFrom<&BoltLocalDateTime> for NaiveDateTime {
+    type Error = Error;
+
+    fn try_from(value: &BoltLocalDateTime) -> std::result::Result<Self, Self::Error> {
+        NaiveDateTime::from_timestamp_opt(value.seconds.value, value.nanoseconds.value as u32)
             .ok_or(Error::ConversionError)
     }
 }

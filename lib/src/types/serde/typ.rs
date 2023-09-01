@@ -387,7 +387,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         match self.value {
             BoltType::String(v) => visitor.visit_borrowed_str(&v.value),
-            BoltType::DateTime(_) => self.deserialize_string(visitor),
+            BoltType::Date(_)
+            | BoltType::Time(_)
+            | BoltType::LocalTime(_)
+            | BoltType::DateTime(_)
+            | BoltType::LocalDateTime(_)
+            | BoltType::DateTimeZoneId(_) => self.deserialize_string(visitor),
             _ => self.unexpected(visitor),
         }
     }
@@ -403,6 +408,15 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                     Error::custom("Could not convert Neo4j DateTime into chrono::DateTime")
                 })?;
                 visitor.visit_string(datetime.to_rfc3339())
+            }
+            BoltType::LocalDateTime(ldt) => {
+                let ldt = ldt.try_to_chrono().map_err(|_| {
+                    Error::custom(
+                        "Could not convert Neo4j LocalDateTime into chrono::NaiveDateTime",
+                    )
+                })?;
+                let ldt = format!("{:?}", ldt);
+                visitor.visit_string(ldt)
             }
             _ => self.unexpected(visitor),
         }
@@ -604,18 +618,26 @@ impl<'de> BoltTypeDeserializer<'de> {
     {
         let integer = match self.value {
             BoltType::Integer(v) => v.value,
-            BoltType::DateTime(datetime) => match datetime.try_to_chrono() {
-                Ok(datetime) => match std::any::type_name::<V>() {
-                    "chrono::datetime::serde::MicroSecondsTimestampVisitor" => {
-                        datetime.timestamp_micros()
-                    }
-                    "chrono::datetime::serde::MilliSecondsTimestampVisitor" => {
-                        datetime.timestamp_millis()
-                    }
-                    "chrono::datetime::serde::SecondsTimestampVisitor" => datetime.timestamp(),
-                    _ => datetime.timestamp_nanos(),
+            BoltType::DateTime(dt) => match dt.try_to_chrono() {
+                Ok(dt) => match std::any::type_name::<V>().rsplit("::").next() {
+                    Some("MicroSecondsTimestampVisitor") => dt.timestamp_micros(),
+                    Some("MilliSecondsTimestampVisitor") => dt.timestamp_millis(),
+                    Some("SecondsTimestampVisitor") => dt.timestamp(),
+                    _ => dt.timestamp_nanos(),
                 },
-                Err(_) => return Err(DeError::DateTImeOutOfBounds(std::any::type_name::<T>())),
+                Err(_) => return Err(DeError::DateTimeOutOfBounds(std::any::type_name::<T>())),
+            },
+            BoltType::LocalDateTime(ldt) => match ldt.try_to_chrono() {
+                Ok(ldt) => match std::any::type_name::<V>().rsplit("::").next() {
+                    Some("MicroSecondsTimestampVisitor") => ldt.timestamp_micros(),
+                    Some("MilliSecondsTimestampVisitor") => ldt.timestamp_millis(),
+                    Some("SecondsTimestampVisitor") => ldt.timestamp(),
+                    otherwise => {
+                        dbg!(otherwise);
+                        ldt.timestamp_nanos()
+                    }
+                },
+                Err(_) => return Err(DeError::DateTimeOutOfBounds(std::any::type_name::<T>())),
             },
             _ => return self.unexpected(visitor),
         };
@@ -818,13 +840,13 @@ mod tests {
 
     use crate::{
         types::{
-            BoltDateTime, BoltDuration, BoltInteger, BoltMap, BoltNode, BoltNull, BoltPoint2D,
-            BoltPoint3D, BoltRelation, BoltUnboundedRelation,
+            BoltDateTime, BoltDuration, BoltInteger, BoltLocalDateTime, BoltMap, BoltNode,
+            BoltNull, BoltPoint2D, BoltPoint3D, BoltRelation, BoltUnboundedRelation,
         },
         EndNodeId, Id, Keys, Labels, StartNodeId, Type,
     };
 
-    use chrono::{DateTime, FixedOffset, Utc};
+    use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, Timelike, Utc};
     use serde::Deserialize;
 
     #[test]
@@ -1481,6 +1503,168 @@ mod tests {
         let datetime = BoltType::DateTime(datetime);
 
         let actual = datetime.to::<S>().unwrap().datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    fn test_local_datetime() -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(1999, 7, 14)
+            .unwrap()
+            .and_hms_nano_opt(13, 37, 42, 421337420)
+            .unwrap()
+    }
+
+    #[test]
+    fn local_datetime() {
+        let expected = test_local_datetime();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<NaiveDateTime>().unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_nanoseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_nanoseconds")]
+            local_datetime: NaiveDateTime,
+        }
+
+        let expected = test_local_datetime();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_opt_nanoseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_nanoseconds_option")]
+            local_datetime: Option<NaiveDateTime>,
+        }
+
+        let expected = test_local_datetime();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_microseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_microseconds")]
+            local_datetime: NaiveDateTime,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(421337000).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_opt_microseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_microseconds_option")]
+            local_datetime: Option<NaiveDateTime>,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(421337000).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_milliseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_milliseconds")]
+            local_datetime: NaiveDateTime,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(421000000).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_opt_milliseconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_milliseconds_option")]
+            local_datetime: Option<NaiveDateTime>,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(421000000).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime.unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_seconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_seconds")]
+            local_datetime: NaiveDateTime,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(0).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn local_datetime_opt_seconds() {
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(transparent)]
+        struct S {
+            #[serde(with = "chrono::naive::serde::ts_seconds_option")]
+            local_datetime: Option<NaiveDateTime>,
+        }
+
+        let expected = test_local_datetime().with_nanosecond(0).unwrap();
+
+        let local_datetime = BoltLocalDateTime::from(test_local_datetime());
+        let local_datetime = BoltType::LocalDateTime(local_datetime);
+
+        let actual = local_datetime.to::<S>().unwrap().local_datetime.unwrap();
         assert_eq!(actual, expected);
     }
 
