@@ -52,7 +52,7 @@ impl<'de> Visitor<'de> for BoltDateTimeVisitor {
 }
 
 impl BoltDateTime {
-    pub(crate) fn map_access<'de>(&'de self) -> impl MapAccess<'de, Error = DeError> {
+    pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         MapDeserializer::new(
             [
                 (Fields::Seconds, self.seconds.value),
