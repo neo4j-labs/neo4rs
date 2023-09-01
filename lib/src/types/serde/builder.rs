@@ -270,7 +270,7 @@ impl ElementBuilder {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum SetOnce<T> {
+pub enum SetOnce<T> {
     Empty,
     Set(T),
 }
@@ -282,17 +282,17 @@ impl<T> Default for SetOnce<T> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct SetOnceError;
+pub struct SetOnceError;
 
 impl<T> SetOnce<T> {
-    fn get_or_insert_with(&mut self, value: impl FnOnce() -> T) -> &mut T {
+    pub fn get_or_insert_with(&mut self, value: impl FnOnce() -> T) -> &mut T {
         match self {
             SetOnce::Empty => self.insert_with(value).unwrap(),
             SetOnce::Set(value) => value,
         }
     }
 
-    fn insert_with(&mut self, value: impl FnOnce() -> T) -> Result<&mut T, SetOnceError> {
+    pub fn insert_with(&mut self, value: impl FnOnce() -> T) -> Result<&mut T, SetOnceError> {
         match self {
             SetOnce::Empty => *self = Self::Set(value()),
             SetOnce::Set(_) => return Err(SetOnceError),
@@ -303,7 +303,7 @@ impl<T> SetOnce<T> {
         }
     }
 
-    fn try_insert_with<E>(
+    pub fn try_insert_with<E>(
         &mut self,
         value: impl FnOnce() -> Result<T, E>,
     ) -> Result<Result<&mut T, SetOnceError>, E> {
@@ -317,17 +317,21 @@ impl<T> SetOnce<T> {
         }
     }
 
-    fn ok_or_else<E>(self, missing: impl FnOnce() -> E) -> Result<T, E> {
+    pub fn ok_or_else<E>(self, missing: impl FnOnce() -> E) -> Result<T, E> {
         match self {
             SetOnce::Empty => Err(missing()),
             SetOnce::Set(value) => Ok(value),
         }
     }
 
-    fn or_else(self, missing: impl FnOnce() -> T) -> T {
+    pub fn or_else(self, missing: impl FnOnce() -> T) -> T {
         match self {
             SetOnce::Empty => missing(),
             SetOnce::Set(value) => value,
         }
+    }
+
+    pub fn is_set(&self) -> bool {
+        matches!(self, Self::Set(_))
     }
 }
