@@ -350,6 +350,9 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
             BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
+            BoltType::DateTimeZoneId(dtz) if name == "Timezone" => {
+                visitor.visit_newtype_struct(BorrowedStrDeserializer::new(dtz.tz_id()))
+            }
             _ => self.unexpected(visitor),
         }
     }
@@ -365,6 +368,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Point2D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
             BoltType::Point3D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
             BoltType::Duration(d) if len == 2 => visitor.visit_seq(d.seq_access()),
+            BoltType::DateTimeZoneId(dtz) => visitor.visit_seq(
+                dtz.seq_access(
+                    std::any::type_name::<V>()
+                        .contains("TupleVisitor<chrono::naive::datetime::NaiveDateTime,"),
+                ),
+            ),
             _ => self.unexpected(visitor),
         }
     }
@@ -407,7 +416,13 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                 let datetime = datetime.try_to_chrono().map_err(|_| {
                     Error::custom("Could not convert Neo4j DateTime into chrono::DateTime")
                 })?;
-                visitor.visit_string(datetime.to_rfc3339())
+                let value = match std::any::type_name::<V>() {
+                    "chrono::naive::datetime::serde::NaiveDateTimeVisitor" => {
+                        format!("{:?}", datetime.naive_utc())
+                    }
+                    _ => datetime.to_rfc3339(),
+                };
+                visitor.visit_string(value)
             }
             BoltType::LocalDateTime(ldt) => {
                 let ldt = ldt.try_to_chrono().map_err(|_| {
@@ -417,6 +432,18 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                 })?;
                 let ldt = format!("{:?}", ldt);
                 visitor.visit_string(ldt)
+            }
+            BoltType::DateTimeZoneId(dtz) => {
+                let dtz = dtz.try_to_chrono().map_err(|_| {
+                    Error::custom("Could not convert Neo4j DateTimeZoneId into chrono::DateTime")
+                })?;
+                let value = match dbg!(std::any::type_name::<V>()) {
+                    "chrono::naive::datetime::serde::NaiveDateTimeVisitor" => {
+                        format!("{:?}", dtz.naive_utc())
+                    }
+                    _ => dtz.to_rfc3339(),
+                };
+                visitor.visit_string(value)
             }
             _ => self.unexpected(visitor),
         }
@@ -840,10 +867,11 @@ mod tests {
 
     use crate::{
         types::{
-            BoltDateTime, BoltDuration, BoltInteger, BoltLocalDateTime, BoltMap, BoltNode,
-            BoltNull, BoltPoint2D, BoltPoint3D, BoltRelation, BoltUnboundedRelation,
+            BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger, BoltLocalDateTime,
+            BoltMap, BoltNode, BoltNull, BoltPoint2D, BoltPoint3D, BoltRelation,
+            BoltUnboundedRelation,
         },
-        EndNodeId, Id, Keys, Labels, StartNodeId, Type,
+        EndNodeId, Id, Keys, Labels, StartNodeId, Timezone, Type,
     };
 
     use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, Timelike, Utc};
@@ -1351,9 +1379,13 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    fn test_datetime() -> DateTime<FixedOffset> {
+        DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap()
+    }
+
     #[test]
     fn datetime() {
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1371,7 +1403,7 @@ mod tests {
             datetime: DateTime<Utc>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1389,7 +1421,7 @@ mod tests {
             datetime: Option<DateTime<Utc>>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1407,7 +1439,7 @@ mod tests {
             datetime: DateTime<Utc>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1425,7 +1457,7 @@ mod tests {
             datetime: Option<DateTime<Utc>>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1443,7 +1475,7 @@ mod tests {
             datetime: DateTime<Utc>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1461,7 +1493,7 @@ mod tests {
             datetime: Option<DateTime<Utc>>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1479,7 +1511,7 @@ mod tests {
             datetime: DateTime<Utc>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1497,7 +1529,7 @@ mod tests {
             datetime: Option<DateTime<Utc>>,
         }
 
-        let expected = DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00").unwrap();
+        let expected = test_datetime();
 
         let datetime = BoltDateTime::from(expected);
         let datetime = BoltType::DateTime(datetime);
@@ -1666,6 +1698,82 @@ mod tests {
 
         let actual = local_datetime.to::<S>().unwrap().local_datetime.unwrap();
         assert_eq!(actual, expected);
+    }
+
+    fn test_datetime_tz() -> DateTime<FixedOffset> {
+        test_local_datetime()
+            .and_local_timezone(FixedOffset::east_opt(2 * 3600).unwrap())
+            .unwrap()
+    }
+
+    #[test]
+    fn datetime_tz() {
+        let expected = test_datetime_tz();
+
+        let datetime_tz = BoltDateTimeZoneId::from((test_local_datetime(), "Europe/Paris"));
+        let datetime_tz = BoltType::DateTimeZoneId(datetime_tz);
+
+        let actual = datetime_tz.to::<DateTime<FixedOffset>>().unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn datetime_tz_info() {
+        let datetime_tz = BoltDateTimeZoneId::from((test_local_datetime(), "Europe/Paris"));
+        let datetime_tz = BoltType::DateTimeZoneId(datetime_tz);
+
+        let actual = datetime_tz.to::<Timezone>().unwrap().0;
+        assert_eq!(actual, "Europe/Paris");
+    }
+
+    #[test]
+    fn datetime_tz_with_info() {
+        let expected = test_datetime_tz();
+
+        let datetime_tz = BoltDateTimeZoneId::from((test_local_datetime(), "Europe/Paris"));
+        let datetime_tz = BoltType::DateTimeZoneId(datetime_tz);
+
+        let (datetime, timezone) = datetime_tz.to::<(DateTime<FixedOffset>, String)>().unwrap();
+
+        assert_eq!(datetime, expected);
+        assert_eq!(timezone, "Europe/Paris");
+    }
+
+    #[test]
+    fn datetime_as_naive_datetime() {
+        let expected = test_datetime().naive_utc();
+
+        let datetime = BoltDateTime::from(test_datetime());
+        let datetime = BoltType::DateTime(datetime);
+
+        let datetime = datetime.to::<NaiveDateTime>().unwrap();
+
+        assert_eq!(datetime, expected);
+    }
+
+    #[test]
+    fn datetime_tz_as_naive_datetime() {
+        let expected = test_datetime_tz().naive_utc();
+
+        let datetime = BoltDateTimeZoneId::from((test_local_datetime(), "Europe/Paris"));
+        let datetime = BoltType::DateTimeZoneId(datetime);
+
+        let datetime = datetime.to::<NaiveDateTime>().unwrap();
+
+        assert_eq!(datetime, expected);
+    }
+
+    #[test]
+    fn datetime_tz_as_naive_datetime_with_tz_info() {
+        let expected = test_datetime_tz().naive_utc();
+
+        let datetime = BoltDateTimeZoneId::from((test_local_datetime(), "Europe/Paris"));
+        let datetime = BoltType::DateTimeZoneId(datetime);
+
+        let (datetime, tz) = datetime.to::<(NaiveDateTime, String)>().unwrap();
+
+        assert_eq!(datetime, expected);
+        assert_eq!(tz, "Europe/Paris");
     }
 
     #[test]

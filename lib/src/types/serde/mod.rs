@@ -41,6 +41,10 @@ pub struct Type<T = String>(pub T);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keys<Coll = HashSet<String>>(pub Coll);
 
+/// Newtype to extract the timezone info of datetimes during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Timezone<T = String>(pub T);
+
 /// Newtype to extract the nodes of a path during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Nodes<T>(pub Vec<T>);
