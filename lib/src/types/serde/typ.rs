@@ -9,8 +9,8 @@ use crate::{
             rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
         },
-        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltKind, BoltList, BoltMap, BoltNull,
-        BoltString, BoltType,
+        BoltBoolean, BoltBytes, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger, BoltKind,
+        BoltList, BoltLocalDateTime, BoltMap, BoltNull, BoltString, BoltType,
     },
     DeError,
 };
@@ -244,10 +244,14 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::Time => variant.tuple_variant(1, self),
             BoltKind::LocalTime => variant.tuple_variant(1, self),
             BoltKind::DateTime => variant
-                .tuple_variant(1, BoltDateTimeVisitor)
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltDateTime>::new())
                 .map(BoltType::DateTime),
-            BoltKind::LocalDateTime => variant.tuple_variant(1, self),
-            BoltKind::DateTimeZoneId => variant.tuple_variant(1, self),
+            BoltKind::LocalDateTime => variant
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltLocalDateTime>::new())
+                .map(BoltType::LocalDateTime),
+            BoltKind::DateTimeZoneId => variant
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltDateTimeZoneId>::new())
+                .map(BoltType::DateTimeZoneId),
         }
     }
 }
@@ -806,9 +810,9 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Date(_) => todo!("date as mapaccess visit_map"),
             BoltType::Time(_) => todo!("time as mapaccess visit_map"),
             BoltType::LocalTime(_) => todo!("localtime as mapaccess visit_map"),
-            BoltType::DateTime(datetime) => visitor.visit_map(datetime.map_access()),
-            BoltType::LocalDateTime(_) => todo!("localdatetime as mapaccess visit_map"),
-            BoltType::DateTimeZoneId(_) => todo!("datetimezoneid as mapaccess visit_map"),
+            BoltType::DateTime(dt) => visitor.visit_map(dt.map_access()),
+            BoltType::LocalDateTime(dt) => visitor.visit_map(dt.map_access()),
+            BoltType::DateTimeZoneId(dt) => visitor.visit_map(dt.map_access()),
         }
     }
 
@@ -1859,12 +1863,9 @@ mod tests {
             ("values".into(), vec![13.37, 42.84].into()),
             ("payload".into(), b"Hello, World!".as_slice().into()),
             ("secret".into(), BoltType::Null(BoltNull)),
-            (
-                "event".into(),
-                DateTime::parse_from_rfc3339("1999-07-14T13:37:42+02:00")
-                    .unwrap()
-                    .into(),
-            ),
+            ("event".into(), test_datetime().into()),
+            ("local_event".into(), test_local_datetime().into()),
+            ("tz_event".into(), test_datetime_tz().into()),
         ]
         .into_iter()
         .collect::<BoltMap>();

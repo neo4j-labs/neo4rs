@@ -1,11 +1,12 @@
 use core::fmt;
-use std::iter::Peekable;
+use std::{iter::Peekable, marker::PhantomData};
 
 use serde::de::{
     value::{BorrowedStrDeserializer, MapDeserializer, SeqDeserializer},
     DeserializeSeed, Error, IntoDeserializer, MapAccess, SeqAccess, Visitor,
 };
 
+use crate::types::{serde::builder::SetOnce, BoltLocalDateTime, BoltString};
 use crate::{
     types::{BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger},
     DeError,
@@ -20,43 +21,6 @@ crate::cenum!(Fields {
     NaiveDatetime,
 });
 
-pub struct BoltDateTimeVisitor;
-
-impl<'de> Visitor<'de> for BoltDateTimeVisitor {
-    type Value = BoltDateTime;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("BoltDateTime struct")
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        let mut result = BoltDateTime {
-            seconds: BoltInteger::new(0),
-            nanoseconds: BoltInteger::new(0),
-            tz_offset_seconds: BoltInteger::new(0),
-        };
-
-        while let Some((key, value)) = map.next_entry::<Fields, BoltInteger>()? {
-            match key {
-                Fields::Seconds => result.seconds = value,
-                Fields::NanoSeconds => result.nanoseconds = value,
-                Fields::TzOffsetSeconds => result.tz_offset_seconds = value,
-                Fields::TzInfo | Fields::Datetime | Fields::NaiveDatetime => {
-                    return Err(Error::unknown_field(
-                        "tz_info",
-                        &["seconds", "nanoseconds", "ts_offset_seconds"],
-                    ))
-                }
-            }
-        }
-
-        Ok(result)
-    }
-}
-
 impl BoltDateTime {
     pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         MapDeserializer::new(
@@ -70,9 +34,15 @@ impl BoltDateTime {
     }
 }
 
-impl BoltDuration {
-    pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
-        SeqDeserializer::new([self.seconds(), self.nanoseconds()].into_iter())
+impl BoltLocalDateTime {
+    pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
+        MapDeserializer::new(
+            [
+                (Fields::Seconds, self.seconds.value),
+                (Fields::NanoSeconds, self.nanoseconds.value),
+            ]
+            .into_iter(),
+        )
     }
 }
 
@@ -83,6 +53,12 @@ impl BoltDateTimeZoneId {
 
     pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         BoltDateTimeZoneIdAccess::fields(self)
+    }
+}
+
+impl BoltDuration {
+    pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
+        SeqDeserializer::new([self.seconds(), self.nanoseconds()].into_iter())
     }
 }
 
@@ -175,5 +151,134 @@ impl<'de, const N: usize> MapAccess<'de> for BoltDateTimeZoneIdAccess<'de, N> {
         V: DeserializeSeed<'de>,
     {
         self.next_element_seed(seed).map(|opt| opt.unwrap())
+    }
+}
+
+pub struct BoltDateTimeVisitor<A>(PhantomData<A>);
+
+impl<A> BoltDateTimeVisitor<A> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<'de, T: DateTimeIsh> Visitor<'de> for BoltDateTimeVisitor<T> {
+    type Value = T;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(std::any::type_name::<T>())?;
+        formatter.write_str(" struct")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut builder = DateTimeIshBuilder::default();
+
+        while let Some(key) = map.next_key::<Fields>()? {
+            match key {
+                Fields::Seconds => builder.seconds(|| map.next_value())?,
+                Fields::NanoSeconds => builder.nanoseconds(|| map.next_value())?,
+                Fields::TzOffsetSeconds => builder.tz_offset_seconds(|| map.next_value())?,
+                Fields::TzInfo => builder.tz_id(|| map.next_value())?,
+                Fields::Datetime | Fields::NaiveDatetime => {
+                    return Err(Error::unknown_field(
+                        "datetime",
+                        &["seconds", "nanoseconds", "ts_offset_seconds", "tz_id"],
+                    ))
+                }
+            }
+        }
+
+        T::build(builder)
+    }
+}
+
+#[derive(Default)]
+struct DateTimeIshBuilder {
+    seconds: SetOnce<BoltInteger>,
+    nanoseconds: SetOnce<BoltInteger>,
+    tz_offset_seconds: SetOnce<BoltInteger>,
+    tz_id: SetOnce<BoltString>,
+}
+
+impl DateTimeIshBuilder {
+    fn seconds<E: Error>(&mut self, f: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E> {
+        self.seconds
+            .try_insert_with(f)
+            .map_or_else(|_| Err(Error::duplicate_field("seconds")), |_| Ok(()))
+    }
+
+    fn nanoseconds<E: Error>(
+        &mut self,
+        f: impl FnOnce() -> Result<BoltInteger, E>,
+    ) -> Result<(), E> {
+        self.nanoseconds
+            .try_insert_with(f)
+            .map_or_else(|_| Err(Error::duplicate_field("nanoseconds")), |_| Ok(()))
+    }
+
+    fn tz_offset_seconds<E: Error>(
+        &mut self,
+        f: impl FnOnce() -> Result<BoltInteger, E>,
+    ) -> Result<(), E> {
+        self.tz_offset_seconds.try_insert_with(f).map_or_else(
+            |_| Err(Error::duplicate_field("tz_offset_seconds")),
+            |_| Ok(()),
+        )
+    }
+
+    fn tz_id<E: Error>(&mut self, f: impl FnOnce() -> Result<BoltString, E>) -> Result<(), E> {
+        self.tz_id
+            .try_insert_with(f)
+            .map_or_else(|_| Err(Error::duplicate_field("tz_id")), |_| Ok(()))
+    }
+}
+
+trait DateTimeIsh: Sized {
+    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E>;
+}
+
+impl DateTimeIsh for BoltDateTime {
+    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+        Ok(BoltDateTime {
+            seconds: builder
+                .seconds
+                .ok_or_else(|| Error::missing_field("seconds"))?,
+            nanoseconds: builder
+                .nanoseconds
+                .ok_or_else(|| Error::missing_field("nanoseconds"))?,
+            tz_offset_seconds: builder
+                .tz_offset_seconds
+                .ok_or_else(|| Error::missing_field("tz_offset_seconds"))?,
+        })
+    }
+}
+
+impl DateTimeIsh for BoltLocalDateTime {
+    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+        Ok(BoltLocalDateTime {
+            seconds: builder
+                .seconds
+                .ok_or_else(|| Error::missing_field("seconds"))?,
+            nanoseconds: builder
+                .nanoseconds
+                .ok_or_else(|| Error::missing_field("nanoseconds"))?,
+        })
+    }
+}
+
+impl DateTimeIsh for BoltDateTimeZoneId {
+    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+        Ok(BoltDateTimeZoneId {
+            seconds: builder
+                .seconds
+                .ok_or_else(|| Error::missing_field("seconds"))?,
+            nanoseconds: builder
+                .nanoseconds
+                .ok_or_else(|| Error::missing_field("nanoseconds"))?,
+            tz_id: builder.tz_id.ok_or_else(|| Error::missing_field("tz_id"))?,
+        })
     }
 }

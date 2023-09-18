@@ -15,8 +15,8 @@ pub struct BoltDateTime {
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB2, 0x64)]
 pub struct BoltLocalDateTime {
-    seconds: BoltInteger,
-    nanoseconds: BoltInteger,
+    pub(crate) seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
