@@ -5,14 +5,14 @@ use neo4rs_macros::BoltStruct;
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB2, 0x54)]
 pub struct BoltTime {
-    nanoseconds: BoltInteger,
-    tz_offset_seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
+    pub(crate) tz_offset_seconds: BoltInteger,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB1, 0x74)]
 pub struct BoltLocalTime {
-    nanoseconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
 }
 
 impl From<(NaiveTime, FixedOffset)> for BoltTime {
@@ -26,26 +26,6 @@ impl From<(NaiveTime, FixedOffset)> for BoltTime {
     }
 }
 
-impl From<BoltTime> for (NaiveTime, FixedOffset) {
-    fn from(value: BoltTime) -> Self {
-        let nanos = value.nanoseconds.value;
-        let seconds = (nanos / 1_000_000_000) as u32;
-        let nanoseconds = (nanos % 1_000_000_000) as u32;
-
-        let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds)
-            .unwrap_or_else(|| {
-                panic!(
-                    "invalid number of seconds {} or nanoseconds {}",
-                    seconds, nanoseconds
-                )
-            });
-        let offset = FixedOffset::east_opt(value.tz_offset_seconds.value as i32)
-            .unwrap_or_else(|| panic!("invald timezone offset {}", value.tz_offset_seconds.value));
-
-        (time, offset)
-    }
-}
-
 impl From<NaiveTime> for BoltLocalTime {
     fn from(value: NaiveTime) -> Self {
         let seconds_from_midnight = value.num_seconds_from_midnight() as i64;
@@ -56,8 +36,40 @@ impl From<NaiveTime> for BoltLocalTime {
     }
 }
 
-impl From<BoltLocalTime> for NaiveTime {
-    fn from(value: BoltLocalTime) -> Self {
+impl BoltTime {
+    pub(crate) fn to_chrono(&self) -> (NaiveTime, FixedOffset) {
+        self.into()
+    }
+}
+
+impl BoltLocalTime {
+    pub(crate) fn to_chrono(&self) -> NaiveTime {
+        self.into()
+    }
+}
+
+impl From<&BoltTime> for (NaiveTime, FixedOffset) {
+    fn from(value: &BoltTime) -> Self {
+        let time = BoltLocalTime {
+            nanoseconds: value.nanoseconds.clone(),
+        }
+        .to_chrono();
+
+        let offset = FixedOffset::east_opt(value.tz_offset_seconds.value as i32)
+            .unwrap_or_else(|| panic!("invald timezone offset {}", value.tz_offset_seconds.value));
+
+        (time, offset)
+    }
+}
+
+impl From<BoltTime> for (NaiveTime, FixedOffset) {
+    fn from(value: BoltTime) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&BoltLocalTime> for NaiveTime {
+    fn from(value: &BoltLocalTime) -> Self {
         let nanos = value.nanoseconds.value;
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
@@ -67,6 +79,12 @@ impl From<BoltLocalTime> for NaiveTime {
                 seconds, nanoseconds
             )
         })
+    }
+}
+
+impl From<BoltLocalTime> for NaiveTime {
+    fn from(value: BoltLocalTime) -> Self {
+        (&value).into()
     }
 }
 

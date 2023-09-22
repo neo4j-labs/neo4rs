@@ -1,8 +1,9 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use bytes::Bytes;
+use chrono::FixedOffset;
 use serde::{
-    de::{Error, SeqAccess, Visitor},
+    de::{Error, SeqAccess, Unexpected, Visitor},
     Deserialize, Deserializer,
 };
 
@@ -11,7 +12,8 @@ use crate::{
         BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap, BoltNull, BoltString,
         BoltType,
     },
-    EndNodeId, Id, Indices, Keys, Labels, Nodes, Relationships, StartNodeId, Timezone, Type,
+    EndNodeId, Id, Indices, Keys, Labels, Nodes, Offset, Relationships, StartNodeId, Timezone,
+    Type,
 };
 
 impl<'de> Deserialize<'de> for BoltString {
@@ -142,3 +144,65 @@ newtype_deser!(
     Relationships<T>(Vec<T>) => Relationships<T>,
     Indices<T>(Vec<T>) => Indices<T>,
 );
+
+impl<'de> Deserialize<'de> for Offset<FixedOffset> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        fn try_to_offset<T>(v: T) -> Result<FixedOffset, Unexpected<'static>>
+        where
+            T: Copy + TryInto<i32> + TryInto<i64> + TryInto<u64>,
+        {
+            match v.try_into().ok().and_then(FixedOffset::east_opt) {
+                Some(offset) => Ok(offset),
+                None => match v.try_into() {
+                    Ok(v) => Err(Unexpected::Signed(v)),
+                    Err(_) => match v.try_into() {
+                        Ok(v) => Err(Unexpected::Unsigned(v)),
+                        Err(_) => Err(Unexpected::Other("big number")),
+                    },
+                },
+            }
+        }
+        struct OffsetVisitor;
+
+        impl<'de> Visitor<'de> for OffsetVisitor {
+            type Value = FixedOffset;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an offset value as i32 within [-86_400, 86_400]")
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                try_to_offset(v).map_err(|u| Error::invalid_value(u, &self))
+            }
+
+            fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                try_to_offset(v).map_err(|u| Error::invalid_value(u, &self))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                try_to_offset(v).map_err(|u| Error::invalid_value(u, &self))
+            }
+
+            fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                try_to_offset(v).map_err(|u| Error::invalid_value(u, &self))
+            }
+        }
+
+        deserializer.deserialize_i32(OffsetVisitor).map(Offset)
+    }
+}

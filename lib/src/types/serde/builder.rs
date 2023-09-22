@@ -317,6 +317,19 @@ impl<T> SetOnce<T> {
         }
     }
 
+    pub fn take(&mut self) -> Option<T> {
+        match self {
+            SetOnce::Empty => None,
+            SetOnce::Set(_) => {
+                let value = match std::mem::take(self) {
+                    Self::Set(value) => value,
+                    Self::Empty => unreachable!("value is set"),
+                };
+                Some(value)
+            }
+        }
+    }
+
     pub fn ok_or_else<E>(self, missing: impl FnOnce() -> E) -> Result<T, E> {
         match self {
             SetOnce::Empty => Err(missing()),

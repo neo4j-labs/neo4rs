@@ -1,13 +1,13 @@
 use crate::errors::Error;
 use crate::types::*;
-use chrono::{Duration, NaiveDate};
+use chrono::{Days, NaiveDate, NaiveDateTime};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB1, 0x44)]
 pub struct BoltDate {
-    days: BoltInteger,
+    pub(crate) days: BoltInteger,
 }
 
 impl From<NaiveDate> for BoltDate {
@@ -18,13 +18,32 @@ impl From<NaiveDate> for BoltDate {
     }
 }
 
+impl BoltDate {
+    pub(crate) fn try_to_chrono(&self) -> Result<NaiveDate> {
+        self.try_into()
+    }
+}
+
+impl TryFrom<&BoltDate> for NaiveDate {
+    type Error = Error;
+
+    fn try_from(value: &BoltDate) -> Result<Self> {
+        let epoch = NaiveDateTime::from_timestamp_opt(0, 0).expect("UNIX epoch is always valid");
+        let days = Days::new(value.days.value.unsigned_abs());
+        if value.days.value >= 0 {
+            epoch.checked_add_days(days)
+        } else {
+            epoch.checked_sub_days(days)
+        }
+        .map_or(Err(Error::ConversionError), |o| Ok(o.date()))
+    }
+}
+
 impl TryInto<NaiveDate> for BoltDate {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDate> {
-        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        let days = Duration::days(self.days.value);
-        epoch.checked_add_signed(days).ok_or(Error::ConversionError)
+        (&self).try_into()
     }
 }
 
@@ -57,5 +76,25 @@ mod tests {
             .unwrap();
 
         assert_eq!(date.to_string(), "2010-01-01");
+    }
+
+    #[test]
+    fn convert_to_chrono() {
+        let date = NaiveDate::from_ymd_opt(2010, 1, 1).unwrap();
+
+        let bolt: BoltDate = date.into();
+        let actual: NaiveDate = bolt.try_into().unwrap();
+
+        assert_eq!(actual, date);
+    }
+
+    #[test]
+    fn convert_to_chrono_negative() {
+        let date = NaiveDate::from_ymd_opt(1910, 1, 1).unwrap();
+
+        let bolt: BoltDate = date.into();
+        let actual: NaiveDate = bolt.try_into().unwrap();
+
+        assert_eq!(actual, date);
     }
 }

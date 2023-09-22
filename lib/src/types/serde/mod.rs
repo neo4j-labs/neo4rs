@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use chrono::FixedOffset;
 pub use error::{DeError, Unexpected};
 pub use kind::BoltKind;
 
@@ -14,6 +15,7 @@ mod node;
 mod path;
 mod point;
 mod rel;
+mod time;
 mod typ;
 mod urel;
 
@@ -44,6 +46,10 @@ pub struct Keys<Coll = HashSet<String>>(pub Coll);
 /// Newtype to extract the timezone info of datetimes during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Timezone<T = String>(pub T);
+
+/// Newtype to extract the offset info of times during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Offset<T = FixedOffset>(pub T);
 
 /// Newtype to extract the nodes of a path during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]

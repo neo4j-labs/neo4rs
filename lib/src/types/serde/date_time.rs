@@ -17,6 +17,7 @@ crate::cenum!(Fields {
     NanoSeconds,
     TzOffsetSeconds,
     TzInfo,
+    Days,
     Datetime,
     NaiveDatetime,
 });
@@ -182,25 +183,66 @@ impl<'de, T: DateTimeIsh> Visitor<'de> for BoltDateTimeVisitor<T> {
                 Fields::NanoSeconds => builder.nanoseconds(|| map.next_value())?,
                 Fields::TzOffsetSeconds => builder.tz_offset_seconds(|| map.next_value())?,
                 Fields::TzInfo => builder.tz_id(|| map.next_value())?,
+                Fields::Days => builder.days(|| map.next_value())?,
                 Fields::Datetime | Fields::NaiveDatetime => {
                     return Err(Error::unknown_field(
                         "datetime",
-                        &["seconds", "nanoseconds", "ts_offset_seconds", "tz_id"],
+                        &[
+                            "seconds",
+                            "nanoseconds",
+                            "ts_offset_seconds",
+                            "tz_id",
+                            "days",
+                        ],
                     ))
                 }
             }
         }
 
-        T::build(builder)
+        let res = T::build(&mut builder)?;
+
+        if builder.seconds.is_set() {
+            return Err(Error::unknown_field(
+                "seconds",
+                &["nanoseconds", "ts_offset_seconds", "tz_id", "days"],
+            ));
+        }
+        if builder.nanoseconds.is_set() {
+            return Err(Error::unknown_field(
+                "nanoseconds",
+                &["seconds", "ts_offset_seconds", "tz_id", "days"],
+            ));
+        }
+        if builder.tz_offset_seconds.is_set() {
+            return Err(Error::unknown_field(
+                "tz_offset_seconds",
+                &["seconds", "nanoseconds", "tz_id", "days"],
+            ));
+        }
+        if builder.tz_id.is_set() {
+            return Err(Error::unknown_field(
+                "tz_id",
+                &["seconds", "nanoseconds", "tz_offset_seconds", "days"],
+            ));
+        }
+        if builder.days.is_set() {
+            return Err(Error::unknown_field(
+                "days",
+                &["seconds", "nanoseconds", "tz_offset_seconds", "tz_id"],
+            ));
+        }
+
+        Ok(res)
     }
 }
 
 #[derive(Default)]
-struct DateTimeIshBuilder {
-    seconds: SetOnce<BoltInteger>,
-    nanoseconds: SetOnce<BoltInteger>,
-    tz_offset_seconds: SetOnce<BoltInteger>,
-    tz_id: SetOnce<BoltString>,
+pub(crate) struct DateTimeIshBuilder {
+    pub(crate) seconds: SetOnce<BoltInteger>,
+    pub(crate) nanoseconds: SetOnce<BoltInteger>,
+    pub(crate) tz_offset_seconds: SetOnce<BoltInteger>,
+    pub(crate) tz_id: SetOnce<BoltString>,
+    pub(crate) days: SetOnce<BoltInteger>,
 }
 
 impl DateTimeIshBuilder {
@@ -234,51 +276,67 @@ impl DateTimeIshBuilder {
             .try_insert_with(f)
             .map_or_else(|_| Err(Error::duplicate_field("tz_id")), |_| Ok(()))
     }
+
+    fn days<E: Error>(&mut self, f: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E> {
+        self.days
+            .try_insert_with(f)
+            .map_or_else(|_| Err(Error::duplicate_field("days")), |_| Ok(()))
+    }
 }
 
-trait DateTimeIsh: Sized {
-    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E>;
+pub(crate) trait DateTimeIsh: Sized {
+    fn build<E: Error>(builder: &mut DateTimeIshBuilder) -> Result<Self, E>;
 }
 
 impl DateTimeIsh for BoltDateTime {
-    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+    fn build<E: Error>(builder: &mut DateTimeIshBuilder) -> Result<Self, E> {
         Ok(BoltDateTime {
             seconds: builder
                 .seconds
+                .take()
                 .ok_or_else(|| Error::missing_field("seconds"))?,
             nanoseconds: builder
                 .nanoseconds
+                .take()
                 .ok_or_else(|| Error::missing_field("nanoseconds"))?,
             tz_offset_seconds: builder
                 .tz_offset_seconds
+                .take()
                 .ok_or_else(|| Error::missing_field("tz_offset_seconds"))?,
         })
     }
 }
 
 impl DateTimeIsh for BoltLocalDateTime {
-    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+    fn build<E: Error>(builder: &mut DateTimeIshBuilder) -> Result<Self, E> {
         Ok(BoltLocalDateTime {
             seconds: builder
                 .seconds
+                .take()
                 .ok_or_else(|| Error::missing_field("seconds"))?,
             nanoseconds: builder
                 .nanoseconds
+                .take()
                 .ok_or_else(|| Error::missing_field("nanoseconds"))?,
         })
     }
 }
 
 impl DateTimeIsh for BoltDateTimeZoneId {
-    fn build<E: Error>(builder: DateTimeIshBuilder) -> Result<Self, E> {
+    fn build<E: Error>(builder: &mut DateTimeIshBuilder) -> Result<Self, E> {
         Ok(BoltDateTimeZoneId {
             seconds: builder
                 .seconds
+                .take()
                 .ok_or_else(|| Error::missing_field("seconds"))?,
             nanoseconds: builder
                 .nanoseconds
+                .take()
                 .ok_or_else(|| Error::missing_field("nanoseconds"))?,
-            tz_id: builder.tz_id.ok_or_else(|| Error::missing_field("tz_id"))?,
+            tz_id: builder
+                .tz_id
+                .take()
+                .ok_or_else(|| Error::missing_field("tz_id"))?,
         })
     }
 }

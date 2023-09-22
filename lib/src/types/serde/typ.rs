@@ -9,8 +9,9 @@ use crate::{
             rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
         },
-        BoltBoolean, BoltBytes, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger, BoltKind,
-        BoltList, BoltLocalDateTime, BoltMap, BoltNull, BoltString, BoltType,
+        BoltBoolean, BoltBytes, BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger,
+        BoltKind, BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNull, BoltString,
+        BoltTime, BoltType,
     },
     DeError,
 };
@@ -240,9 +241,15 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
                 .tuple_variant(1, BoltPathVisitor)
                 .map(BoltType::Path),
             BoltKind::Duration => variant.tuple_variant(1, self),
-            BoltKind::Date => variant.tuple_variant(1, self),
-            BoltKind::Time => variant.tuple_variant(1, self),
-            BoltKind::LocalTime => variant.tuple_variant(1, self),
+            BoltKind::Date => variant
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltDate>::new())
+                .map(BoltType::Date),
+            BoltKind::Time => variant
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltTime>::new())
+                .map(BoltType::Time),
+            BoltKind::LocalTime => variant
+                .tuple_variant(1, BoltDateTimeVisitor::<BoltLocalTime>::new())
+                .map(BoltType::LocalTime),
             BoltKind::DateTime => variant
                 .tuple_variant(1, BoltDateTimeVisitor::<BoltDateTime>::new())
                 .map(BoltType::DateTime),
@@ -378,6 +385,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                         .contains("TupleVisitor<chrono::naive::datetime::NaiveDateTime,"),
                 ),
             ),
+            BoltType::Time(t) if len == 2 => visitor.visit_seq(t.seq_access()),
             _ => self.unexpected(visitor),
         }
     }
@@ -416,6 +424,20 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     {
         match self.value {
             BoltType::String(v) => visitor.visit_string(v.value.clone()),
+            BoltType::Date(v) => {
+                let date = v.try_to_chrono().map_err(|_| {
+                    Error::custom("Could not convert Neo4j Date into chrono::NaiveDate")
+                })?;
+                visitor.visit_string(date.to_string())
+            }
+            BoltType::Time(v) => {
+                let (time, _) = v.to_chrono();
+                visitor.visit_string(time.to_string())
+            }
+            BoltType::LocalTime(v) => {
+                let time = v.to_chrono();
+                visitor.visit_string(time.to_string())
+            }
             BoltType::DateTime(datetime) => {
                 let datetime = datetime.try_to_chrono().map_err(|_| {
                     Error::custom("Could not convert Neo4j DateTime into chrono::DateTime")
@@ -807,9 +829,9 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
             BoltType::Path(p) => ElementDataDeserializer::new(p).tuple_variant(len, visitor),
             BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
-            BoltType::Date(_) => todo!("date as mapaccess visit_map"),
-            BoltType::Time(_) => todo!("time as mapaccess visit_map"),
-            BoltType::LocalTime(_) => todo!("localtime as mapaccess visit_map"),
+            BoltType::Date(d) => visitor.visit_map(d.map_access()),
+            BoltType::Time(t) => visitor.visit_map(t.map_access()),
+            BoltType::LocalTime(t) => visitor.visit_map(t.map_access()),
             BoltType::DateTime(dt) => visitor.visit_map(dt.map_access()),
             BoltType::LocalDateTime(dt) => visitor.visit_map(dt.map_access()),
             BoltType::DateTimeZoneId(dt) => visitor.visit_map(dt.map_access()),
@@ -871,14 +893,14 @@ mod tests {
 
     use crate::{
         types::{
-            BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger, BoltLocalDateTime,
-            BoltMap, BoltNode, BoltNull, BoltPoint2D, BoltPoint3D, BoltRelation,
-            BoltUnboundedRelation,
+            BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger,
+            BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNode, BoltNull, BoltPoint2D,
+            BoltPoint3D, BoltRelation, BoltTime, BoltUnboundedRelation,
         },
-        EndNodeId, Id, Keys, Labels, StartNodeId, Timezone, Type,
+        EndNodeId, Id, Keys, Labels, Offset, StartNodeId, Timezone, Type,
     };
 
-    use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, Timelike, Utc};
+    use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
     use serde::Deserialize;
 
     #[test]
@@ -1838,6 +1860,51 @@ mod tests {
         assert_eq!(actual, duration);
     }
 
+    fn test_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(1999, 7, 14).unwrap()
+    }
+
+    #[test]
+    fn date() {
+        let date = test_date();
+
+        let bolt = BoltDate::from(date);
+        let bolt = BoltType::Date(bolt);
+
+        let actual = bolt.to::<NaiveDate>().unwrap();
+        assert_eq!(actual, date);
+    }
+
+    fn test_time() -> NaiveTime {
+        NaiveTime::from_hms_nano_opt(13, 37, 42, 421337420).unwrap()
+    }
+
+    #[test]
+    fn local_time() {
+        let time = test_time();
+
+        let bolt = BoltLocalTime::from(time);
+        let bolt = BoltType::LocalTime(bolt);
+
+        let actual = bolt.to::<NaiveTime>().unwrap();
+        assert_eq!(actual, time);
+    }
+
+    #[test]
+    fn time() {
+        let time = test_time();
+
+        let bolt = BoltTime::from((time, FixedOffset::east_opt(2 * 3600).unwrap()));
+        let bolt = BoltType::Time(bolt);
+
+        let actual = bolt.to::<NaiveTime>().unwrap();
+        assert_eq!(actual, time);
+
+        let actual = bolt.to::<(NaiveTime, Offset)>().unwrap();
+        assert_eq!(actual.0, time);
+        assert_eq!(actual.1 .0, FixedOffset::east_opt(2 * 3600).unwrap());
+    }
+
     #[test]
     fn type_convert() {
         let i = BoltType::from(42);
@@ -1866,6 +1933,12 @@ mod tests {
             ("event".into(), test_datetime().into()),
             ("local_event".into(), test_local_datetime().into()),
             ("tz_event".into(), test_datetime_tz().into()),
+            ("date_event".into(), test_date().into()),
+            ("local_time_event".into(), test_time().into()),
+            (
+                "time_event".into(),
+                (test_time(), FixedOffset::east_opt(2 * 3600).unwrap()).into(),
+            ),
         ]
         .into_iter()
         .collect::<BoltMap>();
