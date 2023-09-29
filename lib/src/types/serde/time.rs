@@ -1,4 +1,7 @@
-use serde::de::{value::MapDeserializer, Error, IntoDeserializer, MapAccess, SeqAccess};
+use serde::{
+    de::{value::MapDeserializer, Error, IntoDeserializer, MapAccess, SeqAccess},
+    forward_to_deserialize_any, Deserializer,
+};
 
 use crate::{
     types::{
@@ -15,9 +18,7 @@ impl BoltTime {
             offset: Some(self.tz_offset_seconds.clone()),
         }
     }
-}
 
-impl BoltTime {
     pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         MapDeserializer::new(
             [
@@ -30,6 +31,13 @@ impl BoltTime {
 }
 
 impl BoltLocalTime {
+    pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
+        BoltTimeSeq {
+            nanoseconds: Some(self.nanoseconds.clone()),
+            offset: None,
+        }
+    }
+
     pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         MapDeserializer::new([(Fields::NanoSeconds, self.nanoseconds.value)].into_iter())
     }
@@ -53,6 +61,38 @@ impl<'de> SeqAccess<'de> for BoltTimeSeq {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
+        struct OptOffsetDeserializer(Option<BoltInteger>);
+
+        impl<'de> Deserializer<'de> for OptOffsetDeserializer {
+            type Error = DeError;
+
+            fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+            where
+                V: serde::de::Visitor<'de>,
+            {
+                match self.0 {
+                    Some(offset) => visitor.visit_i64(offset.value),
+                    None => visitor.visit_none(),
+                }
+            }
+
+            fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+            where
+                V: serde::de::Visitor<'de>,
+            {
+                match self.0.as_ref() {
+                    Some(_) => visitor.visit_some(self),
+                    None => visitor.visit_none(),
+                }
+            }
+
+            forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
+                unit unit_struct newtype_struct seq tuple tuple_struct map struct enum identifier
+                ignored_any
+            }
+        }
+
         match self.nanoseconds.take() {
             Some(nanoseconds) => seed
                 .deserialize(
@@ -62,10 +102,9 @@ impl<'de> SeqAccess<'de> for BoltTimeSeq {
                         .into_deserializer(),
                 )
                 .map(Some),
-            None => match self.offset.take() {
-                Some(offset) => seed.deserialize(offset.value.into_deserializer()).map(Some),
-                None => Ok(None),
-            },
+            None => seed
+                .deserialize(OptOffsetDeserializer(self.offset.take()))
+                .map(Some),
         }
     }
 }

@@ -115,7 +115,7 @@ impl<'de, const N: usize> SeqAccess<'de> for BoltDateTimeZoneIdAccess<'de, N> {
             Some(Fields::NaiveDatetime) => self
                 .0
                 .try_to_chrono()
-                .map(|dt| format!("{:?}", dt.naive_utc()).into_deserializer())
+                .map(|dt| format!("{:?}", dt.naive_local()).into_deserializer())
                 .map_err(|_| Error::custom("Could not convert into chrono::Datetime"))
                 .and_then(|dt| seed.deserialize(dt))
                 .map(Some),
