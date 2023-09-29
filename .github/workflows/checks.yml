@@ -38,8 +38,10 @@ jobs:
           toolchain: ${{ env.MSRV }}
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Prepare MSRV lockfile
+        run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run cargo check
-        run: cargo +$MSRV check --all-targets
+        run: cargo +$MSRV check --all-targets --locked
 
   fmt:
     name: Check formatting
@@ -74,8 +76,10 @@ jobs:
           components: clippy
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Prepare MSRV lockfile
+        run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run clippy
-        run: cargo +$MSRV clippy --all-targets --all-features -- -D warnings
+        run: cargo +$MSRV clippy --all-targets --all-features --locked -- -D warnings
 
   unit-tests:
     name: Run unit tests
@@ -98,6 +102,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Prepare MSRV lockfile
+        run: cp ci/Cargo.lock.msrv Cargo.lock
+        if: matrix.rust == '1.60.0'
       - name: Run unit tests
         run: cargo +${{ matrix.rust }} nextest run --lib --all-features
 
@@ -121,8 +128,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Prepare MSRV lockfile
+        run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run integration tests
-        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --all-features
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --all-features --locked
 
   msrv:
     name: Validate MSRV and minimal dependency versions
