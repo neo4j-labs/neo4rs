@@ -179,7 +179,9 @@ impl NeoUrl {
         let url = match Url::parse(uri) {
             Ok(url) if url.has_host() => url,
             // missing scheme
-            Ok(_) => Url::parse(&format!("bolt://{}", uri))?,
+            Ok(_) | Err(url::ParseError::RelativeUrlWithoutBase) => {
+                Url::parse(&format!("bolt://{}", uri))?
+            }
             Err(err) => return Err(Error::UrlParseError(err)),
         };
 
@@ -294,6 +296,14 @@ mod tests {
         let url = NeoUrl::parse("localhost:4242").unwrap();
         assert_eq!(url.port(), 4242);
         assert_eq!(url.host(), Host::Domain("localhost"));
+        assert_eq!(url.scheme(), "bolt");
+    }
+
+    #[test]
+    fn should_parse_ip_uri_without_scheme() {
+        let url = NeoUrl::parse("127.0.0.1:4242").unwrap();
+        assert_eq!(url.port(), 4242);
+        assert_eq!(url.host(), Host::Domain("127.0.0.1"));
         assert_eq!(url.scheme(), "bolt");
     }
 }
