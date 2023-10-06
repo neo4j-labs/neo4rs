@@ -120,6 +120,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 2
+      - name: Accept Neo4j Enterprise license
+        run: echo "neo4j:5-enterprise > lib/container-license-acceptance.txt"
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:

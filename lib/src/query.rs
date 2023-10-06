@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::errors::*;
 use crate::messages::*;
 use crate::pool::*;
@@ -45,10 +44,10 @@ impl Query {
 
     pub(crate) async fn run(
         self,
-        config: &Config,
+        db: &str,
         connection: Arc<Mutex<ManagedConnection>>,
     ) -> Result<()> {
-        let run = BoltRequest::run(&config.db, &self.query, self.params.clone());
+        let run = BoltRequest::run(db, &self.query, self.params);
         let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
             BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
@@ -61,20 +60,16 @@ impl Query {
 
     pub(crate) async fn execute(
         self,
-        config: &Config,
+        db: &str,
+        fetch_size: usize,
         connection: Arc<Mutex<ManagedConnection>>,
     ) -> Result<RowStream> {
-        let run = BoltRequest::run(&config.db, &self.query, self.params);
+        let run = BoltRequest::run(db, &self.query, self.params);
         match connection.lock().await.send_recv(run).await {
             Ok(BoltResponse::Success(success)) => {
                 let fields: BoltList = success.get("fields").unwrap_or_else(BoltList::new);
                 let qid: i64 = success.get("qid").unwrap_or(-1);
-                Ok(RowStream::new(
-                    qid,
-                    fields,
-                    config.fetch_size,
-                    connection.clone(),
-                ))
+                Ok(RowStream::new(qid, fields, fetch_size, connection.clone()))
             }
             msg => Err(unexpected(msg, "RUN")),
         }

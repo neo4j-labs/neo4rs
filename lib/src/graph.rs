@@ -41,27 +41,50 @@ impl Graph {
         Self::connect(config).await
     }
 
-    /// Starts a new transaction, all queries that needs to be run/executed within the transaction
+    /// Starts a new transaction on the configured database.
+    /// All queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
     pub async fn start_txn(&self) -> Result<Txn> {
-        let connection = self.pool.get().await?;
-        Txn::new(self.config.clone(), connection).await
+        self.start_txn_on(&self.config.db).await
     }
 
-    /// Runs a query using a connection from the connection pool, it doesn't return any
-    /// [`RowStream`] as the `run` abstraction discards any stream.
+    /// Starts a new transaction on the provided database.
+    /// All queries that needs to be run/executed within the transaction
+    /// should be executed using either [`Txn::run`] or [`Txn::execute`]
+    pub async fn start_txn_on(&self, db: &str) -> Result<Txn> {
+        let connection = self.pool.get().await?;
+        Txn::new(db, self.config.fetch_size, connection).await
+    }
+
+    /// Runs a query on the configured database using a connection from the connection pool,
+    /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
     ///
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run(&self, q: Query) -> Result<()> {
-        let connection = Arc::new(Mutex::new(self.pool.get().await?));
-        q.run(&self.config, connection).await
+        self.run_on(&self.config.db, q).await
     }
 
-    /// Executes a query and returns a [`RowStream`]
-    pub async fn execute(&self, q: Query) -> Result<RowStream> {
+    /// Runs a query on the provided database using a connection from the connection pool.
+    /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
+    ///
+    /// Use [`Graph::run`] for cases where you just want a write operation
+    ///
+    /// use [`Graph::execute`] when you are interested in the result stream
+    pub async fn run_on(&self, db: &str, q: Query) -> Result<()> {
         let connection = Arc::new(Mutex::new(self.pool.get().await?));
-        q.execute(&self.config, connection).await
+        q.run(db, connection).await
+    }
+
+    /// Executes a query on the configured database and returns a [`RowStream`]
+    pub async fn execute(&self, q: Query) -> Result<RowStream> {
+        self.execute_on(&self.config.db, q).await
+    }
+
+    /// Executes a query on the provided database and returns a [`RowStream`]
+    pub async fn execute_on(&self, db: &str, q: Query) -> Result<RowStream> {
+        let connection = Arc::new(Mutex::new(self.pool.get().await?));
+        q.execute(db, self.config.fetch_size, connection).await
     }
 }

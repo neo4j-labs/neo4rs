@@ -69,8 +69,9 @@ impl BoltRequest {
         BoltRequest::Discard(Discard::default())
     }
 
-    pub fn begin() -> BoltRequest {
-        BoltRequest::Begin(Begin::new(BoltMap::default()))
+    pub fn begin(db: &str) -> BoltRequest {
+        let begin = Begin::new([("db".into(), db.into())].into_iter().collect());
+        BoltRequest::Begin(begin)
     }
 
     pub fn commit() -> BoltRequest {
