@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x46)]
 pub struct BoltDateTime {
     seconds: BoltInteger,
@@ -12,14 +12,14 @@ pub struct BoltDateTime {
     tz_offset_seconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB2, 0x64)]
 pub struct BoltLocalDateTime {
     seconds: BoltInteger,
     nanoseconds: BoltInteger,
 }
 
-#[derive(Debug, PartialEq, Clone, BoltStruct)]
+#[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x66)]
 pub struct BoltDateTimeZoneId {
     seconds: BoltInteger,
@@ -94,7 +94,7 @@ impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
         let datetime = NaiveDateTime::from_timestamp_opt(seconds, self.nanoseconds.value as u32)
             .ok_or(Error::ConversionError)?;
 
-        Ok(DateTime::from_utc(datetime, offset))
+        Ok(DateTime::from_naive_utc_and_offset(datetime, offset))
     }
 }
 
