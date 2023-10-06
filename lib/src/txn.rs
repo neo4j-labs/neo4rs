@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::errors::*;
 use crate::messages::*;
 use crate::pool::*;
@@ -12,16 +11,22 @@ use tokio::sync::Mutex;
 /// When a transation is started, a dedicated connection is resered and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
 pub struct Txn {
-    config: Config,
+    db: String,
+    fetch_size: usize,
     connection: Arc<Mutex<ManagedConnection>>,
 }
 
 impl Txn {
-    pub(crate) async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
-        let begin = BoltRequest::begin();
+    pub(crate) async fn new(
+        db: &str,
+        fetch_size: usize,
+        mut connection: ManagedConnection,
+    ) -> Result<Self> {
+        let begin = BoltRequest::begin(db);
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => Ok(Txn {
-                config,
+                db: db.to_owned(),
+                fetch_size,
                 connection: Arc::new(Mutex::new(connection)),
             }),
             msg => Err(unexpected(msg, "BEGIN")),
@@ -38,12 +43,13 @@ impl Txn {
 
     /// Runs a single query and discards the stream.
     pub async fn run(&self, q: Query) -> Result<()> {
-        q.run(&self.config, self.connection.clone()).await
+        q.run(&self.db, self.connection.clone()).await
     }
 
     /// Executes a query and returns a [`RowStream`]
     pub async fn execute(&self, q: Query) -> Result<RowStream> {
-        q.execute(&self.config, self.connection.clone()).await
+        q.execute(&self.db, self.fetch_size, self.connection.clone())
+            .await
     }
 
     /// Commits the transaction in progress

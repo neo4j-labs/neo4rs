@@ -3,7 +3,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Version {
     V4_1,
     V4,

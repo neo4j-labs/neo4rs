@@ -51,7 +51,7 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## MSRV
 
-The crate has a minimum supported Rust version (MSRV) of `1.60.0`.
+The crate has a minimum supported Rust version (MSRV) of `1.63.0`.
 
 A change in the MSRV in *not* considered a breaking change.
 For versions past 1.0.0, a change in the MSRV can be done in a minor version increment (1.1.3 -> 1.2.0)
@@ -116,7 +116,7 @@ It is recommended to close all editors, or more sepcifically, all rust-analyzer 
 
 ```bash
 rm Cargo.lock
-cargo +1.60.0 test --no-run
+cargo +1.63.0 test --no-run
 # If there are errors, update Cargo.toml to fix and try again from the top.
 # You might have to downgrade or remove certain crates to hit the MSRV,
 # or suggest an increase in the MSRV.

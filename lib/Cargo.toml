@@ -10,13 +10,13 @@ documentation = "https://docs.rs/neo4rs"
 readme = "../README.md"
 keywords = ["neo4j", "rust", "bolt", "cypher", "driver"]
 categories = ["database", "network-programming", "asynchronous"]
-rust-version = "1.60"
+rust-version = "1.63"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-trait = "0.1.0"
 bytes = "1.0.0"
-chrono = "0.4.2"
+chrono = "0.4.27"
 deadpool = "0.9.0"
 futures = { version = "0.3.0" }
 log = "0.4"
@@ -33,7 +33,7 @@ webpki-roots = "0.23.0"
 lenient_semver = { version = "0.4.2", default_features = false, features = ["version_lite"] }
 pretty_env_logger = "0.4.0"
 testcontainers = "0.14.0"
-neo4j_testcontainers = "0.1.0"
+neo4j_testcontainers = "0.2.0"
 uuid = { version = "1.0.0", features = ["v4"] }
 serde_bytes = "0.11.11"
 serde_with = "~3.0.0"

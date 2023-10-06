@@ -1,14 +1,47 @@
 use lenient_semver::Version;
-use neo4j_testcontainers::Neo4j;
+use neo4j_testcontainers::{Neo4j, Neo4jImage};
 use neo4rs::{ConfigBuilder, Graph};
 use testcontainers::{clients::Cli, Container};
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
+
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct Neo4jContainerBuilder {
+    enterprise: bool,
+    config: ConfigBuilder,
+}
+
+#[allow(dead_code)]
+impl Neo4jContainerBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_enterprise_edition(mut self) -> Self {
+        self.enterprise = true;
+        self
+    }
+
+    pub fn with_config(mut self, config: ConfigBuilder) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn modify_config(mut self, block: impl FnOnce(ConfigBuilder) -> ConfigBuilder) -> Self {
+        self.config = block(self.config);
+        self
+    }
+
+    pub async fn start(self) -> Result<Neo4jContainer, Box<dyn Error + Send + Sync + 'static>> {
+        Neo4jContainer::from_config_and_edition(self.config, self.enterprise).await
+    }
+}
 
 pub struct Neo4jContainer {
     graph: Arc<Graph>,
     version: String,
-    _container: Option<Container<'static, Neo4j>>,
+    _container: Option<Container<'static, Neo4jImage>>,
 }
 
 impl Neo4jContainer {
@@ -18,13 +51,20 @@ impl Neo4jContainer {
     }
 
     pub async fn from_config(config: ConfigBuilder) -> Self {
+        Self::from_config_and_edition(config, false).await.unwrap()
+    }
+
+    pub async fn from_config_and_edition(
+        config: ConfigBuilder,
+        enterprise_edition: bool,
+    ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
         let _ = pretty_env_logger::try_init();
 
         let server = Self::server_from_env();
 
         let (connection, _container) = match server {
             TestServer::TestContainer => {
-                let (connection, container) = Self::create_testcontainer();
+                let (connection, container) = Self::create_testcontainer(enterprise_edition)?;
                 (connection, Some(container))
             }
             TestServer::External(uri) => {
@@ -35,11 +75,11 @@ impl Neo4jContainer {
 
         let version = connection.version;
         let graph = Self::connect(config, connection.uri, &connection.auth).await;
-        Self {
+        Ok(Self {
             graph,
             version,
             _container,
-        }
+        })
     }
 
     pub fn graph(&self) -> Arc<Graph> {
@@ -64,21 +104,37 @@ impl Neo4jContainer {
         }
     }
 
-    fn create_testcontainer() -> (TestConnection, Container<'static, Neo4j>) {
+    fn create_testcontainer(
+        enterprise: bool,
+    ) -> Result<
+        (TestConnection, Container<'static, Neo4jImage>),
+        Box<dyn Error + Send + Sync + 'static>,
+    > {
+        let image = Neo4j::default();
+        let image = if enterprise {
+            image.with_enterprise_edition()?
+        } else {
+            image
+        };
+
         let docker = Cli::default();
         let docker = Box::leak(Box::new(docker));
 
-        let container = docker.run(Neo4j::default());
+        let container = docker.run(image);
 
-        let uri = Neo4j::uri_ipv4(&container);
+        let uri = container.image().bolt_uri_ipv4();
         let version = container.image().version().to_owned();
-        let user = container.image().user().to_owned();
-        let pass = container.image().pass().to_owned();
+        let user = container.image().user().expect("default user").to_owned();
+        let pass = container
+            .image()
+            .password()
+            .expect("default password")
+            .to_owned();
         let auth = TestAuth { user, pass };
 
         let connection = TestConnection { uri, version, auth };
 
-        (connection, container)
+        Ok((connection, container))
     }
 
     fn create_test_endpoint(uri: String) -> TestConnection {
