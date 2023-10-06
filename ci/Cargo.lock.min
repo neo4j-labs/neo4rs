@@ -537,10 +537,11 @@ dependencies = [
 
 [[package]]
 name = "neo4j_testcontainers"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f502cf0e7658163604bf3ac7975f642d8a6c2c1f4110509493dc1d35dc70b0f7"
+checksum = "bb43391104ac779c0c9805e6d9d5422ddc77cadd4e398981427f4c4273d353a1"
 dependencies = [
+ "lenient_semver",
  "testcontainers",
 ]
 
