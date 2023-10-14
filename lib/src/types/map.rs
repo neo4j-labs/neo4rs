@@ -27,6 +27,10 @@ impl BoltMap {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+
     pub fn len(&self) -> usize {
         self.value.len()
     }
