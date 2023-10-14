@@ -97,8 +97,9 @@ impl TryFrom<&BoltDateTimeZoneId> for DateTime<FixedOffset> {
             .ok_or(Error::ConversionError)?
             .and_local_timezone(tz)
             .earliest()
-            .ok_or(Error::ConversionError)?
-            .fixed_offset();
+            .ok_or(Error::ConversionError)?;
+
+        let dt = dt.with_timezone(&dt.offset().fix());
 
         Ok(dt)
     }
@@ -171,7 +172,7 @@ impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
         let datetime = NaiveDateTime::from_timestamp_opt(seconds, nanoseconds.value as u32)
             .ok_or(Error::ConversionError)?;
 
-        Ok(DateTime::from_naive_utc_and_offset(datetime, offset))
+        Ok(DateTime::from_utc(datetime, offset))
     }
 }
 
