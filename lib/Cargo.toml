@@ -35,5 +35,5 @@ pretty_env_logger = "0.4.0"
 testcontainers = "0.14.0"
 neo4j_testcontainers = "0.2.0"
 uuid = { version = "1.0.0", features = ["v4"] }
-serde_bytes = "0.11.11"
-serde_with = "~3.0.0"
+serde_bytes = "0.11.0"
+serde_with = "3.0.0"
