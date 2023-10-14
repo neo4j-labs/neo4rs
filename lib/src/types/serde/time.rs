@@ -15,7 +15,11 @@ impl BoltTime {
     pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
         BoltTimeSeq {
             nanoseconds: Some(self.nanoseconds.clone()),
-            offset: Some(self.tz_offset_seconds.clone()),
+            offset: if self.tz_offset_seconds.value == 0 {
+                None
+            } else {
+                Some(self.tz_offset_seconds.clone())
+            },
         }
     }
 
