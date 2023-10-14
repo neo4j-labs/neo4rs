@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::BoltInteger;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
@@ -62,10 +62,8 @@ impl From<BoltDuration> for std::time::Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_a_duration() {
@@ -81,11 +79,9 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_duration() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xB4, 0x45, 0x0C, 0x02, 0x1E, 0xC9, 0x02, 0xBC,
-        ])));
+        let mut bytes = Bytes::from_static(&[0xB4, 0x45, 0x0C, 0x02, 0x1E, 0xC9, 0x02, 0xBC]);
 
-        let duration: BoltDuration = BoltDuration::parse(Version::V4_1, bytes).unwrap();
+        let duration: BoltDuration = BoltDuration::parse(Version::V4_1, &mut bytes).unwrap();
 
         assert_eq!(duration.months.value, 12);
         assert_eq!(duration.days.value, 2);

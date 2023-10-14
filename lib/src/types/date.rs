@@ -1,5 +1,7 @@
-use crate::errors::Error;
-use crate::types::*;
+use crate::{
+    errors::Error,
+    types::{BoltInteger, Result},
+};
 use chrono::{Days, NaiveDate, NaiveDateTime};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
@@ -50,10 +52,8 @@ impl TryInto<NaiveDate> for BoltDate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_a_date() {
@@ -66,11 +66,9 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_date() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xB1, 0x44, 0xC9, 0x39, 0x12,
-        ])));
+        let mut bytes = Bytes::from_static(&[0xB1, 0x44, 0xC9, 0x39, 0x12]);
 
-        let date: NaiveDate = BoltDate::parse(Version::V4_1, bytes)
+        let date: NaiveDate = BoltDate::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();

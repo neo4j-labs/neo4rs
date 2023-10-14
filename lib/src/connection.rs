@@ -1,15 +1,19 @@
-use crate::errors::{unexpected, Error, Result};
-use crate::messages::*;
-use crate::version::Version;
-use bytes::*;
-use std::mem;
-use std::sync::Arc;
+use crate::{
+    errors::{unexpected, Error, Result},
+    messages::{BoltRequest, BoltResponse},
+    version::Version,
+};
+use bytes::{Bytes, BytesMut};
+use std::{mem, sync::Arc};
 use stream::ConnectionStream;
-use tokio::io::BufStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio_rustls::rustls::{OwnedTrustAnchor, RootCertStore, ServerName};
-use tokio_rustls::{rustls::ClientConfig, TlsConnector};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt, BufStream},
+    net::TcpStream,
+};
+use tokio_rustls::{
+    rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName},
+    TlsConnector,
+};
 use url::{Host, Url};
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
@@ -147,29 +151,32 @@ impl Connection {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
-            chunk_size = self.read_u16().await?;
+            chunk_size = self.stream.read_u16().await?;
         }
 
         while chunk_size > 0 {
-            let chunk = self.read(chunk_size).await?;
-            bytes.put_slice(&chunk);
-            chunk_size = self.read_u16().await?;
+            bytes.reserve(usize::from(chunk_size));
+            assert!(bytes.capacity() - bytes.len() == usize::from(chunk_size));
+            let read = self.stream.read_buf(&mut bytes).await?;
+            assert_eq!(read, usize::from(chunk_size));
+            // bytes.resize(bytes.len() + usize::from(chunk_size), 0);
+            // self.read_into(bytes.as_mut()).await?;
+            chunk_size = self.stream.read_u16().await?;
         }
 
         BoltResponse::parse(self.version, bytes.freeze())
     }
 
-    async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
-        let mut buf = vec![0; size as usize];
-        self.stream.read_exact(&mut buf).await?;
-        Ok(buf)
-    }
-
-    async fn read_u16(&mut self) -> Result<u16> {
-        let mut data = [0, 0];
-        self.stream.read_exact(&mut data).await?;
-        Ok(u16::from_be_bytes(data))
-    }
+    // async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
+    //     let mut buf = vec![0; size as usize];
+    //     self.stream.read_exact(&mut buf).await?;
+    //     Ok(buf)
+    // }
+    //
+    // async fn read_into(&mut self, buf: &mut [u8]) -> Result<()> {
+    //     self.stream.read_exact(buf).await?;
+    //     Ok(())
+    // }
 }
 
 struct NeoUrl(Url);

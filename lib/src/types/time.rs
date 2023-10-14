@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::BoltInteger;
 use chrono::{FixedOffset, NaiveTime, Offset, Timelike};
 use neo4rs_macros::BoltStruct;
 
@@ -91,10 +91,8 @@ impl From<BoltLocalTime> for NaiveTime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_time() {
@@ -113,11 +111,11 @@ mod tests {
 
     #[test]
     fn should_deserialize_time() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut bytes = Bytes::from_static(&[
             0xB2, 0x54, 0xCB, 0x00, 0x00, 0x17, 0x5D, 0x2F, 0xB8, 0x3A, 0x64, 0xC9, 0x1C, 0x20,
-        ])));
+        ]);
 
-        let (time, offset) = BoltTime::parse(Version::V4_1, bytes)
+        let (time, offset) = BoltTime::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();
@@ -142,11 +140,11 @@ mod tests {
 
     #[test]
     fn should_deserialize_local_time() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut bytes = Bytes::from_static(&[
             0xB1, 0x74, 0xCB, 0x00, 0x00, 0x17, 0x5D, 0x2F, 0xB8, 0x3A, 0x64,
-        ])));
+        ]);
 
-        let time: NaiveTime = BoltLocalTime::parse(Version::V4_1, bytes)
+        let time: NaiveTime = BoltLocalTime::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();

@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::{BoltFloat, BoltInteger};
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
@@ -21,10 +21,8 @@ pub struct BoltPoint3D {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_2d_point() {
@@ -47,12 +45,12 @@ mod tests {
 
     #[test]
     fn should_deserialize_2d_point() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB3, 0x58, 0x2A, 0xC1, 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC1, 0x40,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ])));
+        ]);
 
-        let point: BoltPoint2D = BoltPoint2D::parse(Version::V4_1, input).unwrap();
+        let point: BoltPoint2D = BoltPoint2D::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(point.sr_id, BoltInteger::new(42));
         assert_eq!(point.x, BoltFloat::new(1.0));
@@ -82,13 +80,13 @@ mod tests {
 
     #[test]
     fn should_deserialize_3d_point() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB4, 0x59, 0x2A, 0xC1, 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC1, 0x40,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC1, 0x40, 0x08, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
-        ])));
+        ]);
 
-        let point: BoltPoint3D = BoltPoint3D::parse(Version::V4_1, input).unwrap();
+        let point: BoltPoint3D = BoltPoint3D::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(point.sr_id, BoltInteger::new(42));
         assert_eq!(point.x, BoltFloat::new(1.0));

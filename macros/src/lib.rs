@@ -1,135 +1,170 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
-use syn::{DeriveInput, MetaList};
+use syn::punctuated::Punctuated;
+use syn::DeriveInput;
+use syn::{parse_macro_input, Attribute, LitInt, Token};
 
 #[proc_macro_derive(BoltStruct, attributes(signature))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
+    match derive_impl(ast) {
+        Ok(data) => data,
+        Err(err) => TokenStream::from(err.into_compile_error()),
+    }
+}
+
+fn derive_impl(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let struct_name = &ast.ident;
 
-    let meta = ast.attrs.get(0).unwrap().parse_meta().unwrap();
+    let attr = ast
+        .attrs
+        .get(0)
+        .ok_or_else(|| syn::Error::new_spanned(&ast, "Missing #[signature]"))?;
 
-    let values: Vec<syn::LitInt> = match meta {
-        syn::Meta::List(MetaList { nested, .. }) => {
-            nested.into_iter().map(|nested_meta| match nested_meta {
-                syn::NestedMeta::Lit(syn::Lit::Int(value)) => value,
-                _ => panic!(concat!(
-                    stringify!(#struct_name),
-                    ": signature is not literal"
-                )),
-            })
+    let signature = Signature::try_from(attr)?;
+
+    let fields = if let syn::Data::Struct(ref structure) = ast.data {
+        match &structure.fields {
+            syn::Fields::Named(syn::FieldsNamed { named, .. }) => Ok(Some(named)),
+            syn::Fields::Unnamed(_) => Err(syn::Error::new_spanned(
+                &ast,
+                concat!(stringify!(#name), ": unnamed fields not supported"),
+            )),
+            syn::Fields::Unit => Ok(None),
         }
-        _ => panic!(concat!(stringify!(#struct_name), ": invalid signature")),
-    }
-    .collect();
-
-    let (struct_marker, struct_signature) = if values.len() == 2 {
-        let marker = values.get(0).unwrap();
-        let sig = values.get(1).unwrap();
-        (quote! { #marker}, quote! {Some(#sig)})
     } else {
-        let marker = values.get(0).unwrap();
-        (quote! { #marker}, quote! { None::<u8> })
-    };
+        Err(syn::Error::new_spanned(
+            &ast,
+            concat!(stringify!(#name), ": not a struct"),
+        ))
+    }?;
 
-    let fields = if let syn::Data::Struct(structure) = ast.data {
-        match structure.fields {
-            syn::Fields::Named(syn::FieldsNamed { named, .. }) => named,
-            syn::Fields::Unnamed(_) => {
-                unimplemented!(concat!(stringify!(#name), ": unnamed fields not supported"))
+    let can_parse = match signature.fields() {
+        (marker, Some(signature)) => {
+            quote! {
+                input.len() >= 2 && input[0] == #marker && input[1] == #signature
             }
-            syn::Fields::Unit => syn::punctuated::Punctuated::new(),
         }
-    } else {
-        unimplemented!(concat!(stringify!(#name), ": not a struct"));
+        (marker, None) => {
+            quote! {
+                input.len() >= 1 && input[0] == #marker
+            }
+        }
     };
 
-    let serialize_fields = fields.iter().map(|f| {
-        let name = &f.ident;
-        quote! {
-            let #name: bytes::Bytes = self.#name.into_bytes(version)?
+    let parse_signature = match signature.fields() {
+        (_, Some(_)) => {
+            quote! {
+                input.get_u8();
+                input.get_u8();
+            }
         }
-    });
-
-    let allocate_bytes = fields.iter().map(|f| {
-        let name = &f.ident;
-        quote! {
-            total_bytes += #name.len()
+        (_, None) => {
+            quote! {
+                input.get_u8();
+            }
         }
-    });
+    };
 
-    let put_bytes = fields.iter().map(|f| {
-        let name = &f.ident;
-        quote! {
-            bytes.put(#name)
-        }
-    });
-
-    let deserialize_fields = fields.iter().map(|f| {
+    let deserialize_fields = fields.iter().flat_map(|o| o.iter()).map(|f| {
         let name = &f.ident;
         let typ = &f.ty;
         quote! {
-            #name: #typ::parse(version, input.clone())?
+            #name: #typ::parse(version, input)?
+        }
+    });
+
+    let write_signature = match signature.fields() {
+        (marker, Some(signature)) => {
+            quote! {
+                bytes.reserve(2);
+                bytes.put_u8(#marker);
+                bytes.put_u8(#signature);
+            }
+        }
+        (marker, None) => {
+            quote! {
+                bytes.reserve(1);
+                bytes.put_u8(#marker);
+            }
+        }
+    };
+
+    let serialize_fields = fields.iter().flat_map(|o| o.iter()).map(|f| {
+        let name = &f.ident;
+        quote! {
+            self.#name.write_into(version, bytes)?
         }
     });
 
     let expanded = quote! {
-        use std::convert::*;
-        use bytes::*;
 
-        impl #struct_name {
+        impl crate::types::BoltWireFormat for #struct_name {
 
-            pub fn into_bytes(self, version: crate::version::Version) -> crate::errors::Result<bytes::Bytes> {
-                #(#serialize_fields;)*
-                let mut total_bytes = std::mem::size_of::<u8>() + std::mem::size_of::<u8>();
-                #(#allocate_bytes;)*
-                let mut bytes = BytesMut::with_capacity(total_bytes);
-                bytes.put_u8(#struct_marker);
-                if let Some(signature) = #struct_signature {
-                    bytes.put_u8(signature);
-                }
-                #(#put_bytes;)*
-                Ok(bytes.freeze())
+            fn can_parse(_version: crate::Version, input: &[u8]) -> bool {
+                use ::bytes::Buf;
+                #can_parse
             }
 
-        }
-
-        impl #struct_name {
-            pub fn can_parse(version: crate::version::Version, input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> bool {
-                match (#struct_marker, #struct_signature) {
-                    (marker, Some(signature)) =>  {
-                        input.borrow().len() >= 2 && input.borrow()[0] == marker && input.borrow()[1] == signature
-                    },
-                    (marker, None) => {
-                        input.borrow().len() >= 1 && input.borrow()[0] == marker
-                    }
-                    _ => false
-                }
-            }
-        }
-
-        impl #struct_name {
-
-            pub fn parse(version: crate::version::Version, input: std::rc::Rc<std::cell::RefCell<bytes::Bytes>>) -> crate::errors::Result<#struct_name> {
-
-                match (#struct_marker, #struct_signature) {
-                    (_, Some(_)) =>  {
-                        input.borrow_mut().get_u8();
-                        input.borrow_mut().get_u8();
-                    },
-                    (_, None) => {
-                        input.borrow_mut().get_u8();
-                    }
-                }
-
+            fn parse(version: crate::Version, input: &mut ::bytes::Bytes) -> crate::errors::Result<Self> {
+                use ::bytes::Buf;
+                #parse_signature
                 Ok(#struct_name {
                     #(#deserialize_fields,)*
                 })
             }
+
+            fn write_into(&self, version: crate::Version, bytes: &mut ::bytes::BytesMut) -> crate::errors::Result<()> {
+                use ::bytes::BufMut;
+                #write_signature
+                #(#serialize_fields;)*
+                Ok(())
+            }
+
+        }
+    };
+
+    Ok(expanded.into())
+}
+
+struct Signature {
+    marker: LitInt,
+    signature: Option<LitInt>,
+}
+
+impl Signature {
+    fn fields(&self) -> (&LitInt, Option<&LitInt>) {
+        (&self.marker, self.signature.as_ref())
+    }
+}
+
+impl TryFrom<&Attribute> for Signature {
+    type Error = syn::Error;
+
+    fn try_from(attr: &Attribute) -> Result<Self, Self::Error> {
+        let nested = attr.parse_args_with(Punctuated::<LitInt, Token![,]>::parse_terminated)?;
+
+        let mut iter = nested.iter();
+
+        let marker = iter
+            .next()
+            .ok_or_else(|| {
+                syn::Error::new_spanned(
+                    attr,
+                    "Invalid signature, at least one marker byte is required",
+                )
+            })?
+            .clone();
+
+        let signature = iter.next().cloned();
+
+        if let Some(item) = iter.next() {
+            return Err(syn::Error::new_spanned(
+                item,
+                "Invalid signature, expected at most two elements.",
+            ));
         }
 
-
-    };
-    expanded.into()
+        Ok(Self { marker, signature })
+    }
 }

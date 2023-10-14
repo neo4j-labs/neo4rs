@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::{BoltInteger, BoltList, BoltNode, BoltType, BoltUnboundedRelation};
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
@@ -49,10 +49,8 @@ impl BoltPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_a_path() {
@@ -95,16 +93,16 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_path() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB3, 0x50, 0x92, 0xB3, 0x4E, 0x2A, 0x91, 0x86, 0x50, 0x65, 0x72, 0x73, 0x6F, 0x6E,
             0xA1, 0x84, 0x6E, 0x61, 0x6D, 0x65, 0x84, 0x4D, 0x61, 0x72, 0x6B, 0xB3, 0x4E, 0x2B,
             0x91, 0x86, 0x50, 0x65, 0x72, 0x73, 0x6F, 0x6E, 0xA1, 0x84, 0x6E, 0x61, 0x6D, 0x65,
             0x85, 0x4A, 0x61, 0x6D, 0x65, 0x73, 0x91, 0xB3, 0x72, 0x16, 0x86, 0x66, 0x72, 0x69,
             0x65, 0x6E, 0x64, 0xA1, 0x83, 0x6B, 0x65, 0x79, 0x85, 0x76, 0x61, 0x6C, 0x75, 0x65,
             0x92, 0x16, 0x2A,
-        ])));
+        ]);
 
-        let path: BoltPath = BoltPath::parse(Version::V4_1, input).unwrap();
+        let path: BoltPath = BoltPath::parse(Version::V4_1, &mut input).unwrap();
 
         let nodes = path.nodes();
         let rels = path.rels();

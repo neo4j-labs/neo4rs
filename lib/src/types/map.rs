@@ -1,11 +1,11 @@
 use crate::{
     errors::{Error, Result},
-    types::{serde::DeError, BoltString, BoltType, Bytes},
+    types::{serde::DeError, BoltString, BoltType, BoltWireFormat},
     version::Version,
 };
 use ::serde::Deserialize;
-use bytes::{Buf, BufMut, BytesMut};
-use std::{cell::RefCell, collections::HashMap, iter::FromIterator, mem, rc::Rc};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::{collections::HashMap, iter::FromIterator, mem};
 
 pub const TINY: u8 = 0xA0;
 pub const SMALL: u8 = 0xD8;
@@ -52,14 +52,6 @@ impl BoltMap {
             None => Err(DeError::NoSuchProperty),
         }
     }
-
-    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
-        let marker = input.borrow()[0];
-        (TINY..=(TINY | 0x0F)).contains(&marker)
-            || marker == SMALL
-            || marker == MEDIUM
-            || marker == LARGE
-    }
 }
 
 impl FromIterator<(BoltString, BoltType)> for BoltMap {
@@ -75,49 +67,22 @@ impl FromIterator<(BoltString, BoltType)> for BoltMap {
     }
 }
 
-impl BoltMap {
-    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
-        let mut key_value_bytes = BytesMut::new();
-        let length = self.value.len();
-        for (key, value) in self.value {
-            let key_bytes: Bytes = key.into_bytes(version)?;
-            let value_bytes: Bytes = value.into_bytes(version)?;
-            key_value_bytes.put(key_bytes);
-            key_value_bytes.put(value_bytes);
-        }
-
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>() + mem::size_of::<u32>() + key_value_bytes.len(),
-        );
-
-        match length {
-            0..=15 => bytes.put_u8(TINY | length as u8),
-            16..=255 => {
-                bytes.put_u8(SMALL);
-                bytes.put_u8(length as u8);
-            }
-            256..=65_535 => {
-                bytes.put_u8(MEDIUM);
-                bytes.put_u16(length as u16);
-            }
-            65_536..=4_294_967_295 => {
-                bytes.put_u8(LARGE);
-                bytes.put_u32(length as u32);
-            }
-            _ => return Err(Error::MapTooBig),
-        }
-
-        bytes.put(key_value_bytes);
-        Ok(bytes.freeze())
+impl BoltWireFormat for BoltMap {
+    fn can_parse(_version: Version, input: &[u8]) -> bool {
+        let marker = input[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
     }
 
-    pub fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltMap> {
-        let marker = input.borrow_mut().get_u8();
+    fn parse(version: Version, input: &mut Bytes) -> Result<Self> {
+        let marker = input.get_u8();
         let size = match marker {
             0xA0..=0xAF => 0x0F & marker as usize,
-            SMALL => input.borrow_mut().get_u8() as usize,
-            MEDIUM => input.borrow_mut().get_u16() as usize,
-            LARGE => input.borrow_mut().get_u32() as usize,
+            SMALL => input.get_u8() as usize,
+            MEDIUM => input.get_u16() as usize,
+            LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid map marker {}",
@@ -128,12 +93,45 @@ impl BoltMap {
 
         let mut map = BoltMap::default();
         for _ in 0..size {
-            let key: BoltString = BoltString::parse(version, input.clone())?;
-            let value: BoltType = BoltType::parse(version, input.clone())?;
+            let key = BoltString::parse(version, input)?;
+            let value = BoltType::parse(version, input)?;
             map.put(key, value);
         }
 
         Ok(map)
+    }
+
+    fn write_into(&self, version: Version, bytes: &mut BytesMut) -> Result<()> {
+        let length = self.value.len();
+        match length {
+            0..=15 => {
+                bytes.reserve(1);
+                bytes.put_u8(TINY | length as u8)
+            }
+            16..=255 => {
+                bytes.reserve(2);
+                bytes.put_u8(SMALL);
+                bytes.put_u8(length as u8);
+            }
+            256..=65_535 => {
+                bytes.reserve(1 + mem::size_of::<u16>());
+                bytes.put_u8(MEDIUM);
+                bytes.put_u16(length as u16);
+            }
+            65_536..=4_294_967_295 => {
+                bytes.reserve(1 + mem::size_of::<u32>());
+                bytes.put_u8(LARGE);
+                bytes.put_u32(length as u32);
+            }
+            _ => return Err(Error::MapTooBig),
+        }
+
+        for (key, value) in &self.value {
+            key.write_into(version, bytes)?;
+            value.write_into(version, bytes)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -162,11 +160,9 @@ mod tests {
 
     #[test]
     fn should_deserialize_map_of_strings() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xA1, 0x81, 0x61, 0x81, 0x62,
-        ])));
+        let mut input = Bytes::from_static(&[0xA1, 0x81, 0x61, 0x81, 0x62]);
 
-        let map: BoltMap = BoltMap::parse(Version::V4_1, input).unwrap();
+        let map: BoltMap = BoltMap::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(map.value.len(), 1);
     }
@@ -178,10 +174,9 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
-        assert_eq!(bytes.borrow()[0], SMALL);
-        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
+        let mut bytes = map.clone().into_bytes(Version::V4_1).unwrap();
+        assert_eq!(bytes[0], SMALL);
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, &mut bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 
@@ -192,10 +187,9 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
-        assert_eq!(bytes.borrow()[0], MEDIUM);
-        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
+        let mut bytes = map.clone().into_bytes(Version::V4_1).unwrap();
+        assert_eq!(bytes[0], MEDIUM);
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, &mut bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 
@@ -206,10 +200,9 @@ mod tests {
             map.put(i.to_string().into(), i.to_string().into());
         }
 
-        let bytes: Rc<RefCell<Bytes>> =
-            Rc::new(RefCell::new(map.clone().into_bytes(Version::V4_1).unwrap()));
-        assert_eq!(bytes.borrow()[0], LARGE);
-        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
+        let mut bytes = map.clone().into_bytes(Version::V4_1).unwrap();
+        assert_eq!(bytes[0], LARGE);
+        let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, &mut bytes).unwrap();
         assert_eq!(map, deserialized_map);
     }
 }

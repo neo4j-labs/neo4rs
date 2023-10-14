@@ -62,12 +62,9 @@ impl From<BoltUnboundedRelation> for BoltType {
 
 #[cfg(test)]
 mod tests {
-    use crate::Version;
-
     use super::*;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_a_relation() {
@@ -98,12 +95,12 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_relation() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB5, 0x52, 0x2A, 0x01, 0x02, 0x83, 0x72, 0x65, 0x6C, 0xA1, 0x84, 0x6E, 0x61, 0x6D,
             0x65, 0x84, 0x4D, 0x61, 0x72, 0x6B,
-        ])));
+        ]);
 
-        let relation: BoltRelation = BoltRelation::parse(Version::V4_1, input).unwrap();
+        let relation: BoltRelation = BoltRelation::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(relation.id, BoltInteger::new(42));
         assert_eq!(relation.start_node_id, BoltInteger::new(1));
@@ -135,13 +132,13 @@ mod tests {
 
     #[test]
     fn should_deserialize_an_unbounded_relation() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB3, 0x72, 0x2A, 0x83, 0x72, 0x65, 0x6C, 0xA1, 0x84, 0x6E, 0x61, 0x6D, 0x65, 0x84,
             0x4D, 0x61, 0x72, 0x6B,
-        ])));
+        ]);
 
         let relation: BoltUnboundedRelation =
-            BoltUnboundedRelation::parse(Version::V4_1, input).unwrap();
+            BoltUnboundedRelation::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(relation.id, BoltInteger::new(42));
         assert_eq!(relation.typ, BoltString::new("rel"));

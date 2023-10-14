@@ -1,4 +1,3 @@
-use bytes::*;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
@@ -14,7 +13,8 @@ impl Default for BoltNull {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::*;
 
     #[test]
     fn should_serialize_null() {

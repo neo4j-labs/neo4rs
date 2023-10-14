@@ -13,7 +13,7 @@ impl Commit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
+    use crate::{types::BoltWireFormat, version::Version};
     use bytes::*;
 
     #[test]

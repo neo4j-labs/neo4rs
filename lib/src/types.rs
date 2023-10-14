@@ -16,6 +16,7 @@ pub(crate) mod serde;
 pub mod string;
 pub mod time;
 pub use self::time::{BoltLocalTime, BoltTime};
+mod wire;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;
@@ -31,13 +32,14 @@ pub use path::BoltPath;
 pub use point::{BoltPoint2D, BoltPoint3D};
 pub use relation::{BoltRelation, BoltUnboundedRelation};
 pub use string::BoltString;
+pub(crate) use wire::BoltWireFormat;
 
-use crate::errors::*;
-use crate::version::Version;
-use bytes::Bytes;
-use std::cell::RefCell;
+use crate::{
+    errors::{Error, Result},
+    version::Version,
+};
+use bytes::{Bytes, BytesMut};
 use std::fmt::Display;
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltType {
@@ -75,98 +77,98 @@ impl Display for BoltType {
 }
 
 impl BoltType {
-    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
+    fn write_into(&self, version: Version, bytes: &mut BytesMut) -> Result<()> {
         match self {
-            BoltType::Null(t) => t.into_bytes(version),
-            BoltType::Boolean(t) => t.into_bytes(version),
-            BoltType::Integer(t) => t.into_bytes(version),
-            BoltType::Float(t) => t.into_bytes(version),
-            BoltType::String(t) => t.into_bytes(version),
-            BoltType::List(t) => t.into_bytes(version),
-            BoltType::Point2D(t) => t.into_bytes(version),
-            BoltType::Point3D(t) => t.into_bytes(version),
-            BoltType::Map(t) => t.into_bytes(version),
-            BoltType::Node(t) => t.into_bytes(version),
-            BoltType::Path(t) => t.into_bytes(version),
-            BoltType::Relation(t) => t.into_bytes(version),
-            BoltType::UnboundedRelation(t) => t.into_bytes(version),
-            BoltType::Bytes(t) => t.into_bytes(version),
-            BoltType::Duration(t) => t.into_bytes(version),
-            BoltType::Date(t) => t.into_bytes(version),
-            BoltType::Time(t) => t.into_bytes(version),
-            BoltType::LocalTime(t) => t.into_bytes(version),
-            BoltType::DateTime(t) => t.into_bytes(version),
-            BoltType::LocalDateTime(t) => t.into_bytes(version),
-            BoltType::DateTimeZoneId(t) => t.into_bytes(version),
+            BoltType::Null(t) => t.write_into(version, bytes),
+            BoltType::Boolean(t) => t.write_into(version, bytes),
+            BoltType::Integer(t) => t.write_into(version, bytes),
+            BoltType::Float(t) => t.write_into(version, bytes),
+            BoltType::String(t) => t.write_into(version, bytes),
+            BoltType::List(t) => t.write_into(version, bytes),
+            BoltType::Point2D(t) => t.write_into(version, bytes),
+            BoltType::Point3D(t) => t.write_into(version, bytes),
+            BoltType::Map(t) => t.write_into(version, bytes),
+            BoltType::Node(t) => t.write_into(version, bytes),
+            BoltType::Path(t) => t.write_into(version, bytes),
+            BoltType::Relation(t) => t.write_into(version, bytes),
+            BoltType::UnboundedRelation(t) => t.write_into(version, bytes),
+            BoltType::Bytes(t) => t.write_into(version, bytes),
+            BoltType::Duration(t) => t.write_into(version, bytes),
+            BoltType::Date(t) => t.write_into(version, bytes),
+            BoltType::Time(t) => t.write_into(version, bytes),
+            BoltType::LocalTime(t) => t.write_into(version, bytes),
+            BoltType::DateTime(t) => t.write_into(version, bytes),
+            BoltType::LocalDateTime(t) => t.write_into(version, bytes),
+            BoltType::DateTimeZoneId(t) => t.write_into(version, bytes),
         }
     }
 
-    fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltType> {
+    fn parse(version: Version, input: &mut Bytes) -> Result<BoltType> {
         let bolt_type = match input {
-            input if BoltInteger::can_parse(version, input.clone()) => {
+            input if BoltInteger::can_parse(version, input) => {
                 BoltType::Integer(BoltInteger::parse(version, input)?)
             }
-            input if BoltFloat::can_parse(version, input.clone()) => {
+            input if BoltFloat::can_parse(version, input) => {
                 BoltType::Float(BoltFloat::parse(version, input)?)
             }
-            input if BoltString::can_parse(version, input.clone()) => {
+            input if BoltString::can_parse(version, input) => {
                 BoltType::String(BoltString::parse(version, input)?)
             }
-            input if BoltList::can_parse(version, input.clone()) => {
+            input if BoltList::can_parse(version, input) => {
                 BoltType::List(BoltList::parse(version, input)?)
             }
-            input if BoltMap::can_parse(version, input.clone()) => {
+            input if BoltMap::can_parse(version, input) => {
                 BoltType::Map(BoltMap::parse(version, input)?)
             }
-            input if BoltNode::can_parse(version, input.clone()) => {
+            input if BoltNode::can_parse(version, input) => {
                 BoltType::Node(BoltNode::parse(version, input)?)
             }
-            input if BoltBoolean::can_parse(version, input.clone()) => {
+            input if BoltBoolean::can_parse(version, input) => {
                 BoltType::Boolean(BoltBoolean::parse(version, input)?)
             }
-            input if BoltNull::can_parse(version, input.clone()) => {
+            input if BoltNull::can_parse(version, input) => {
                 BoltType::Null(BoltNull::parse(version, input)?)
             }
-            input if BoltPoint2D::can_parse(version, input.clone()) => {
+            input if BoltPoint2D::can_parse(version, input) => {
                 BoltType::Point2D(BoltPoint2D::parse(version, input)?)
             }
-            input if BoltPoint3D::can_parse(version, input.clone()) => {
+            input if BoltPoint3D::can_parse(version, input) => {
                 BoltType::Point3D(BoltPoint3D::parse(version, input)?)
             }
-            input if BoltBytes::can_parse(version, input.clone()) => {
+            input if BoltBytes::can_parse(version, input) => {
                 BoltType::Bytes(BoltBytes::parse(version, input)?)
             }
-            input if BoltPath::can_parse(version, input.clone()) => {
+            input if BoltPath::can_parse(version, input) => {
                 BoltType::Path(BoltPath::parse(version, input)?)
             }
-            input if BoltDuration::can_parse(version, input.clone()) => {
+            input if BoltDuration::can_parse(version, input) => {
                 BoltType::Duration(BoltDuration::parse(version, input)?)
             }
-            input if BoltDate::can_parse(version, input.clone()) => {
+            input if BoltDate::can_parse(version, input) => {
                 BoltType::Date(BoltDate::parse(version, input)?)
             }
-            input if BoltTime::can_parse(version, input.clone()) => {
+            input if BoltTime::can_parse(version, input) => {
                 BoltType::Time(BoltTime::parse(version, input)?)
             }
-            input if BoltLocalTime::can_parse(version, input.clone()) => {
+            input if BoltLocalTime::can_parse(version, input) => {
                 BoltType::LocalTime(BoltLocalTime::parse(version, input)?)
             }
-            input if BoltDateTime::can_parse(version, input.clone()) => {
+            input if BoltDateTime::can_parse(version, input) => {
                 BoltType::DateTime(BoltDateTime::parse(version, input)?)
             }
-            input if BoltLocalDateTime::can_parse(version, input.clone()) => {
+            input if BoltLocalDateTime::can_parse(version, input) => {
                 BoltType::LocalDateTime(BoltLocalDateTime::parse(version, input)?)
             }
-            input if BoltDateTimeZoneId::can_parse(version, input.clone()) => {
+            input if BoltDateTimeZoneId::can_parse(version, input) => {
                 BoltType::DateTimeZoneId(BoltDateTimeZoneId::parse(version, input)?)
             }
-            input if BoltUnboundedRelation::can_parse(version, input.clone()) => {
+            input if BoltUnboundedRelation::can_parse(version, input) => {
                 BoltType::UnboundedRelation(BoltUnboundedRelation::parse(version, input)?)
             }
-            input if BoltRelation::can_parse(version, input.clone()) => {
+            input if BoltRelation::can_parse(version, input) => {
                 BoltType::Relation(BoltRelation::parse(version, input)?)
             }
-            _ => return Err(Error::UnknownType(format!("{:#04X?}", input.borrow()))),
+            _ => return Err(Error::UnknownType(format!("{:#04X?}", input))),
         };
         Ok(bolt_type)
     }

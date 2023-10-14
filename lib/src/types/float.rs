@@ -1,9 +1,6 @@
-use crate::errors::*;
-use crate::version::Version;
-use bytes::*;
-use std::cell::RefCell;
+use crate::{errors::Result, types::BoltWireFormat, version::Version};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::mem;
-use std::rc::Rc;
 
 pub const MARKER: u8 = 0xC1;
 
@@ -16,25 +13,24 @@ impl BoltFloat {
     pub fn new(value: f64) -> BoltFloat {
         BoltFloat { value }
     }
-
-    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
-        input.borrow()[0] == MARKER
-    }
 }
 
-impl BoltFloat {
-    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltFloat> {
-        let mut input = input.borrow_mut();
+impl BoltWireFormat for BoltFloat {
+    fn can_parse(_: Version, input: &[u8]) -> bool {
+        input[0] == MARKER
+    }
+
+    fn parse(_: Version, input: &mut Bytes) -> Result<BoltFloat> {
         let _marker = input.get_u8();
         let value = input.get_f64();
         Ok(BoltFloat::new(value))
     }
 
-    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
-        let mut bytes = BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<f64>());
+    fn write_into(&self, _version: Version, bytes: &mut BytesMut) -> Result<()> {
+        bytes.reserve(mem::size_of::<u8>() + mem::size_of::<f64>());
         bytes.put_u8(MARKER);
         bytes.put_f64(self.value);
-        Ok(bytes.freeze())
+        Ok(())
     }
 }
 
@@ -59,16 +55,12 @@ mod tests {
 
     #[test]
     fn should_deserialize_float() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,
-        ])));
-        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, input).unwrap();
+        let mut input = Bytes::from_static(&[0xC1, 0x3F, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE]);
+        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, &mut input).unwrap();
         assert_eq!(bolt_float.value, 1.23);
 
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE,
-        ])));
-        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, input).unwrap();
+        let mut input = Bytes::from_static(&[0xC1, 0xBF, 0xF3, 0xAE, 0x14, 0x7A, 0xE1, 0x47, 0xAE]);
+        let bolt_float: BoltFloat = BoltFloat::parse(Version::V4_1, &mut input).unwrap();
         assert_eq!(bolt_float.value, -1.23);
     }
 }

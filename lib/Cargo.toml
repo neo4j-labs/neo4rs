@@ -22,7 +22,7 @@ deadpool = "0.9.0"
 delegate = "0.10.0"
 futures = { version = "0.3.0" }
 log = "0.4"
-neo4rs-macros = { version = "0.2.1", path = "../macros" }
+neo4rs-macros = { version = "0.3.0", path = "../macros" }
 paste = "1.0.0"
 pin-project-lite = "0.2.9"
 serde = "1.0.0"
