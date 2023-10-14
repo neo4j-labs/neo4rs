@@ -100,8 +100,9 @@
 //!
 //! ### Streams within a transaction
 //!
-//! Each [`RowStream`] returned by various execute within the same transaction are well isolated,
-//! so you can consume the stream anytime within the transaction using [`RowStream::next`]
+//! Each [`RowStream`] returned by various execute functions within the same
+//! transaction are well isolated, so you can consume the stream anytime
+//! within the transaction using [`RowStream::next`]
 //!
 //!
 //! ```no_run
@@ -123,6 +124,29 @@
 //!
 //! ```
 //!
+//! ### Streams are evaluated lazily
+//!
+//! The [`RowStream`] returned by various `execute` functions need to be
+//! consumed with [`RowStream::next`] in order to actually execute the
+//! query.
+//! The various `run` functions on the other hand are always executed
+//! eagerly.
+//!
+//!
+//! ```no_run
+//! use neo4rs::*;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!    let uri = "127.0.0.1:7687";
+//!    let user = "neo4j";
+//!    let pass = "neo";
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!
+#![doc = include_str!("../include/result_stream.rs")]
+//! }
+//!
+//! ```
 //!
 //! ### Rollback a transaction
 //! ```no_run

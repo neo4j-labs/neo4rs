@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 ///
 /// A stream will contain a connection from the connection pool which will be released to the pool
 /// when the stream is dropped.
+#[must_use = "Results must be streamed through with `next` in order to execute the query"]
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
