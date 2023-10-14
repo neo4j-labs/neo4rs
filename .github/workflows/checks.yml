@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        neo4j: ["5.7", "5.6", "4.4", "4.3", "4.2", "4.1"]
+        neo4j: ["5.12", "5.11", "5.10", "5.9", "5.8", "5.7", "4.4", "4.3", "4.2", "4.1"]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
