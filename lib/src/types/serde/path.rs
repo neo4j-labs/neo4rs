@@ -272,11 +272,8 @@ mod tests {
             [("since".into(), 2017.into())].into_iter().collect(),
         );
         BoltPath {
-            nodes: BoltList::from(vec![
-                BoltType::Node(alice.clone()),
-                BoltType::Node(bob.clone()),
-            ]),
-            rels: BoltList::from(vec![BoltType::UnboundedRelation(rel.clone())]),
+            nodes: BoltList::from(vec![BoltType::Node(alice), BoltType::Node(bob)]),
+            rels: BoltList::from(vec![BoltType::UnboundedRelation(rel)]),
             indices: BoltList::from(vec![BoltType::from(1), BoltType::from(1)]),
         }
     }
