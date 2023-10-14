@@ -17,9 +17,16 @@
 
     // use serde to extract the relationship data
     let relation: Related = row.get("r").unwrap();
-    assert!(relation.id.0 >= 0);
-    assert!(relation.start_node_id.0 >= 0);
-    assert!(relation.end_node_id.0 >= 0);
+
+    // The following checks are always true, but are included here
+    // to demonstrate the types of the fields.
+    #[allow(clippy::absurd_extreme_comparisons, unused_comparisons)]
+    {
+        assert!(relation.id.0 >= 0);
+        assert!(relation.start_node_id.0 >= 0);
+        assert!(relation.end_node_id.0 >= 0);
+    }
+
     assert_eq!(relation.typ.0, "RELATED");
     assert_eq!(relation.keys.0, vec!["as"]);
     assert_eq!(relation.related_as, "friend");
