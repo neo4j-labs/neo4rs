@@ -6,7 +6,7 @@ edition = "2021"
 description = "Macros used by neo4rs"
 license = "MIT"
 repository = "https://github.com/neo4j-labs/neo4rs"
-rust-version = "1.60"
+rust-version = "1.63"
 
 [lib]
 proc-macro = true
