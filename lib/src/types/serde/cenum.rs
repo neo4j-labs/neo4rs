@@ -12,7 +12,7 @@ macro_rules! cenum {
 
         impl $name {
 
-            pub const VARIANTS: &[Self] = &[
+            pub const VARIANTS: &'static [Self] = &[
                 $(
                     Self::$variants,
                 )+
@@ -20,7 +20,7 @@ macro_rules! cenum {
 
             paste::paste! {
                 #[allow(unused)]
-                pub const NAMES: &[&'static str] = &[
+                pub const NAMES: &'static [&'static str] = &[
                     $(
                         stringify!([<$variants:snake:lower>])
                     ),+

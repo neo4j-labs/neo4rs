@@ -15,6 +15,7 @@ pub mod relation;
 pub(crate) mod serde;
 pub mod string;
 pub mod time;
+pub use self::time::{BoltLocalTime, BoltTime};
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;
@@ -30,7 +31,6 @@ pub use path::BoltPath;
 pub use point::{BoltPoint2D, BoltPoint3D};
 pub use relation::{BoltRelation, BoltUnboundedRelation};
 pub use string::BoltString;
-pub use time::{BoltLocalTime, BoltTime};
 
 use crate::errors::*;
 use crate::version::Version;

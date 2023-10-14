@@ -76,7 +76,10 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
         let additional_fields = fields
             .iter()
             .copied()
-            .filter(|f| !properties.is_some_and(|p| p.contains_key(*f)))
+            .filter(|f| match properties {
+                Some(properties) => !properties.contains_key(*f),
+                None => true,
+            })
             .map(|f| (f, AdditionalData::Element(self.data)));
         let property_fields = properties
             .into_iter()
@@ -115,10 +118,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
 
         match name {
             "Id" => {
-                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
-                    self.data.value(ElementDataKey::Id)
-                else {
-                    return Err(DeError::missing_field("id"));
+                let id = match self.data.value(ElementDataKey::Id) {
+                    Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
+                    _ => return Err(DeError::missing_field("id")),
                 };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
@@ -129,10 +131,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "StartNodeId" => {
-                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
-                    self.data.value(ElementDataKey::StartNodeId)
-                else {
-                    return Err(DeError::missing_field("start_node_id"));
+                let id = match self.data.value(ElementDataKey::StartNodeId) {
+                    Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
+                    _ => return Err(DeError::missing_field("start_node_id")),
                 };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
@@ -143,10 +144,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "EndNodeId" => {
-                let Some(ElementDataValue::Int(&BoltInteger { value: id })) =
-                    self.data.value(ElementDataKey::EndNodeId)
-                else {
-                    return Err(DeError::missing_field("end_node_id"));
+                let id = match self.data.value(ElementDataKey::EndNodeId) {
+                    Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
+                    _ => return Err(DeError::missing_field("end_node_id")),
                 };
                 match visitation {
                     Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
@@ -157,10 +157,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Labels" => {
-                let Some(ElementDataValue::Lst(BoltList { value: labels })) =
-                    self.data.value(ElementDataKey::Labels)
-                else {
-                    return Err(DeError::missing_field("labels"));
+                let labels = match self.data.value(ElementDataKey::Labels) {
+                    Some(ElementDataValue::Lst(BoltList { value: labels })) => labels,
+                    _ => return Err(DeError::missing_field("labels")),
                 };
                 match visitation {
                     Visitation::Newtype => {
@@ -175,10 +174,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Type" => {
-                let Some(ElementDataValue::Str(BoltString { value: typ })) =
-                    self.data.value(ElementDataKey::Type)
-                else {
-                    return Err(DeError::missing_field("type"));
+                let typ = match self.data.value(ElementDataKey::Type) {
+                    Some(ElementDataValue::Str(BoltString { value: typ })) => typ,
+                    _ => return Err(DeError::missing_field("type")),
                 };
                 let typ = BorrowedStr(typ);
                 match visitation {
@@ -190,10 +188,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Keys" => {
-                let Some(ElementDataValue::Map(BoltMap { value: properties })) =
-                    self.data.value(ElementDataKey::Properties)
-                else {
-                    return Err(DeError::missing_field("properties"));
+                let properties = match self.data.value(ElementDataKey::Properties) {
+                    Some(ElementDataValue::Map(BoltMap { value: properties })) => properties,
+                    _ => return Err(DeError::missing_field("properties")),
                 };
                 let keys = properties.keys();
                 match visitation {
@@ -207,10 +204,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Nodes" => {
-                let Some(ElementDataValue::Lst(BoltList { value: nodes })) =
-                    self.data.value(ElementDataKey::Nodes)
-                else {
-                    return Err(DeError::missing_field("nodes"));
+                let nodes = match self.data.value(ElementDataKey::Nodes) {
+                    Some(ElementDataValue::Lst(BoltList { value: nodes })) => nodes,
+                    _ => return Err(DeError::missing_field("nodes")),
                 };
                 match visitation {
                     Visitation::Newtype => {
@@ -225,10 +221,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Relationships" => {
-                let Some(ElementDataValue::Lst(BoltList { value: rels })) =
-                    self.data.value(ElementDataKey::Relationships)
-                else {
-                    return Err(DeError::missing_field("relationships"));
+                let rels = match self.data.value(ElementDataKey::Relationships) {
+                    Some(ElementDataValue::Lst(BoltList { value: rels })) => rels,
+                    _ => return Err(DeError::missing_field("relationships")),
                 };
                 match visitation {
                     Visitation::Newtype => {
@@ -243,10 +238,9 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 }
             }
             "Indices" => {
-                let Some(ElementDataValue::Lst(BoltList { value: ids })) =
-                    self.data.value(ElementDataKey::Indices)
-                else {
-                    return Err(DeError::missing_field("indices"));
+                let ids = match self.data.value(ElementDataKey::Indices) {
+                    Some(ElementDataValue::Lst(BoltList { value: ids })) => ids,
+                    _ => return Err(DeError::missing_field("indices")),
                 };
                 match visitation {
                     Visitation::Newtype => {
@@ -262,7 +256,10 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
             }
             _ => Err(DeError::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
-                &"one of `Id`, `Labels`, `Type`, `StartNodeId`, `EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Indices`",
+                &concat!(
+                    "one of `Id`, `Labels`, `Type`, `StartNodeId`, ",
+                    "`EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Indices`"
+                ),
             )),
         }
     }
