@@ -15,7 +15,6 @@ pub mod relation;
 pub(crate) mod serde;
 pub mod string;
 pub mod time;
-pub use self::serde::BoltKind;
 pub use binary::BoltBytes;
 pub use boolean::BoltBoolean;
 pub use date::BoltDate;

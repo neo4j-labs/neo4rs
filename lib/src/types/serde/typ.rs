@@ -8,10 +8,11 @@ use crate::{
             point::{self, BoltPointDeserializer, BoltPointVisitor},
             rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
+            BoltKind,
         },
         BoltBoolean, BoltBytes, BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger,
-        BoltKind, BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNull, BoltString,
-        BoltTime, BoltType,
+        BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNull, BoltString, BoltTime,
+        BoltType,
     },
     DeError,
 };

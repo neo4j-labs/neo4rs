@@ -3,8 +3,9 @@ use crate::{
         serde::{
             builder::{BoltUnboundedRelationBuilder, Id},
             element::{ElementDataDeserializer, ElementDataKey},
+            BoltKind,
         },
-        BoltKind, BoltString, BoltUnboundedRelation,
+        BoltString, BoltUnboundedRelation,
     },
     DeError, Type, UnboundedRelation,
 };

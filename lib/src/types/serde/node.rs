@@ -3,8 +3,9 @@ use crate::{
         serde::{
             builder::{BoltNodeBuilder, Id},
             element::{ElementDataDeserializer, ElementDataKey},
+            BoltKind,
         },
-        BoltKind, BoltList, BoltNode, BoltString,
+        BoltList, BoltNode, BoltString,
     },
     DeError, Labels, Node,
 };

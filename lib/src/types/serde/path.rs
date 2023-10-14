@@ -4,8 +4,9 @@ use crate::{
         serde::{
             builder::BoltPathBuilder,
             element::{ElementDataDeserializer, ElementDataKey},
+            BoltKind,
         },
-        BoltKind, BoltList, BoltPath, BoltType,
+        BoltList, BoltPath, BoltType,
     },
     DeError, Indices, Nodes, Path, Relationships,
 };

@@ -1,6 +1,9 @@
 use crate::{
     cenum,
-    types::{serde::builder::SetOnce, BoltFloat, BoltInteger, BoltKind, BoltPoint2D, BoltPoint3D},
+    types::{
+        serde::{builder::SetOnce, BoltKind},
+        BoltFloat, BoltInteger, BoltPoint2D, BoltPoint3D,
+    },
     Point2D, Point3D,
 };
 
