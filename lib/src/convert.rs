@@ -16,22 +16,26 @@ impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     }
 }
 
-impl<A: From<BoltString> + Eq + PartialEq + Hash, B: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for HashMap<A, B> {
+impl<K, V> TryFrom<BoltType> for HashMap<K, V>
+where
+    K: From<BoltString> + Eq + Hash,
+    V: TryFrom<BoltType, Error = Error>,
+{
     type Error = Error;
 
-    fn try_from(input: BoltType) -> Result<HashMap<A, B>> {
+    fn try_from(input: BoltType) -> Result<HashMap<K, V>> {
         match input {
-            BoltType::Map(l) => {
-                let mut map = HashMap::new();
-                for (key, val) in l.value {
-                    if let BoltType::Null(_) = val {
-                        ()
+            BoltType::Map(l) => l
+                .value
+                .into_iter()
+                .filter_map(|(k, v)| {
+                    if let BoltType::Null(_) = v {
+                        None
                     } else {
-                        map.insert(A::from(key.clone()), B::try_from(val.clone())?);
+                        V::try_from(v).map(|v| Some((K::from(k), v))).transpose()
                     }
-                }
-                Ok(map)
-            },
+                })
+                .collect::<Result<HashMap<_, _>>>(),
             _ => Err(Error::ConversionError),
         }
     }
@@ -309,12 +313,18 @@ impl<A: Into<BoltType> + Clone> From<&[A]> for BoltType {
     }
 }
 
-impl<A: Into<BoltString> + Clone, B: Into<BoltType> + Clone> From<HashMap<A, B>> for BoltType {
-    fn from(value: HashMap<A, B>) -> Self {
-        BoltType::Map(BoltMap { value: value.iter().fold(HashMap::new(), |mut accum, (k, v)| {
-            accum.insert(k.clone().into(), v.clone().into());
-            accum
-        })})
+impl<K, V> From<HashMap<K, V>> for BoltType
+where
+    K: Into<BoltString>,
+    V: Into<BoltType>,
+{
+    fn from(value: HashMap<K, V>) -> Self {
+        BoltType::Map(
+            value
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
     }
 }
 
@@ -425,11 +435,14 @@ mod tests {
 
     #[test]
     fn convert_into_map() {
-        let map = HashMap::from([(BoltString::new("42"), BoltType::Null(BoltNull {})), 
-            (BoltString::new("1337"), BoltType::Integer(BoltInteger::new(1337)))]);
-        let value = BoltType::Map(BoltMap {
-            value: map,
-        });
+        let map = HashMap::from([
+            (BoltString::new("42"), BoltType::Null(BoltNull {})),
+            (
+                BoltString::new("1337"),
+                BoltType::Integer(BoltInteger::new(1337)),
+            ),
+        ]);
+        let value = BoltType::Map(BoltMap { value: map });
         let value = HashMap::<String, i64>::try_from(value).unwrap();
         assert_eq!(value, HashMap::from([("1337".to_owned(), 1337_i64)]));
     }
@@ -468,7 +481,10 @@ mod tests {
         assert_eq!(
             value,
             BoltType::Map(BoltMap {
-                value: HashMap::from([(BoltString::new("1337"), BoltType::Integer(BoltInteger::new(1337)))]),
+                value: HashMap::from([(
+                    BoltString::new("1337"),
+                    BoltType::Integer(BoltInteger::new(1337))
+                )]),
             })
         );
     }
