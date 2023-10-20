@@ -7,24 +7,46 @@ use std::convert::TryInto;
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x46)]
 pub struct BoltDateTime {
-    seconds: BoltInteger,
-    nanoseconds: BoltInteger,
-    tz_offset_seconds: BoltInteger,
+    pub(crate) seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
+    pub(crate) tz_offset_seconds: BoltInteger,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB2, 0x64)]
 pub struct BoltLocalDateTime {
-    seconds: BoltInteger,
-    nanoseconds: BoltInteger,
+    pub(crate) seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB3, 0x66)]
 pub struct BoltDateTimeZoneId {
-    seconds: BoltInteger,
-    nanoseconds: BoltInteger,
-    tz_id: BoltString,
+    pub(crate) seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
+    pub(crate) tz_id: BoltString,
+}
+
+impl BoltDateTime {
+    pub(crate) fn try_to_chrono(&self) -> Result<DateTime<FixedOffset>> {
+        self.try_into()
+    }
+}
+
+impl BoltLocalDateTime {
+    pub(crate) fn try_to_chrono(&self) -> Result<NaiveDateTime> {
+        self.try_into()
+    }
+}
+
+impl BoltDateTimeZoneId {
+    pub(crate) fn try_to_chrono(&self) -> Result<DateTime<FixedOffset>> {
+        self.try_into()
+    }
+
+    pub fn tz_id(&self) -> &str {
+        &self.tz_id.value
+    }
 }
 
 impl From<(NaiveDateTime, &str)> for BoltDateTimeZoneId {
@@ -49,6 +71,40 @@ impl TryInto<(NaiveDateTime, String)> for BoltDateTimeZoneId {
     }
 }
 
+impl TryFrom<&BoltDateTimeZoneId> for NaiveDateTime {
+    type Error = Error;
+
+    fn try_from(value: &BoltDateTimeZoneId) -> Result<Self, Self::Error> {
+        NaiveDateTime::from_timestamp_opt(value.seconds.value, value.nanoseconds.value as u32)
+            .ok_or(Error::ConversionError)
+    }
+}
+
+impl TryFrom<&BoltDateTimeZoneId> for DateTime<FixedOffset> {
+    type Error = Error;
+
+    fn try_from(value: &BoltDateTimeZoneId) -> std::result::Result<Self, Self::Error> {
+        let tz: chrono_tz::Tz = value
+            .tz_id
+            .value
+            .parse()
+            .map_err(|_| Error::ConversionError)?;
+
+        let seconds = value.seconds.value;
+        let nanoseconds = value.nanoseconds.value as u32;
+
+        let dt = NaiveDateTime::from_timestamp_opt(seconds, nanoseconds)
+            .ok_or(Error::ConversionError)?
+            .and_local_timezone(tz)
+            .earliest()
+            .ok_or(Error::ConversionError)?;
+
+        let dt = dt.with_timezone(&dt.offset().fix());
+
+        Ok(dt)
+    }
+}
+
 impl From<NaiveDateTime> for BoltLocalDateTime {
     fn from(value: NaiveDateTime) -> Self {
         let seconds = value.timestamp().into();
@@ -65,7 +121,15 @@ impl TryInto<NaiveDateTime> for BoltLocalDateTime {
     type Error = Error;
 
     fn try_into(self) -> Result<NaiveDateTime> {
-        NaiveDateTime::from_timestamp_opt(self.seconds.value, self.nanoseconds.value as u32)
+        (&self).try_into()
+    }
+}
+
+impl TryFrom<&BoltLocalDateTime> for NaiveDateTime {
+    type Error = Error;
+
+    fn try_from(value: &BoltLocalDateTime) -> std::result::Result<Self, Self::Error> {
+        NaiveDateTime::from_timestamp_opt(value.seconds.value, value.nanoseconds.value as u32)
             .ok_or(Error::ConversionError)
     }
 }
@@ -88,13 +152,27 @@ impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
     type Error = Error;
 
     fn try_into(self) -> Result<DateTime<FixedOffset>> {
-        let seconds = self.seconds.value - self.tz_offset_seconds.value;
-        let offset = FixedOffset::east_opt(self.tz_offset_seconds.value as i32)
-            .ok_or(Error::ConversionError)?;
-        let datetime = NaiveDateTime::from_timestamp_opt(seconds, self.nanoseconds.value as u32)
+        (&self).try_into()
+    }
+}
+
+impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
+    type Error = Error;
+
+    fn try_from(
+        BoltDateTime {
+            seconds,
+            nanoseconds,
+            tz_offset_seconds,
+        }: &BoltDateTime,
+    ) -> std::result::Result<Self, Self::Error> {
+        let seconds = seconds.value - tz_offset_seconds.value;
+        let offset =
+            FixedOffset::east_opt(tz_offset_seconds.value as i32).ok_or(Error::ConversionError)?;
+        let datetime = NaiveDateTime::from_timestamp_opt(seconds, nanoseconds.value as u32)
             .ok_or(Error::ConversionError)?;
 
-        Ok(DateTime::from_naive_utc_and_offset(datetime, offset))
+        Ok(DateTime::from_utc(datetime, offset))
     }
 }
 

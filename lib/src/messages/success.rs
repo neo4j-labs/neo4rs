@@ -1,4 +1,5 @@
-use crate::types::*;
+use crate::types::{serde::DeError, BoltMap};
+use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
@@ -8,8 +9,11 @@ pub struct Success {
 }
 
 impl Success {
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.metadata.get(key)
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.metadata.get::<T>(key)
     }
 }
 

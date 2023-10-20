@@ -1,10 +1,6 @@
-use crate::errors::*;
-use crate::types::*;
-use crate::version::Version;
+use crate::{errors::*, types::*, version::Version};
 use bytes::*;
-use std::cell::RefCell;
-use std::mem;
-use std::rc::Rc;
+use std::{cell::RefCell, mem, rc::Rc};
 
 pub const TINY: u8 = 0x90;
 pub const SMALL: u8 = 0xD4;

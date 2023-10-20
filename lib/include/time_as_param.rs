@@ -6,7 +6,7 @@
         .await
         .unwrap();
     let row = result.next().await.unwrap().unwrap();
-    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    let t: (chrono::NaiveTime, Option<Offset>) = row.get("output").unwrap();
     assert_eq!(t.0.to_string(), "11:15:30.000000200");
     assert_eq!(t.1, None);
     assert!(result.next().await.unwrap().is_none());
@@ -19,8 +19,8 @@
         .await
         .unwrap();
     let row = result.next().await.unwrap().unwrap();
-    let t: (chrono::NaiveTime, Option<chrono::FixedOffset>) = row.get("output").unwrap();
+    let t: (chrono::NaiveTime, Option<Offset>) = row.get("output").unwrap();
     assert_eq!(t.0.to_string(), "11:15:30.000000200");
-    assert_eq!(t.1, Some(offset));
+    assert_eq!(t.1, Some(Offset(offset)));
     assert!(result.next().await.unwrap().is_none());
 }

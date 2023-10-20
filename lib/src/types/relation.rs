@@ -1,4 +1,5 @@
-use crate::types::*;
+use crate::types::{serde::DeError, BoltInteger, BoltMap, BoltString, BoltType, Result};
+use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
@@ -30,14 +31,20 @@ impl BoltUnboundedRelation {
 }
 
 impl BoltRelation {
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.properties.get(key)
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.properties.get::<T>(key)
     }
 }
 
 impl BoltUnboundedRelation {
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.properties.get(key)
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.properties.get::<T>(key)
     }
 }
 
@@ -55,6 +62,8 @@ impl From<BoltUnboundedRelation> for BoltType {
 
 #[cfg(test)]
 mod tests {
+    use crate::Version;
+
     use super::*;
     use bytes::*;
     use std::cell::RefCell;

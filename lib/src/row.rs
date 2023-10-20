@@ -1,6 +1,6 @@
 use crate::types::{
     serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation,
-    BoltType, BoltUnboundedRelation,
+    BoltUnboundedRelation,
 };
 
 use serde::Deserialize;
@@ -15,25 +15,25 @@ pub struct Row {
 }
 
 /// Snapshot of a node within a graph database
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     inner: BoltNode,
 }
 
 /// Alternating sequence of nodes and relationships
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Path {
     inner: BoltPath,
 }
 
 /// Snapshot of a relationship within a graph database
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Relation {
     inner: BoltRelation,
 }
 
 /// Relationship detail without start or end node information
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnboundedRelation {
     inner: BoltUnboundedRelation,
 }
@@ -53,19 +53,53 @@ impl Path {
         Path { inner }
     }
 
+    #[deprecated(since = "0.7.0", note = "Please use `indices` instead.")]
     pub fn ids(&self) -> Vec<i64> {
-        let bolt_ids = self.inner.ids();
-        bolt_ids.into_iter().map(|id| id.value).collect()
+        self.indices()
+    }
+
+    pub fn indices(&self) -> Vec<i64> {
+        self.indices_as().unwrap()
     }
 
     pub fn nodes(&self) -> Vec<Node> {
-        let nodes = self.inner.nodes();
-        nodes.into_iter().map(Node::new).collect()
+        self.nodes_as().unwrap()
     }
 
     pub fn rels(&self) -> Vec<UnboundedRelation> {
-        let rels = self.inner.rels();
-        rels.into_iter().map(UnboundedRelation::new).collect()
+        self.relationships_as().unwrap()
+    }
+
+    /// Deserialize the path into a custom type that implements [`serde::Deserialize`]
+    pub fn to<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.to::<T>()
+    }
+
+    /// Deserialize the nodes of this path into custom type that implements [`serde::Deserialize`]
+    pub fn nodes_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Nodes<T>>()?.0)
+    }
+
+    /// Deserialize the relationships of this path into custom type that implements [`serde::Deserialize`]
+    pub fn relationships_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Relationships<T>>()?.0)
+    }
+
+    /// Deserialize the indices of this path into a custom type that implements [`serde::Deserialize`]
+    pub fn indices_as<'this, T>(&'this self) -> Result<Vec<T>, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        Ok(self.to::<crate::Indices<T>>()?.0)
     }
 }
 
@@ -122,8 +156,12 @@ impl Row {
         Row { attributes }
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.attributes.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.attributes.get::<T>(key)
     }
 
     pub fn to<'this, T>(&'this self) -> Result<T, DeError>
@@ -154,9 +192,12 @@ impl Node {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    /// Get the attributes of the node
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this node and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the node into custom type that implements [`serde::Deserialize`]
@@ -194,8 +235,12 @@ impl Relation {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
@@ -225,8 +270,12 @@ impl UnboundedRelation {
         self.to::<crate::Keys<_>>().unwrap().0
     }
 
-    pub fn get<T: std::convert::TryFrom<BoltType>>(&self, key: &str) -> Option<T> {
-        self.inner.get(key)
+    /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
+    pub fn get<'this, T>(&'this self, key: &str) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
+        self.inner.properties.get::<T>(key)
     }
 
     /// Deserialize the relationship into custom type that implements [`serde::Deserialize`]
@@ -242,7 +291,7 @@ impl UnboundedRelation {
 mod tests {
     use serde::Deserialize;
 
-    use crate::types::BoltString;
+    use crate::types::{BoltString, BoltType};
 
     use super::*;
 

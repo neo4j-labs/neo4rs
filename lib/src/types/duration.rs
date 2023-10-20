@@ -24,6 +24,17 @@ impl BoltDuration {
             nanoseconds,
         }
     }
+
+    pub(crate) fn seconds(&self) -> i64 {
+        self.seconds
+            .value
+            .saturating_add(self.days.value.saturating_mul(24 * 3600))
+            .saturating_add(self.months.value.saturating_mul(2_629_800))
+    }
+
+    pub(crate) fn nanoseconds(&self) -> i64 {
+        self.nanoseconds.value
+    }
 }
 
 impl From<std::time::Duration> for BoltDuration {

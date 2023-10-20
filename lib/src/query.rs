@@ -67,7 +67,7 @@ impl Query {
         let run = BoltRequest::run(db, &self.query, self.params);
         match connection.lock().await.send_recv(run).await {
             Ok(BoltResponse::Success(success)) => {
-                let fields: BoltList = success.get("fields").unwrap_or_else(BoltList::new);
+                let fields: BoltList = success.get("fields").unwrap_or_default();
                 let qid: i64 = success.get("qid").unwrap_or(-1);
                 Ok(RowStream::new(qid, fields, fetch_size, connection.clone()))
             }

@@ -18,7 +18,7 @@
 
     let row = result.next().await.unwrap().unwrap();
     let path: Path = row.get("p").unwrap();
-    assert_eq!(path.ids().len(), 2);
+    assert_eq!(path.indices().len(), 2);
     assert_eq!(path.nodes().len(), 2);
     assert_eq!(path.rels().len(), 1);
     assert!(result.next().await.unwrap().is_none());

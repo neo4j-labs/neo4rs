@@ -6,7 +6,7 @@ use neo4rs_macros::BoltStruct;
 pub struct BoltPath {
     pub nodes: BoltList,
     pub rels: BoltList,
-    pub ids: BoltList,
+    pub indices: BoltList,
 }
 
 impl BoltPath {
@@ -30,14 +30,19 @@ impl BoltPath {
         rels
     }
 
-    pub fn ids(&self) -> Vec<BoltInteger> {
-        let mut ids = Vec::with_capacity(self.ids.len());
-        for bolt_type in self.ids.iter() {
+    pub fn indices(&self) -> Vec<BoltInteger> {
+        let mut ids = Vec::with_capacity(self.indices.len());
+        for bolt_type in self.indices.iter() {
             if let BoltType::Integer(id) = bolt_type {
                 ids.push(id.clone());
             }
         }
         ids
+    }
+
+    #[deprecated(since = "0.7.0", note = "Please use `indices` instead.")]
+    pub fn ids(&self) -> Vec<BoltInteger> {
+        self.indices()
     }
 }
 
@@ -70,7 +75,7 @@ mod tests {
         let path = BoltPath {
             nodes: vec![mark.into(), james.into()].into(),
             rels: vec![friend.into()].into(),
-            ids: vec![22.into(), 42.into()].into(),
+            indices: vec![22.into(), 42.into()].into(),
         };
 
         let bytes: Bytes = path.into_bytes(Version::V4_1).unwrap();
@@ -103,7 +108,7 @@ mod tests {
 
         let nodes = path.nodes();
         let rels = path.rels();
-        let ids = path.ids();
+        let ids = path.indices();
         assert_eq!(nodes.len(), 2);
         assert_eq!(rels.len(), 1);
         assert_eq!(ids.len(), 2);
