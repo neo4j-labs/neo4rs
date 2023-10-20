@@ -3,3 +3,4 @@ shared-version = true
 consolidate-commits = false
 pre-release-commit-message = "Release {{version}}"
 tag-message = "Release {{crate_name}} {{version}}"
+pre-release-hook = [ "cargo", "xtask", "msrv", "min" ]
