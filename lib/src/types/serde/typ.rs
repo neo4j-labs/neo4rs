@@ -889,7 +889,7 @@ impl FromFloat for f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, fmt::Debug, time::Duration};
+    use std::{borrow::Cow, collections::HashMap, fmt::Debug, time::Duration};
 
     use super::*;
 
@@ -899,7 +899,7 @@ mod tests {
             BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNode, BoltNull, BoltPoint2D,
             BoltPoint3D, BoltRelation, BoltTime, BoltUnboundedRelation,
         },
-        EndNodeId, Id, Keys, Labels, Offset, StartNodeId, Timezone, Type,
+        EndNodeId, Id, Keys, Labels, Node, Offset, Row, StartNodeId, Timezone, Type,
     };
 
     use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
@@ -1984,5 +1984,42 @@ mod tests {
 
         let actual = map.to::<BoltType>().unwrap();
         assert_eq!(actual, map);
+    }
+
+    #[test]
+    fn issue_108_example() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Model {
+            node: Node,
+            d_left: Option<Node>,
+            d_right: Option<Node>,
+        }
+
+        #[derive(Deserialize)]
+        struct Res {
+            res: Vec<Model>,
+        }
+
+        let model1 = BoltNode::new(BoltInteger::new(1), BoltList::new(), BoltMap::new());
+        let model2 = BoltNode::new(BoltInteger::new(2), BoltList::new(), BoltMap::new());
+        let models = HashMap::from_iter([("node", model1), ("d_left", model2)]);
+        let models = BoltList::from(vec![models.into()]);
+
+        let row = Row::new(
+            vec!["res".into()].into(),
+            vec![BoltType::List(models)].into(),
+        );
+
+        let m1 = row.get::<Vec<Model>>("res").unwrap();
+        let m2 = row.to::<Res>().unwrap().res;
+
+        assert_eq!(m1, m2);
+        assert_eq!(m1.len(), 1);
+
+        let m = &m1[0];
+
+        assert_eq!(m.node.id(), 1);
+        assert_eq!(m.d_left.as_ref().unwrap().id(), 2);
+        assert_eq!(m.d_right.as_ref(), None);
     }
 }
