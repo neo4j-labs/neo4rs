@@ -81,7 +81,7 @@ The tests will use the official `neo4j` docker image, with the provided version 
 You might run into panics or test failures with the message 'failed to start container'.
 In that case, try to pull the image first before running the tests with `docker pull neo4j:$NEO4J_VERSION_TAG`.
 
-This could happend if you are on a machine with an architecture that is not supported by the image, e.g. `arm64` like the Apple silicon Macs.
+This could happen if you are on a machine with an architecture that is not supported by the image, e.g. `arm64` like the Apple silicon Macs.
 In that case, pulling the image will fail with a message like 'no matching manifest for linux/arm64/v8'.
 You need to use the `--platform` flag to pull the image for a different architecture, e.g. `docker pull --platform linux/amd64 neo4j:$NEO4J_VERSION_TAG`.
 There is an experimental option in docker to use Rosetta to run those images, so that tests don't take forever to run (please check the docker documentation).
@@ -103,34 +103,39 @@ It is recommended to only run a single integration test and manually clean up th
 env NEO4J_TEST_URI=neo4j+s://42421337thisisnotarealinstance.databases.neo4j.io NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=supersecret NEO4J_VERSION_TAG=5.8 cargo test --test <name of the integration test, see the file names in lib/tests/>
 ```
 
-### Updating Cargo.lock files for CI
+### Updating `Cargo.lock` files for CI
 
 We have CI tests that verify the MSRV as well as the minimal version of the dependencies.
-The minimal versions are the lowest version that still satisfies the Cargo.toml entries, instead of the default of the highest version.
+The minimal versions are the lowest version that still satisfies the `Cargo.toml` entries, instead of the default of the highest version.
 
-If you change anything in the Cargo.toml, you need to update the Cargo.lock files for CI.
+If you change anything in the `Cargo.toml`, you need to update the `Cargo.lock` files for CI.
 
-It is recommended to close all editors, or more sepcifically, all rust-analyzer instances for this project before running the commands below.
+This project uses [xtask](https://github.com/matklad/cargo-xtask#cargo-xtask)s to help with updating the lock files.
+
+It is recommended to close all editors, or more specifically, all rust-analyzer instances for this project before running the commands below.
 
 #### Update `ci/Cargo.lock.msrv`
 
 ```bash
-rm Cargo.lock
-cargo +1.63.0 test --no-run
 # If there are errors, update Cargo.toml to fix and try again from the top.
-# You might have to downgrade or remove certain crates to hit the MSRV,
-# or suggest an increase in the MSRV.
-cp Cargo.lock ci/Cargo.lock.msrv
+# You might have to downgrade or remove certain crates to hit the MSRV.
+# A number of such downgrades are already defined in the `update_msrv_lock` function
+# in the xtask script.
+# Alternatively, you might suggest an increase of the MSRV.
+cargo xtask msrv
 ```
+
+Using `xtask` requires that `curl` and `jq` are available on the system.
+
 
 #### Update `ci/Cargo.lock.min`
 
 ```bash
-rm Cargo.lock
-RUST_LOG=debug cargo +nightly -Z minimal-versions test --no-run
 # If there are errors, update Cargo.toml to fix and try again from the top.
-cp Cargo.lock ci/Cargo.lock.min
+cargo xtask min
 ```
+
+Using `xtask` requires that `curl` and `jq` are available on the system.
 
 
 ## License
