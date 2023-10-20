@@ -1,7 +1,9 @@
 use crate::errors::*;
 use crate::row::*;
 use crate::types::*;
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::hash::Hash;
 
 impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     type Error = Error;
@@ -9,6 +11,31 @@ impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     fn try_from(input: BoltType) -> Result<Vec<A>> {
         match input {
             BoltType::List(l) => l.value.iter().map(|x| A::try_from(x.clone())).collect(),
+            _ => Err(Error::ConversionError),
+        }
+    }
+}
+
+impl<K, V> TryFrom<BoltType> for HashMap<K, V>
+where
+    K: From<BoltString> + Eq + Hash,
+    V: TryFrom<BoltType, Error = Error>,
+{
+    type Error = Error;
+
+    fn try_from(input: BoltType) -> Result<HashMap<K, V>> {
+        match input {
+            BoltType::Map(l) => l
+                .value
+                .into_iter()
+                .filter_map(|(k, v)| {
+                    if let BoltType::Null(_) = v {
+                        None
+                    } else {
+                        V::try_from(v).map(|v| Some((K::from(k), v))).transpose()
+                    }
+                })
+                .collect::<Result<HashMap<_, _>>>(),
             _ => Err(Error::ConversionError),
         }
     }
@@ -286,6 +313,21 @@ impl<A: Into<BoltType> + Clone> From<&[A]> for BoltType {
     }
 }
 
+impl<K, V> From<HashMap<K, V>> for BoltType
+where
+    K: Into<BoltString>,
+    V: Into<BoltType>,
+{
+    fn from(value: HashMap<K, V>) -> Self {
+        BoltType::Map(
+            value
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
+    }
+}
+
 impl From<Vec<u8>> for BoltType {
     fn from(value: Vec<u8>) -> Self {
         BoltType::Bytes(BoltBytes::new(value.into()))
@@ -392,6 +434,20 @@ mod tests {
     }
 
     #[test]
+    fn convert_into_map() {
+        let map = HashMap::from([
+            (BoltString::new("42"), BoltType::Null(BoltNull {})),
+            (
+                BoltString::new("1337"),
+                BoltType::Integer(BoltInteger::new(1337)),
+            ),
+        ]);
+        let value = BoltType::Map(BoltMap { value: map });
+        let value = HashMap::<String, i64>::try_from(value).unwrap();
+        assert_eq!(value, HashMap::from([("1337".to_owned(), 1337_i64)]));
+    }
+
+    #[test]
     fn convert_propagates_error() {
         let value = BoltType::List(BoltList {
             value: vec![
@@ -414,6 +470,21 @@ mod tests {
                     BoltType::Integer(BoltInteger::new(42)),
                     BoltType::Integer(BoltInteger::new(1337)),
                 ],
+            })
+        );
+    }
+
+    #[test]
+    fn convert_from_map() {
+        let map = HashMap::from([("1337".to_owned(), 1337_i64)]);
+        let value: BoltType = map.into();
+        assert_eq!(
+            value,
+            BoltType::Map(BoltMap {
+                value: HashMap::from([(
+                    BoltString::new("1337"),
+                    BoltType::Integer(BoltInteger::new(1337))
+                )]),
             })
         );
     }
