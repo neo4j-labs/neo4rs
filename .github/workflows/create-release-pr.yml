@@ -37,15 +37,15 @@ jobs:
       - uses: chainguard-dev/actions/setup-gitsign@main
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Setup Rust nightly
+      - name: Set up Rust nightly
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-      - name: Setup Rust MSRV
+      - name: Set up Rust MSRV
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
-      - name: Setup Rust stable
+      - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
