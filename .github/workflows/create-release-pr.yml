@@ -20,6 +20,7 @@ on:
 
 env:
   RUSTUP_TOOLCHAIN: stable
+  MSRV: 1.63.0
 
 jobs:
   make-release-pr:
@@ -36,6 +37,18 @@ jobs:
       - uses: chainguard-dev/actions/setup-gitsign@main
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Setup Rust nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+      - name: Setup Rust MSRV
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: Install cargo-release
         uses: baptiste0928/cargo-install@v2
         with:
