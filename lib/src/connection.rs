@@ -1,15 +1,19 @@
-use crate::errors::{unexpected, Error, Result};
-use crate::messages::*;
-use crate::version::Version;
-use bytes::*;
-use std::mem;
-use std::sync::Arc;
+use crate::{
+    errors::{unexpected, Error, Result},
+    messages::{BoltRequest, BoltResponse},
+    version::Version,
+};
+use bytes::{BufMut, Bytes, BytesMut};
+use std::{mem, sync::Arc};
 use stream::ConnectionStream;
-use tokio::io::BufStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio_rustls::rustls::{OwnedTrustAnchor, RootCertStore, ServerName};
-use tokio_rustls::{rustls::ClientConfig, TlsConnector};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt, BufStream},
+    net::TcpStream,
+};
+use tokio_rustls::{
+    rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName},
+    TlsConnector,
+};
 use url::{Host, Url};
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
@@ -147,28 +151,58 @@ impl Connection {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
-            chunk_size = self.read_u16().await?;
+            chunk_size = self.read_chunk_size().await?;
         }
 
         while chunk_size > 0 {
-            let chunk = self.read(chunk_size).await?;
-            bytes.put_slice(&chunk);
-            chunk_size = self.read_u16().await?;
+            self.read_chunk(chunk_size, &mut bytes).await?;
+            chunk_size = self.read_chunk_size().await?;
         }
 
         BoltResponse::parse(self.version, bytes.freeze())
     }
 
-    async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
-        let mut buf = vec![0; size as usize];
-        self.stream.read_exact(&mut buf).await?;
-        Ok(buf)
+    async fn read_chunk_size(&mut self) -> Result<usize> {
+        Ok(usize::from(self.stream.read_u16().await?))
     }
 
-    async fn read_u16(&mut self) -> Result<u16> {
-        let mut data = [0, 0];
-        self.stream.read_exact(&mut data).await?;
-        Ok(u16::from_be_bytes(data))
+    async fn read_chunk(&mut self, chunk_size: usize, buf: &mut BytesMut) -> Result<()> {
+        // This is an unsafe variant of doing the following
+        // but skips the zero-initialization of the buffer
+        //
+        //     let pos = bytes.len();
+        //     bytes.resize(pos + chunk_size, 0);
+        //     self.stream.read_exact(&mut bytes[pos..]).await?;
+        //
+        // Alternatively, this an unsafe variant of the following except
+        // it does read extactly `chunk_size` bytes and not maybe more
+        //
+        //     bytes.reserve(chunk_size);
+        //     self.stream.read_buf(&mut bytes).await?;
+
+        let additional = chunk_size.saturating_sub(buf.capacity() - buf.len());
+        buf.reserve(additional);
+
+        {
+            // shadowing `buf` and the extra block help with
+            // maintaining the safety invariants
+            let buf = buf.chunk_mut();
+            assert!(buf.len() >= chunk_size);
+
+            // SAFETY:
+            // We are only passing the buffer to `read_buf` which will
+            // never read and never write uninitialized data.
+            let buf = unsafe { buf.as_uninit_slice_mut() };
+            let mut buf = &mut buf[..chunk_size];
+
+            let read = self.stream.read_buf(&mut buf).await?;
+            assert_eq!(read, chunk_size);
+        }
+
+        // SAFETY: We have asserted to have read `chunk_size` bytes into the buffer.
+        unsafe { buf.advance_mut(chunk_size) };
+
+        Ok(())
     }
 }
 
@@ -272,6 +306,26 @@ mod stream {
             match self.project() {
                 ConnectionStreamProj::Unencrypted { stream } => stream.poll_shutdown(cx),
                 ConnectionStreamProj::Encrypted { stream } => stream.poll_shutdown(cx),
+            }
+        }
+
+        fn poll_write_vectored(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            bufs: &[std::io::IoSlice<'_>],
+        ) -> std::task::Poll<Result<usize, std::io::Error>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => {
+                    stream.poll_write_vectored(cx, bufs)
+                }
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_write_vectored(cx, bufs),
+            }
+        }
+
+        fn is_write_vectored(&self) -> bool {
+            match self {
+                ConnectionStream::Unencrypted { stream } => stream.is_write_vectored(),
+                ConnectionStream::Encrypted { stream } => stream.is_write_vectored(),
             }
         }
     }

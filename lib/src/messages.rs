@@ -10,11 +10,14 @@ mod reset;
 mod rollback;
 mod run;
 mod success;
-use crate::errors::*;
-use crate::types::*;
-use crate::version::Version;
+
+use crate::{
+    errors::{Error, Result},
+    types::{BoltMap, BoltWireFormat},
+    version::Version,
+};
 use begin::Begin;
-use bytes::*;
+use bytes::Bytes;
 use commit::Commit;
 use discard::Discard;
 use failure::Failure;
@@ -24,8 +27,6 @@ use record::Record;
 use reset::Reset;
 use rollback::Rollback;
 use run::Run;
-use std::cell::RefCell;
-use std::rc::Rc;
 use success::Success;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -104,18 +105,22 @@ impl BoltRequest {
 }
 
 impl BoltResponse {
-    pub fn parse(version: Version, response: Bytes) -> Result<BoltResponse> {
-        match Rc::new(RefCell::new(response)) {
-            input if Success::can_parse(version, input.clone()) => {
-                Ok(BoltResponse::Success(Success::parse(version, input)?))
-            }
-            input if Failure::can_parse(version, input.clone()) => {
-                Ok(BoltResponse::Failure(Failure::parse(version, input)?))
-            }
-            input if Record::can_parse(version, input.clone()) => {
-                Ok(BoltResponse::Record(Record::parse(version, input)?))
-            }
-            msg => Err(Error::UnknownMessage(format!("unknown message {:?}", msg))),
+    pub fn parse(version: Version, mut response: Bytes) -> Result<BoltResponse> {
+        if Success::can_parse(version, &response) {
+            let success = Success::parse(version, &mut response)?;
+            return Ok(BoltResponse::Success(success));
         }
+        if Failure::can_parse(version, &response) {
+            let failure = Failure::parse(version, &mut response)?;
+            return Ok(BoltResponse::Failure(failure));
+        }
+        if Record::can_parse(version, &response) {
+            let record = Record::parse(version, &mut response)?;
+            return Ok(BoltResponse::Record(record));
+        }
+        Err(Error::UnknownMessage(format!(
+            "unknown message {:?}",
+            response
+        )))
     }
 }

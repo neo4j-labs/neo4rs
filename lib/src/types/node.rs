@@ -38,19 +38,17 @@ impl From<BoltNode> for BoltType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::{types::BoltWireFormat, version::Version};
+    use bytes::Bytes;
 
     #[test]
     fn should_deserialize_a_node() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut input = Bytes::from_static(&[
             0xB3, 0x4E, 0x13, 0x91, 0x86, 0x50, 0x65, 0x72, 0x73, 0x6F, 0x6E, 0xA1, 0x84, 0x6E,
             0x61, 0x6D, 0x65, 0x84, 0x4D, 0x61, 0x72, 0x6B,
-        ])));
+        ]);
 
-        let node: BoltNode = BoltNode::parse(Version::V4_1, input).unwrap();
+        let node: BoltNode = BoltNode::parse(Version::V4_1, &mut input).unwrap();
 
         assert_eq!(node.id, BoltInteger::new(19));
         assert_eq!(node.labels, vec!["Person".into()].into());

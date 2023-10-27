@@ -1,6 +1,10 @@
-use crate::{errors::*, types::*, version::Version};
-use bytes::*;
-use std::{cell::RefCell, mem, rc::Rc};
+use crate::{
+    errors::{Error, Result},
+    types::{BoltType, BoltWireFormat, BytesMut},
+    version::Version,
+};
+use bytes::{Buf, BufMut, Bytes};
+use std::mem;
 
 pub const TINY: u8 = 0x90;
 pub const SMALL: u8 = 0xD4;
@@ -45,14 +49,6 @@ impl BoltList {
         self.value.get(index)
     }
 
-    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
-        let marker = input.borrow()[0];
-        (TINY..=(TINY | 0x0F)).contains(&marker)
-            || marker == SMALL
-            || marker == MEDIUM
-            || marker == LARGE
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = &BoltType> {
         self.value.iter()
     }
@@ -82,46 +78,22 @@ impl From<Vec<BoltType>> for BoltList {
     }
 }
 
-impl BoltList {
-    pub fn into_bytes(self, version: Version) -> Result<Bytes> {
-        let mut values = BytesMut::new();
-        let length = self.value.len();
-
-        for elem in self.value {
-            values.put(elem.into_bytes(version)?);
-        }
-
-        let mut bytes =
-            BytesMut::with_capacity(mem::size_of::<u8>() + mem::size_of::<u32>() + values.len());
-
-        match length {
-            0..=15 => bytes.put_u8(TINY | length as u8),
-            16..=255 => {
-                bytes.put_u8(SMALL);
-                bytes.put_u8(length as u8);
-            }
-            256..=65_535 => {
-                bytes.put_u8(MEDIUM);
-                bytes.put_u16(length as u16);
-            }
-            65_536..=2_147_483_648 => {
-                bytes.put_u8(LARGE);
-                bytes.put_u32(length as u32);
-            }
-            _ => return Err(Error::ListTooLong),
-        }
-
-        bytes.put(values);
-        Ok(bytes.freeze())
+impl BoltWireFormat for BoltList {
+    fn can_parse(_version: Version, input: &[u8]) -> bool {
+        let marker = input[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
     }
 
-    pub fn parse(version: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltList> {
-        let marker = input.borrow_mut().get_u8();
+    fn parse(version: Version, input: &mut Bytes) -> Result<Self> {
+        let marker = input.get_u8();
         let size = match marker {
             0x90..=0x9F => 0x0F & marker as usize,
-            SMALL => input.borrow_mut().get_u8() as usize,
-            MEDIUM => input.borrow_mut().get_u16() as usize,
-            LARGE => input.borrow_mut().get_u32() as usize,
+            SMALL => input.get_u8() as usize,
+            MEDIUM => input.get_u16() as usize,
+            LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid list marker {}",
@@ -132,10 +104,42 @@ impl BoltList {
 
         let mut list = BoltList::with_capacity(size);
         for _ in 0..size {
-            list.push(BoltType::parse(version, input.clone())?);
+            list.push(BoltType::parse(version, input)?);
         }
 
         Ok(list)
+    }
+
+    fn write_into(&self, version: Version, bytes: &mut BytesMut) -> Result<()> {
+        let length = self.value.len();
+
+        match length {
+            0..=15 => {
+                bytes.reserve(1);
+                bytes.put_u8(TINY | length as u8);
+            }
+            16..=255 => {
+                bytes.reserve(2);
+                bytes.put_u8(SMALL);
+                bytes.put_u8(length as u8);
+            }
+            256..=65_535 => {
+                bytes.reserve(1 + mem::size_of::<u16>());
+                bytes.put_u8(MEDIUM);
+                bytes.put_u16(length as u16);
+            }
+            65_536..=2_147_483_648 => {
+                bytes.reserve(1 + mem::size_of::<u32>());
+                bytes.put_u8(LARGE);
+                bytes.put_u32(length as u32);
+            }
+            _ => return Err(Error::ListTooLong),
+        }
+        for elem in &self.value {
+            elem.write_into(version, bytes)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -171,9 +175,9 @@ mod tests {
 
     #[test]
     fn should_deserialize_list() {
-        let b = Rc::new(RefCell::new(Bytes::from_static(&[0x92, 0x81, 0x61, 0x01])));
+        let mut b = Bytes::from_static(&[0x92, 0x81, 0x61, 0x01]);
 
-        let bolt_list: BoltList = BoltList::parse(Version::V4_1, b).unwrap();
+        let bolt_list: BoltList = BoltList::parse(Version::V4_1, &mut b).unwrap();
 
         assert_eq!(bolt_list.len(), 2);
         match bolt_list.get(0).unwrap() {

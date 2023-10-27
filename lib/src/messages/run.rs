@@ -23,6 +23,8 @@ impl Run {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
+
     use super::*;
     use crate::version::Version;
 

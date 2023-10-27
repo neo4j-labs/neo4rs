@@ -1,12 +1,11 @@
-use crate::errors::*;
-use crate::version::Version;
-use bytes::*;
-use std::borrow::Borrow;
-use std::cell::RefCell;
-use std::convert::From;
-use std::fmt::Display;
-use std::mem;
-use std::rc::Rc;
+use crate::{
+    errors::{Error, Result},
+    types::BoltWireFormat,
+    version::Version,
+};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::{borrow::Borrow, str::from_utf8};
+use std::{fmt::Display, mem};
 
 pub const TINY: u8 = 0x80;
 pub const SMALL: u8 = 0xD0;
@@ -24,14 +23,6 @@ impl BoltString {
             value: value.to_string(),
         }
     }
-
-    pub fn can_parse(_: Version, input: Rc<RefCell<Bytes>>) -> bool {
-        let marker = (*input).borrow()[0];
-        (TINY..=(TINY | 0x0F)).contains(&marker)
-            || marker == SMALL
-            || marker == MEDIUM
-            || marker == LARGE
-    }
 }
 
 impl Display for BoltString {
@@ -47,8 +38,8 @@ impl From<&str> for BoltString {
 }
 
 impl From<String> for BoltString {
-    fn from(v: String) -> Self {
-        BoltString::new(&v)
+    fn from(value: String) -> Self {
+        BoltString { value }
     }
 }
 
@@ -63,33 +54,16 @@ impl Borrow<str> for BoltString {
     }
 }
 
-impl BoltString {
-    pub fn into_bytes(self, _: Version) -> Result<Bytes> {
-        let mut bytes = BytesMut::with_capacity(
-            mem::size_of::<u8>() + mem::size_of::<u32>() + self.value.len(),
-        );
-        match self.value.len() {
-            0..=15 => bytes.put_u8(TINY | self.value.len() as u8),
-            16..=255 => {
-                bytes.put_u8(SMALL);
-                bytes.put_u8(self.value.len() as u8);
-            }
-            256..=65_535 => {
-                bytes.put_u8(MEDIUM);
-                bytes.put_u16(self.value.len() as u16);
-            }
-            65_536..=4_294_967_295 => {
-                bytes.put_u8(LARGE);
-                bytes.put_u32(self.value.len() as u32);
-            }
-            _ => return Err(Error::StringTooLong),
-        };
-        bytes.put_slice(self.value.as_bytes());
-        Ok(bytes.freeze())
+impl BoltWireFormat for BoltString {
+    fn can_parse(_version: Version, input: &[u8]) -> bool {
+        let marker = (*input)[0];
+        (TINY..=(TINY | 0x0F)).contains(&marker)
+            || marker == SMALL
+            || marker == MEDIUM
+            || marker == LARGE
     }
 
-    pub fn parse(_: Version, input: Rc<RefCell<Bytes>>) -> Result<BoltString> {
-        let mut input = input.borrow_mut();
+    fn parse(_version: Version, input: &mut Bytes) -> Result<Self> {
         let marker = input.get_u8();
         let length = match marker {
             0x80..=0x8F => 0x0F & marker as usize,
@@ -103,15 +77,47 @@ impl BoltString {
                 )))
             }
         };
-        let byte_array = input.split_to(length).to_vec();
-        let string_value = std::string::String::from_utf8(byte_array)
-            .map_err(|e| Error::DeserializationError(e.to_string()))?;
-        Ok(string_value.into())
+
+        let bytes = input.split_to(length);
+        match from_utf8(&bytes) {
+            Ok(t) => Ok(t.into()),
+            Err(e) => Err(Error::DeserializationError(e.to_string())),
+        }
+    }
+
+    fn write_into(&self, _version: Version, bytes: &mut BytesMut) -> Result<()> {
+        let required_bytes = self.value.len();
+        match self.value.len() {
+            0..=15 => {
+                bytes.reserve(1 + required_bytes);
+                bytes.put_u8(TINY | self.value.len() as u8);
+            }
+            16..=255 => {
+                bytes.reserve(2 + required_bytes);
+                bytes.put_u8(SMALL);
+                bytes.put_u8(self.value.len() as u8);
+            }
+            256..=65_535 => {
+                bytes.reserve(1 + mem::size_of::<u16>() + required_bytes);
+                bytes.put_u8(MEDIUM);
+                bytes.put_u16(self.value.len() as u16);
+            }
+            65_536..=4_294_967_295 => {
+                bytes.reserve(1 + mem::size_of::<u32>() + required_bytes);
+                bytes.put_u8(LARGE);
+                bytes.put_u32(self.value.len() as u32);
+            }
+            _ => return Err(Error::StringTooLong),
+        };
+        bytes.put_slice(self.value.as_bytes());
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
+
     use super::*;
 
     #[test]
@@ -123,8 +129,8 @@ mod tests {
 
     #[test]
     fn should_deserialize_empty_string() {
-        let input = Rc::new(RefCell::new(Bytes::from_static(&[TINY])));
-        let s: BoltString = BoltString::parse(Version::V4_1, input).unwrap();
+        let mut input = Bytes::from_static(&[TINY]);
+        let s: BoltString = BoltString::parse(Version::V4_1, &mut input).unwrap();
         assert_eq!(s, "".into());
     }
 
@@ -137,8 +143,8 @@ mod tests {
 
     #[test]
     fn should_deserialize_tiny_string() {
-        let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[0x81, 0x61])));
-        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
+        let mut serialized_bytes = Bytes::from_static(&[0x81, 0x61]);
+        let result: BoltString = BoltString::parse(Version::V4_1, &mut serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -158,8 +164,8 @@ mod tests {
 
     #[test]
     fn should_deserialize_small_string() {
-        let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[SMALL, 0x01, 0x61])));
-        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
+        let mut serialized_bytes = Bytes::from_static(&[SMALL, 0x01, 0x61]);
+        let result: BoltString = BoltString::parse(Version::V4_1, &mut serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -179,10 +185,8 @@ mod tests {
 
     #[test]
     fn should_deserialize_medium_string() {
-        let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[
-            MEDIUM, 0x00, 0x01, 0x61,
-        ])));
-        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
+        let mut serialized_bytes = Bytes::from_static(&[MEDIUM, 0x00, 0x01, 0x61]);
+        let result: BoltString = BoltString::parse(Version::V4_1, &mut serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 
@@ -202,10 +206,8 @@ mod tests {
 
     #[test]
     fn should_deserialize_large_string() {
-        let serialized_bytes = Rc::new(RefCell::new(Bytes::from_static(&[
-            LARGE, 0x00, 0x00, 0x00, 0x01, 0x61,
-        ])));
-        let result: BoltString = BoltString::parse(Version::V4_1, serialized_bytes).unwrap();
+        let mut serialized_bytes = Bytes::from_static(&[LARGE, 0x00, 0x00, 0x00, 0x01, 0x61]);
+        let result: BoltString = BoltString::parse(Version::V4_1, &mut serialized_bytes).unwrap();
         assert_eq!(result, "a".into());
     }
 }

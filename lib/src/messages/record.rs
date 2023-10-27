@@ -11,17 +11,13 @@ pub struct Record {
 mod tests {
     use super::*;
     use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use bytes::Bytes;
 
     #[test]
     fn should_deserialize_record_message() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
-            0xB1, 0x71, 0x92, 0x81, 0x61, 0x81, 0x62,
-        ])));
+        let mut bytes = Bytes::from_static(&[0xB1, 0x71, 0x92, 0x81, 0x61, 0x81, 0x62]);
 
-        let record: Record = Record::parse(Version::V4_1, bytes).unwrap();
+        let record: Record = Record::parse(Version::V4_1, &mut bytes).unwrap();
 
         assert_eq!(record.data.len(), 2);
     }

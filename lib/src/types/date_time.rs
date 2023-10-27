@@ -180,9 +180,7 @@ impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
 mod tests {
     use super::*;
     use crate::version::Version;
-    use bytes::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use bytes::Bytes;
 
     #[test]
     fn should_serialize_a_datetime() {
@@ -200,11 +198,11 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_datetime() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut bytes = Bytes::from_static(&[
             0xB3, 0x46, 0xCA, 0x55, 0x8A, 0xA7, 0x9B, 0x00, 0xC9, 0x0E, 0x10,
-        ])));
+        ]);
 
-        let datetime: DateTime<FixedOffset> = BoltDateTime::parse(Version::V4_1, bytes)
+        let datetime: DateTime<FixedOffset> = BoltDateTime::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();
@@ -228,11 +226,11 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_localdatetime() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut bytes = Bytes::from_static(&[
             0xB2, 0x64, 0xCA, 0x55, 0x93, 0xAC, 0x0F, 0xCA, 0x42, 0xEF, 0x9E, 0xC0,
-        ])));
+        ]);
 
-        let datetime: NaiveDateTime = BoltLocalDateTime::parse(Version::V4_1, bytes)
+        let datetime: NaiveDateTime = BoltLocalDateTime::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();
@@ -259,12 +257,12 @@ mod tests {
 
     #[test]
     fn should_deserialize_a_datetime_with_zoneid() {
-        let bytes = Rc::new(RefCell::new(Bytes::from_static(&[
+        let mut bytes = Bytes::from_static(&[
             0xB3, 0x66, 0xCA, 0x55, 0x93, 0xAC, 0x0F, 0xCA, 0x42, 0xEF, 0x9E, 0xC0, 0x8C, 0x45,
             0x75, 0x72, 0x6F, 0x70, 0x65, 0x2F, 0x50, 0x61, 0x72, 0x69, 0x73,
-        ])));
+        ]);
 
-        let (datetime, zone_id) = BoltDateTimeZoneId::parse(Version::V4_1, bytes)
+        let (datetime, zone_id) = BoltDateTimeZoneId::parse(Version::V4_1, &mut bytes)
             .unwrap()
             .try_into()
             .unwrap();
