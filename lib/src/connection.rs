@@ -3,7 +3,7 @@ use crate::{
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
@@ -151,32 +151,59 @@ impl Connection {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
-            chunk_size = self.stream.read_u16().await?;
+            chunk_size = self.read_chunk_size().await?;
         }
 
         while chunk_size > 0 {
-            bytes.reserve(usize::from(chunk_size));
-            assert!(bytes.capacity() - bytes.len() == usize::from(chunk_size));
-            let read = self.stream.read_buf(&mut bytes).await?;
-            assert_eq!(read, usize::from(chunk_size));
-            // bytes.resize(bytes.len() + usize::from(chunk_size), 0);
-            // self.read_into(bytes.as_mut()).await?;
-            chunk_size = self.stream.read_u16().await?;
+            self.read_chunk(chunk_size, &mut bytes).await?;
+            chunk_size = self.read_chunk_size().await?;
         }
 
         BoltResponse::parse(self.version, bytes.freeze())
     }
 
-    // async fn read(&mut self, size: u16) -> Result<Vec<u8>> {
-    //     let mut buf = vec![0; size as usize];
-    //     self.stream.read_exact(&mut buf).await?;
-    //     Ok(buf)
-    // }
-    //
-    // async fn read_into(&mut self, buf: &mut [u8]) -> Result<()> {
-    //     self.stream.read_exact(buf).await?;
-    //     Ok(())
-    // }
+    async fn read_chunk_size(&mut self) -> Result<usize> {
+        Ok(usize::from(self.stream.read_u16().await?))
+    }
+
+    async fn read_chunk(&mut self, chunk_size: usize, buf: &mut BytesMut) -> Result<()> {
+        // This is an unsafe variant of doing the following
+        // but skips the zero-initialization of the buffer
+        //
+        //     let pos = bytes.len();
+        //     bytes.resize(pos + chunk_size, 0);
+        //     self.stream.read_exact(&mut bytes[pos..]).await?;
+        //
+        // Alternatively, this an unsafe variant of the following except
+        // it does read extactly `chunk_size` bytes and not maybe more
+        //
+        //     bytes.reserve(chunk_size);
+        //     self.stream.read_buf(&mut bytes).await?;
+
+        let additional = chunk_size.saturating_sub(buf.capacity() - buf.len());
+        buf.reserve(additional);
+
+        {
+            // shadowing `buf` and the extra block help with
+            // maintaining the safety invariants
+            let buf = buf.chunk_mut();
+            assert!(buf.len() >= chunk_size);
+
+            // SAFETY:
+            // We are only passing the buffer to `read_buf` which will
+            // never read and never write uninitialized data.
+            let buf = unsafe { buf.as_uninit_slice_mut() };
+            let mut buf = &mut buf[..chunk_size];
+
+            let read = self.stream.read_buf(&mut buf).await?;
+            assert_eq!(read, chunk_size);
+        }
+
+        // SAFETY: We have asserted to have read `chunk_size` bytes into the buffer.
+        unsafe { buf.advance_mut(chunk_size) };
+
+        Ok(())
+    }
 }
 
 struct NeoUrl(Url);
