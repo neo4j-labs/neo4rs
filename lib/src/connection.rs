@@ -281,6 +281,26 @@ mod stream {
                 ConnectionStreamProj::Encrypted { stream } => stream.poll_shutdown(cx),
             }
         }
+
+        fn poll_write_vectored(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            bufs: &[std::io::IoSlice<'_>],
+        ) -> std::task::Poll<Result<usize, std::io::Error>> {
+            match self.project() {
+                ConnectionStreamProj::Unencrypted { stream } => {
+                    stream.poll_write_vectored(cx, bufs)
+                }
+                ConnectionStreamProj::Encrypted { stream } => stream.poll_write_vectored(cx, bufs),
+            }
+        }
+
+        fn is_write_vectored(&self) -> bool {
+            match self {
+                ConnectionStream::Unencrypted { stream } => stream.is_write_vectored(),
+                ConnectionStream::Encrypted { stream } => stream.is_write_vectored(),
+            }
+        }
     }
 }
 
