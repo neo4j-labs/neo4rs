@@ -594,7 +594,11 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_some(self)
+        if let BoltType::Null(_) = self.value {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self)
+        }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -971,6 +975,30 @@ mod tests {
         let expected = Person {
             name: "Alice".into(),
             age: 42,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn struct_with_null_value() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            name: String,
+            age: Option<u8>,
+        }
+
+        let map = [
+            (BoltString::from("name"), BoltType::from("Alice")),
+            (BoltString::from("age"), BoltType::Null(BoltNull)),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let actual = map.to::<Person>().unwrap();
+        let expected = Person {
+            name: "Alice".into(),
+            age: None,
         };
 
         assert_eq!(actual, expected);
