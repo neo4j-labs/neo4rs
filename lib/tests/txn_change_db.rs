@@ -31,22 +31,22 @@ async fn txn_changes_db() {
     .await
     .unwrap();
 
-    let txn = graph.start_txn().await.unwrap();
-
     #[derive(Deserialize)]
     struct Database {
         name: String,
     }
 
+    let txn = graph.start_txn().await.unwrap();
+
     let databases = txn.execute(query("SHOW DATABASES")).await.unwrap();
 
-    let names = stream::unfold(databases, |mut databases| async move {
-        let db = databases.next().await.unwrap()?;
-        let db = db.to::<Database>().unwrap();
-        Some((db.name, databases))
-    });
+    let mut names = databases
+        .into_stream_as::<Database>()
+        .map_ok(|db| db.name)
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
 
-    let mut names = names.collect::<Vec<_>>().await;
     names.sort();
 
     assert_eq!(names, vec!["deebee", "system"]);

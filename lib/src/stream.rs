@@ -1,8 +1,13 @@
-use crate::errors::*;
-use crate::messages::*;
-use crate::pool::*;
-use crate::row::*;
-use crate::types::*;
+use crate::{
+    errors::{unexpected, Error, Result},
+    messages::{BoltRequest, BoltResponse},
+    pool::ManagedConnection,
+    row::Row,
+    types::BoltList,
+    DeError,
+};
+use futures::{stream::try_unfold, TryStream};
+use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -84,5 +89,49 @@ impl RowStream {
                 }
             }
         }
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every element is a [`crate::row::Row`].
+    pub fn into_stream(self) -> impl TryStream<Ok = Row, Error = Error> {
+        try_unfold(self, |mut stream| async move {
+            match stream.next().await {
+                Ok(Some(row)) => Ok(Some((row, stream))),
+                Ok(None) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every row is converted into a `T` by calling [`crate::row::Row::to`].
+    pub fn into_stream_as<T: DeserializeOwned>(self) -> impl TryStream<Ok = T, Error = Error> {
+        self.into_stream_de(|row| row.to::<T>())
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// the value at the given column is converted into a `T`
+    /// by calling [`crate::row::Row::get`].
+    pub fn column_into_stream<'db, T: DeserializeOwned + 'db>(
+        self,
+        column: &'db str,
+    ) -> impl TryStream<Ok = T, Error = Error> + 'db {
+        self.into_stream_de(move |row| row.get::<T>(column))
+    }
+
+    fn into_stream_de<T: DeserializeOwned>(
+        self,
+        deser: impl Fn(Row) -> Result<T, DeError>,
+    ) -> impl TryStream<Ok = T, Error = Error> {
+        try_unfold((self, deser), |(mut stream, de)| async move {
+            match stream.next().await {
+                Ok(Some(row)) => match de(row) {
+                    Ok(res) => Ok(Some((res, (stream, de)))),
+                    Err(e) => Err(Error::DeserializationError(e)),
+                },
+                Ok(None) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
     }
 }
