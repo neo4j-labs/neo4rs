@@ -161,14 +161,13 @@ impl Connection {
         //     bytes.reserve(chunk_size);
         //     self.stream.read_buf(&mut bytes).await?;
 
-        let additional = chunk_size.saturating_sub(buf.capacity() - buf.len());
-        buf.reserve(additional);
-
-        {
+        buf.reserve(chunk_size);
+        let read = {
             // shadowing `buf` and the extra block help with
             // maintaining the safety invariants
             let buf = buf.chunk_mut();
-            assert!(buf.len() >= chunk_size);
+            let available = buf.len();
+            assert!(available >= chunk_size);
 
             // SAFETY:
             // We are only passing the buffer to `read_buf` which will
@@ -177,11 +176,13 @@ impl Connection {
             let mut buf = &mut buf[..chunk_size];
 
             let read = self.stream.read_buf(&mut buf).await?;
-            assert_eq!(read, chunk_size);
-        }
+            assert!(read <= chunk_size);
 
-        // SAFETY: We have asserted to have read `chunk_size` bytes into the buffer.
-        unsafe { buf.advance_mut(chunk_size) };
+            read
+        };
+
+        // SAFETY: We have asserted to have read `read` bytes into the buffer.
+        unsafe { buf.advance_mut(read) };
 
         Ok(())
     }
