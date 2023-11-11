@@ -3,7 +3,7 @@ use neo4j_testcontainers::{Neo4j, Neo4jImage};
 use neo4rs::{ConfigBuilder, Graph};
 use testcontainers::{clients::Cli, Container};
 
-use std::{error::Error, sync::Arc};
+use std::error::Error;
 
 #[allow(dead_code)]
 #[derive(Default)]
@@ -39,7 +39,7 @@ impl Neo4jContainerBuilder {
 }
 
 pub struct Neo4jContainer {
-    graph: Arc<Graph>,
+    graph: Graph,
     version: String,
     _container: Option<Container<'static, Neo4jImage>>,
 }
@@ -82,7 +82,7 @@ impl Neo4jContainer {
         })
     }
 
-    pub fn graph(&self) -> Arc<Graph> {
+    pub fn graph(&self) -> Graph {
         self.graph.clone()
     }
 
@@ -156,7 +156,7 @@ impl Neo4jContainer {
         TestConnection { uri, auth, version }
     }
 
-    async fn connect(config: ConfigBuilder, uri: String, auth: &TestAuth) -> Arc<Graph> {
+    async fn connect(config: ConfigBuilder, uri: String, auth: &TestAuth) -> Graph {
         let config = config
             .uri(uri)
             .user(&auth.user)
@@ -164,9 +164,7 @@ impl Neo4jContainer {
             .build()
             .unwrap();
 
-        let graph = Graph::connect(config).await.unwrap();
-
-        Arc::new(graph)
+        Graph::connect(config).await.unwrap()
     }
 }
 

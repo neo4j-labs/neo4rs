@@ -1,8 +1,53 @@
-pub use crate::errors::*;
+use crate::errors::{Error, Result};
+use std::{ops::Deref, sync::Arc};
 
 const DEFAULT_DATABASE: &str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
+
+/// Newtype for the name of the database.
+/// Stores the name as an `Arc<str>` to avoid cloning the name around.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Database(Arc<str>);
+
+impl From<&str> for Database {
+    fn from(s: &str) -> Self {
+        Database(s.into())
+    }
+}
+
+impl From<String> for Database {
+    fn from(s: String) -> Self {
+        Database(s.into())
+    }
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Database(DEFAULT_DATABASE.into())
+    }
+}
+
+impl AsRef<str> for Database {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for Database {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// The configuration that is used once a connection is alive.
+#[derive(Debug, Clone)]
+pub struct LiveConfig {
+    pub(crate) db: Database,
+    pub(crate) fetch_size: usize,
+}
 
 /// The configuration used to connect to the database, see [`crate::Graph::connect`].
 #[derive(Debug, Clone)]
@@ -11,8 +56,17 @@ pub struct Config {
     pub(crate) user: String,
     pub(crate) password: String,
     pub(crate) max_connections: usize,
-    pub(crate) db: String,
+    pub(crate) db: Database,
     pub(crate) fetch_size: usize,
+}
+
+impl Config {
+    pub(crate) fn into_live_config(self) -> LiveConfig {
+        LiveConfig {
+            db: self.db,
+            fetch_size: self.fetch_size,
+        }
+    }
 }
 
 /// A builder to override default configurations and build the [`Config`].
@@ -20,7 +74,7 @@ pub struct ConfigBuilder {
     uri: Option<String>,
     user: Option<String>,
     password: Option<String>,
-    db: String,
+    db: Database,
     fetch_size: usize,
     max_connections: usize,
 }
@@ -52,7 +106,7 @@ impl ConfigBuilder {
     /// The name of the database to connect to.
     ///
     /// Defaults to "neo4j" if not set.
-    pub fn db(mut self, db: impl Into<String>) -> Self {
+    pub fn db(mut self, db: impl Into<Database>) -> Self {
         self.db = db.into();
         self
     }
@@ -121,7 +175,7 @@ mod tests {
         assert_eq!(config.uri, "127.0.0.1:7687");
         assert_eq!(config.user, "some_user");
         assert_eq!(config.password, "some_password");
-        assert_eq!(config.db, "some_db");
+        assert_eq!(&*config.db, "some_db");
         assert_eq!(config.fetch_size, 10);
         assert_eq!(config.max_connections, 5);
     }
@@ -137,7 +191,7 @@ mod tests {
         assert_eq!(config.uri, "127.0.0.1:7687");
         assert_eq!(config.user, "some_user");
         assert_eq!(config.password, "some_password");
-        assert_eq!(config.db, "neo4j");
+        assert_eq!(&*config.db, "neo4j");
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
     }

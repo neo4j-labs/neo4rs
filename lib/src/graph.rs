@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ConfigBuilder},
+    config::{Config, ConfigBuilder, Database, LiveConfig},
     errors::Result,
     pool::{create_pool, ConnectionPool},
     query::Query,
@@ -7,9 +7,12 @@ use crate::{
     txn::Txn,
 };
 
-/// A neo4j database abstraction
+/// A neo4j database abstraction.
+/// This type can be cloned and shared across threads, internal resources
+/// are reference-counted.
+#[derive(Clone)]
 pub struct Graph {
-    config: Config,
+    config: LiveConfig,
     pool: ConnectionPool,
 }
 
@@ -24,6 +27,7 @@ impl Graph {
     /// You can build a config using [`ConfigBuilder::default()`].
     pub async fn connect(config: Config) -> Result<Self> {
         let pool = create_pool(&config).await?;
+        let config = config.into_live_config();
         Ok(Graph { config, pool })
     }
 
@@ -45,15 +49,15 @@ impl Graph {
     /// All queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
     pub async fn start_txn(&self) -> Result<Txn> {
-        self.start_txn_on(&self.config.db).await
+        self.start_txn_on(self.config.db.clone()).await
     }
 
     /// Starts a new transaction on the provided database.
     /// All queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
-    pub async fn start_txn_on(&self, db: &str) -> Result<Txn> {
+    pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
         let connection = self.pool.get().await?;
-        Txn::new(db, self.config.fetch_size, connection).await
+        Txn::new(db.into(), self.config.fetch_size, connection).await
     }
 
     /// Runs a query on the configured database using a connection from the connection pool,
