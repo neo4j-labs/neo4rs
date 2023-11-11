@@ -2,6 +2,7 @@ use crate::{
     errors::{Error, Result},
     types::BoltWireFormat,
     version::Version,
+    DeError,
 };
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::{borrow::Borrow, str::from_utf8};
@@ -81,7 +82,7 @@ impl BoltWireFormat for BoltString {
         let bytes = input.split_to(length);
         match from_utf8(&bytes) {
             Ok(t) => Ok(t.into()),
-            Err(e) => Err(Error::DeserializationError(e.to_string())),
+            Err(e) => Err(Error::DeserializationError(DeError::Other(e.to_string()))),
         }
     }
 
