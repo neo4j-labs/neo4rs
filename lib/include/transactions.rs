@@ -2,7 +2,7 @@
     let mut txn = graph.start_txn().await.unwrap();
     let id = uuid::Uuid::new_v4().to_string();
     let result = txn
-        .run_queries(vec![
+        .run_queries([
             query("CREATE (p:Person {id: $id})").param("id", id.clone()),
             query("CREATE (p:Person {id: $id})").param("id", id.clone()),
         ])

@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use neo4rs::*;
 use serde::Deserialize;
 
@@ -20,16 +20,16 @@ async fn txn_changes_db() {
     };
     let graph = neo4j.graph();
 
-    stream::iter([
+    let mut txn = graph.start_txn_on("system").await.unwrap();
+    txn.run_queries([
         "CREATE DATABASE deebee",
         "START DATABASE deebee",
         "STOP DATABASE neo4j",
         "DROP DATABASE neo4j",
     ])
-    .then(|q| graph.run_on("system", query(q)))
-    .try_collect::<()>()
     .await
     .unwrap();
+    txn.commit().await.unwrap();
 
     #[derive(Deserialize)]
     struct Database {

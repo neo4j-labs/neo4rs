@@ -81,6 +81,18 @@ impl Query {
     }
 }
 
+impl From<String> for Query {
+    fn from(query: String) -> Self {
+        Query::new(query)
+    }
+}
+
+impl From<&str> for Query {
+    fn from(query: &str) -> Self {
+        Query::new(query.to_owned())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
