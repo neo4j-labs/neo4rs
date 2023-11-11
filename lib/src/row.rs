@@ -1,6 +1,9 @@
-use crate::types::{
-    serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation,
-    BoltUnboundedRelation,
+use crate::{
+    types::{
+        serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D,
+        BoltRelation, BoltUnboundedRelation,
+    },
+    BoltType,
 };
 
 use serde::Deserialize;
@@ -168,7 +171,26 @@ impl Row {
     where
         T: Deserialize<'this>,
     {
+        self.to_strict::<T>().or_else(|e| match self.single() {
+            Some(single) => single.to::<T>(),
+            None => Err(e),
+        })
+    }
+
+    pub fn to_strict<'this, T>(&'this self) -> Result<T, DeError>
+    where
+        T: Deserialize<'this>,
+    {
         self.attributes.to::<T>()
+    }
+
+    fn single(&self) -> Option<&BoltType> {
+        let mut values = self.attributes.value.values();
+        let first = values.next()?;
+        if values.next().is_some() {
+            return None;
+        }
+        Some(first)
     }
 }
 
