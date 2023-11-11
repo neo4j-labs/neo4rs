@@ -25,35 +25,16 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub async fn new(uri: &str, user: &str, password: &str) -> Result<Connection> {
-        let url = NeoUrl::parse(uri)?;
-        let port = url.port();
-        let host = url.host();
-
-        let stream = match host {
-            Host::Domain(domain) => TcpStream::connect((domain, port)).await?,
-            Host::Ipv4(ip) => TcpStream::connect((ip, port)).await?,
-            Host::Ipv6(ip) => TcpStream::connect((ip, port)).await?,
+    pub(crate) async fn new(info: &ConnectionInfo) -> Result<Connection> {
+        let stream = match &info.host {
+            Host::Domain(domain) => TcpStream::connect((&**domain, info.port)).await?,
+            Host::Ipv4(ip) => TcpStream::connect((*ip, info.port)).await?,
+            Host::Ipv6(ip) => TcpStream::connect((*ip, info.port)).await?,
         };
 
-        match url.scheme() {
-            "bolt" | "" => Self::new_unencrypted(stream, user, password).await,
-            "bolt+s" => Self::new_tls(stream, host, user, password).await,
-            "neo4j" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
-                Self::new_unencrypted(stream, user, password).await
-            }
-            "neo4j+s" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
-                Self::new_tls(stream, host, user, password).await
-            }
-            otherwise => Err(Error::UnsupportedScheme(otherwise.to_owned())),
+        match info.encryption {
+            Encryption::No => Self::new_unencrypted(stream, &info.user, &info.password).await,
+            Encryption::Tls => Self::new_tls(stream, &info.host, &info.user, &info.password).await,
         }
     }
 
@@ -61,9 +42,9 @@ impl Connection {
         Self::init(user, password, stream).await
     }
 
-    async fn new_tls(
+    async fn new_tls<T: AsRef<str>>(
         stream: TcpStream,
-        host: Host<&str>,
+        host: &Host<T>,
         user: &str,
         password: &str,
     ) -> Result<Connection> {
@@ -88,10 +69,10 @@ impl Connection {
         let connector = TlsConnector::from(config);
 
         let domain = match host {
-            Host::Domain(domain) => ServerName::try_from(domain)
-                .map_err(|_| Error::InvalidDnsName(domain.to_owned()))?,
-            Host::Ipv4(ip) => ServerName::IpAddress(ip.into()),
-            Host::Ipv6(ip) => ServerName::IpAddress(ip.into()),
+            Host::Domain(domain) => ServerName::try_from(domain.as_ref())
+                .map_err(|_| Error::InvalidDnsName(domain.as_ref().to_owned()))?,
+            Host::Ipv4(ip) => ServerName::IpAddress((*ip).into()),
+            Host::Ipv6(ip) => ServerName::IpAddress((*ip).into()),
         };
 
         let stream = connector.connect(domain, stream).await?;
@@ -203,6 +184,59 @@ impl Connection {
         unsafe { buf.advance_mut(chunk_size) };
 
         Ok(())
+    }
+}
+
+pub(crate) struct ConnectionInfo {
+    user: Arc<str>,
+    password: Arc<str>,
+    host: Host<Arc<str>>,
+    port: u16,
+    encryption: Encryption,
+}
+
+enum Encryption {
+    No,
+    Tls,
+}
+
+impl ConnectionInfo {
+    pub(crate) fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
+        let url = NeoUrl::parse(uri)?;
+        let port = url.port();
+        let host = url.host();
+
+        let encryption = match url.scheme() {
+            "bolt" | "" => Encryption::No,
+            "bolt+s" => Encryption::Tls,
+            "neo4j" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Encryption::No
+            }
+            "neo4j+s" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Encryption::Tls
+            }
+            otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
+        };
+
+        Ok(Self {
+            user: user.into(),
+            password: password.into(),
+            host: match host {
+                Host::Domain(s) => Host::Domain(s.into()),
+                Host::Ipv4(d) => Host::Ipv4(d),
+                Host::Ipv6(d) => Host::Ipv6(d),
+            },
+            port,
+            encryption,
+        })
     }
 }
 
