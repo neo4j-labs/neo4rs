@@ -36,12 +36,11 @@ async fn txn_changes_db() {
         name: String,
     }
 
-    let txn = graph.start_txn().await.unwrap();
-
+    let mut txn = graph.start_txn().await.unwrap();
     let databases = txn.execute(query("SHOW DATABASES")).await.unwrap();
 
     let mut names = databases
-        .into_stream_as::<Database>()
+        .into_stream_as::<Database>(txn.handle())
         .map_ok(|db| db.name)
         .try_collect::<Vec<_>>()
         .await

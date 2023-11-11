@@ -1,5 +1,5 @@
 {
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     let id = uuid::Uuid::new_v4().to_string();
     let result = txn
         .run_queries(vec![

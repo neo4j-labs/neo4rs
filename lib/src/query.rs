@@ -1,10 +1,10 @@
-use crate::errors::*;
-use crate::messages::*;
-use crate::pool::*;
-use crate::stream::*;
-use crate::types::*;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::{
+    errors::{unexpected, Result},
+    messages::{BoltRequest, BoltResponse},
+    pool::ManagedConnection,
+    stream::{DetachedRowStream, RowStream},
+    types::{BoltList, BoltMap, BoltString, BoltType},
+};
 
 /// Abstracts a cypher query that is sent to neo4j server.
 #[derive(Clone)]
@@ -42,13 +42,8 @@ impl Query {
         self.params.value.contains_key(key)
     }
 
-    pub(crate) async fn run(
-        self,
-        db: &str,
-        connection: Arc<Mutex<ManagedConnection>>,
-    ) -> Result<()> {
+    pub(crate) async fn run(self, db: &str, connection: &mut ManagedConnection) -> Result<()> {
         let run = BoltRequest::run(db, &self.query, self.params);
-        let mut connection = connection.lock().await;
         match connection.send_recv(run).await? {
             BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
                 BoltResponse::Success(_) => Ok(()),
@@ -62,14 +57,24 @@ impl Query {
         self,
         db: &str,
         fetch_size: usize,
-        connection: Arc<Mutex<ManagedConnection>>,
+        mut connection: ManagedConnection,
+    ) -> Result<DetachedRowStream> {
+        let stream = self.execute_mut(db, fetch_size, &mut connection).await?;
+        Ok(DetachedRowStream::new(stream, connection))
+    }
+
+    pub(crate) async fn execute_mut<'conn>(
+        self,
+        db: &str,
+        fetch_size: usize,
+        connection: &'conn mut ManagedConnection,
     ) -> Result<RowStream> {
         let run = BoltRequest::run(db, &self.query, self.params);
-        match connection.lock().await.send_recv(run).await {
+        match connection.send_recv(run).await {
             Ok(BoltResponse::Success(success)) => {
                 let fields: BoltList = success.get("fields").unwrap_or_default();
                 let qid: i64 = success.get("qid").unwrap_or(-1);
-                Ok(RowStream::new(qid, fields, fetch_size, connection.clone()))
+                Ok(RowStream::new(qid, fields, fetch_size))
             }
             msg => Err(unexpected(msg, "RUN")),
         }

@@ -1,11 +1,11 @@
-use crate::config::{Config, ConfigBuilder};
-use crate::errors::*;
-use crate::pool::{create_pool, ConnectionPool};
-use crate::query::Query;
-use crate::stream::RowStream;
-use crate::txn::Txn;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::{
+    config::{Config, ConfigBuilder},
+    errors::Result,
+    pool::{create_pool, ConnectionPool},
+    query::Query,
+    stream::DetachedRowStream,
+    txn::Txn,
+};
 
 /// A neo4j database abstraction
 pub struct Graph {
@@ -73,18 +73,18 @@ impl Graph {
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run_on(&self, db: &str, q: Query) -> Result<()> {
-        let connection = Arc::new(Mutex::new(self.pool.get().await?));
-        q.run(db, connection).await
+        let mut connection = self.pool.get().await?;
+        q.run(db, &mut connection).await
     }
 
-    /// Executes a query on the configured database and returns a [`RowStream`]
-    pub async fn execute(&self, q: Query) -> Result<RowStream> {
+    /// Executes a query on the configured database and returns a [`DetachedRowStream`]
+    pub async fn execute(&self, q: Query) -> Result<DetachedRowStream> {
         self.execute_on(&self.config.db, q).await
     }
 
-    /// Executes a query on the provided database and returns a [`RowStream`]
-    pub async fn execute_on(&self, db: &str, q: Query) -> Result<RowStream> {
-        let connection = Arc::new(Mutex::new(self.pool.get().await?));
+    /// Executes a query on the provided database and returns a [`DetaRowStream`]
+    pub async fn execute_on(&self, db: &str, q: Query) -> Result<DetachedRowStream> {
+        let connection = self.pool.get().await?;
         q.execute(db, self.config.fetch_size, connection).await
     }
 }
