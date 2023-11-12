@@ -637,7 +637,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         if name != std::any::type_name::<BoltType>() {
-            return Err(DeError::invalid_type(Unexp::Str(name), &"BoltType"));
+            return Err(DeError::invalid_type(Unexp::Enum, &"BoltType"));
         }
 
         visitor.visit_enum(BoltEnum { value: self.value })
@@ -660,7 +660,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     forward_to_deserialize_any! { char identifier }
 
     fn is_human_readable(&self) -> bool {
-        false
+        true
     }
 }
 
@@ -893,7 +893,7 @@ impl FromFloat for f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, collections::HashMap, fmt::Debug, time::Duration};
+    use std::{borrow::Cow, collections::HashMap, fmt::Debug, net::SocketAddr, time::Duration};
 
     use super::*;
 
@@ -2049,5 +2049,23 @@ mod tests {
         assert_eq!(m.node.id(), 1);
         assert_eq!(m.d_left.as_ref().unwrap().id(), 2);
         assert_eq!(m.d_right.as_ref(), None);
+    }
+
+    #[test]
+    fn deserialize_socket_addr() {
+        #[derive(Debug, Deserialize)]
+        struct Test {
+            addr: SocketAddr,
+        }
+
+        let value = BoltType::from("127.0.0.1:4242");
+        let value = [(BoltString::from("addr"), value)]
+            .into_iter()
+            .collect::<BoltMap>();
+        let value = BoltType::Map(value);
+
+        let actual = value.to::<Test>().unwrap();
+
+        assert_eq!(actual.addr, SocketAddr::from(([127, 0, 0, 1], 4242)));
     }
 }
