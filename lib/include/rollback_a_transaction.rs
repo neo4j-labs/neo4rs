@@ -1,5 +1,5 @@
 { 
-    let txn = graph.start_txn().await.unwrap();
+    let mut txn = graph.start_txn().await.unwrap();
     let id = uuid::Uuid::new_v4().to_string();
     // create a node
     txn.run(query("CREATE (p:Person {id: $id})").param("id", id.clone()))
