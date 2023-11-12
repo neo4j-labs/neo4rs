@@ -637,7 +637,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
         V: Visitor<'de>,
     {
         if name != std::any::type_name::<BoltType>() {
-            return Err(DeError::invalid_type(Unexp::Str(name), &"BoltType"));
+            return Err(DeError::invalid_type(Unexp::Enum, &"BoltType"));
         }
 
         visitor.visit_enum(BoltEnum { value: self.value })
