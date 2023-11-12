@@ -367,7 +367,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::DateTimeZoneId(dtz) if name == "Timezone" => {
                 visitor.visit_newtype_struct(BorrowedStrDeserializer::new(dtz.tz_id()))
             }
-            _ => self.unexpected(visitor),
+            _ => visitor.visit_newtype_struct(self),
         }
     }
 
@@ -2168,5 +2168,26 @@ mod tests {
         let actual = value.to::<Frobnicate>().unwrap();
 
         assert_eq!(actual, Frobnicate::Foo);
+    }
+
+    #[test]
+    fn deserialize_tuple_struct() {
+        #[derive(Deserialize, Debug)]
+        pub struct MyString(String);
+
+        #[derive(Deserialize, Debug)]
+        pub struct MyThing {
+            my_string: MyString,
+        }
+
+        let value = BoltType::from("Frobnicate");
+        let value = [(BoltString::from("my_string"), value)]
+            .into_iter()
+            .collect::<BoltMap>();
+        let value = BoltType::Map(value);
+
+        let actual = value.to::<MyThing>().unwrap();
+
+        assert_eq!(actual.my_string.0, "Frobnicate");
     }
 }
