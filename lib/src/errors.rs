@@ -1,3 +1,5 @@
+use crate::DeError;
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error)]
@@ -57,7 +59,7 @@ pub enum Error {
     InvalidTypeMarker(String),
 
     #[error("{0}")]
-    DeserializationError(String),
+    DeserializationError(DeError),
 }
 
 impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {

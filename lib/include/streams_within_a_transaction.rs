@@ -2,6 +2,11 @@
     let name = uuid::Uuid::new_v4().to_string();
     let txn = graph.start_txn().await.unwrap();
 
+    #[derive(serde::Deserialize)]
+    struct Person {
+        name: String,
+    }
+
     txn.run_queries(vec![
         query("CREATE (p { name: $name })").param("name", name.clone()),
         query("CREATE (p { name: $name })").param("name", name.clone()),
@@ -15,16 +20,16 @@
         .await
         .unwrap();
     let row = stream_one.next().await.unwrap().unwrap();
-    assert_eq!(row.get::<Node>("p").unwrap().get::<String>("name").unwrap().as_str(), &name);
+    assert_eq!(row.to::<Person>().unwrap().name, name);
 
     //start stream_two
     let mut stream_two = txn.execute(query("RETURN 1")).await.unwrap();
     let row = stream_two.next().await.unwrap().unwrap();
-    assert_eq!(row.get::<i64>("1").unwrap(), 1);
+    assert_eq!(row.to::<i64>().unwrap(), 1);
 
     //stream_one is still active here
     let row = stream_one.next().await.unwrap().unwrap();
-    assert_eq!(row.get::<Node>("p").unwrap().get::<String>("name").unwrap(), name);
+    assert_eq!(row.to::<Person>().unwrap().name, name);
 
     //stream_one completes
     assert!(stream_one.next().await.unwrap().is_none());
