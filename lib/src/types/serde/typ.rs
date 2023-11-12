@@ -28,7 +28,7 @@ use serde::{
         DeserializeSeed, Deserializer, EnumAccess, Error, Expected, IntoDeserializer,
         Unexpected as Unexp, VariantAccess, Visitor,
     },
-    forward_to_deserialize_any, Deserialize,
+    Deserialize,
 };
 
 impl<'de> Deserialize<'de> for BoltType {
@@ -658,10 +658,43 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        match self.value {
+            BoltType::String(_) => self.deserialize_str(visitor),
+            BoltType::Boolean(_) => self.deserialize_bool(visitor),
+            BoltType::Map(_)
+            | BoltType::Node(_)
+            | BoltType::Relation(_)
+            | BoltType::UnboundedRelation(_)
+            | BoltType::Path(_)
+            | BoltType::Point2D(_)
+            | BoltType::Point3D(_) => self.deserialize_map(visitor),
+            BoltType::Null(_) => self.deserialize_unit(visitor),
+            BoltType::Integer(_) => self.deserialize_i64(visitor),
+            BoltType::Float(_) => self.deserialize_f64(visitor),
+            BoltType::List(_) | BoltType::Bytes(_) => self.deserialize_seq(visitor),
+            BoltType::Date(_)
+            | BoltType::Time(_)
+            | BoltType::LocalTime(_)
+            | BoltType::DateTime(_)
+            | BoltType::LocalDateTime(_)
+            | BoltType::DateTimeZoneId(_) => self.deserialize_string(visitor),
+            BoltType::Duration(_) => self.deserialize_newtype_struct("", visitor),
+        }
+    }
+
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
         self.unexpected(visitor)
     }
 
-    forward_to_deserialize_any! { char identifier }
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.unexpected(visitor)
+    }
 
     fn is_human_readable(&self) -> bool {
         true
@@ -2189,5 +2222,38 @@ mod tests {
         let actual = value.to::<MyThing>().unwrap();
 
         assert_eq!(actual.my_string.0, "Frobnicate");
+    }
+
+    #[test]
+    fn deserialize_into_serde_json() {
+        let actual = [
+            ("age".into(), 42.into()),
+            ("awesome".into(), true.into()),
+            ("values".into(), vec![13.37, 42.84].into()),
+            (
+                "nested".into(),
+                BoltType::Map([("key".into(), "value".into())].into_iter().collect()),
+            ),
+            ("payload".into(), b"Hello, World!".as_slice().into()),
+            ("secret".into(), BoltType::Null(BoltNull)),
+        ]
+        .into_iter()
+        .collect::<BoltMap>();
+
+        let actual = BoltType::Map(actual);
+        let actual = actual.to::<serde_json::Value>().unwrap();
+
+        let expected = serde_json::json!({
+            "age": 42,
+            "awesome": true,
+            "values": [13.37, 42.84],
+            "nested": {
+                "key": "value",
+            },
+            "payload": [72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33],
+            "secret": null,
+        });
+
+        assert_eq!(actual, expected);
     }
 }
