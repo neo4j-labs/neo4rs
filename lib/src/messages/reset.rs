@@ -10,6 +10,12 @@ impl Reset {
     }
 }
 
+impl Default for Reset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

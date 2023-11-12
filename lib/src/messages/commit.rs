@@ -10,6 +10,12 @@ impl Commit {
     }
 }
 
+impl Default for Commit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

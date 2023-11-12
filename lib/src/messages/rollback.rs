@@ -10,6 +10,12 @@ impl Rollback {
     }
 }
 
+impl Default for Rollback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
