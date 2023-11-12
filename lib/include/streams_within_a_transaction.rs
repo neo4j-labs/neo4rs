@@ -7,7 +7,7 @@
         name: String,
     }
 
-    txn.run_queries(vec![
+    txn.run_queries([
         query("CREATE (p { name: $name })").param("name", name.clone()),
         query("CREATE (p { name: $name })").param("name", name.clone()),
     ])

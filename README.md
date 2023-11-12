@@ -18,7 +18,7 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## Example
 
-```rust    
+```rust
     // concurrent queries
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
@@ -28,27 +28,26 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
         let graph = graph.clone();
         tokio::spawn(async move {
             let mut result = graph.execute(
-	       query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
-	    ).await.unwrap();
+           query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
+        ).await.unwrap();
             while let Ok(Some(row)) = result.next().await {
-        	let node: Node = row.get("p").unwrap();
-        	let name: String = node.get("name").unwrap();
+            let node: Node = row.get("p").unwrap();
+            let name: String = node.get("name").unwrap();
                 println!("{}", name);
             }
         });
     }
-    
+
     //Transactions
     let mut txn = graph.start_txn().await.unwrap();
-    txn.run_queries(vec![
-        query("CREATE (p:Person {name: 'mark'})"),
-        query("CREATE (p:Person {name: 'jake'})"),
-        query("CREATE (p:Person {name: 'luke'})"),
+    txn.run_queries([
+        "CREATE (p:Person {name: 'mark'})",
+        "CREATE (p:Person {name: 'jake'})",
+        "CREATE (p:Person {name: 'luke'})",
     ])
     .await
     .unwrap();
     txn.commit().await.unwrap(); //or txn.rollback().await.unwrap();
-    
 ```
 
 ## MSRV

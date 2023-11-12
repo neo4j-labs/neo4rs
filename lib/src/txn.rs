@@ -34,9 +34,12 @@ impl Txn {
     }
 
     /// Runs multiple queries one after the other in the same connection
-    pub async fn run_queries(&mut self, queries: Vec<Query>) -> Result<()> {
-        for query in queries.into_iter() {
-            self.run(query).await?;
+    pub async fn run_queries<Q: Into<Query>>(
+        &mut self,
+        queries: impl IntoIterator<Item = Q>,
+    ) -> Result<()> {
+        for query in queries {
+            self.run(query.into()).await?;
         }
         Ok(())
     }
