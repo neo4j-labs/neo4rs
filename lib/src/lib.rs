@@ -22,7 +22,7 @@
 //!    let pass = "neo";
 //!    let id = uuid::Uuid::new_v4().to_string();
 //!
-//!    let graph = std::sync::Arc::new(Graph::new(uri, user, pass).await.unwrap());
+//!    let graph = Graph::new(uri, user, pass).await.unwrap();
 //!
 #![doc = include_str!("../include/example.rs")]
 //! }
@@ -435,7 +435,7 @@ mod txn;
 mod types;
 mod version;
 
-pub use crate::config::{Config, ConfigBuilder};
+pub use crate::config::{Config, ConfigBuilder, Database};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;

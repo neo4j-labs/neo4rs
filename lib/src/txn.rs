@@ -1,4 +1,5 @@
 use crate::{
+    config::Database,
     errors::{unexpected, Result},
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
@@ -11,21 +12,21 @@ use crate::{
 /// When a transation is started, a dedicated connection is resered and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
 pub struct Txn {
-    db: String,
+    db: Database,
     fetch_size: usize,
     connection: ManagedConnection,
 }
 
 impl Txn {
     pub(crate) async fn new(
-        db: &str,
+        db: Database,
         fetch_size: usize,
         mut connection: ManagedConnection,
     ) -> Result<Self> {
-        let begin = BoltRequest::begin(db);
+        let begin = BoltRequest::begin(&db);
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => Ok(Txn {
-                db: db.to_owned(),
+                db,
                 fetch_size,
                 connection,
             }),
