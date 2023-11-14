@@ -446,5 +446,9 @@ pub use crate::types::serde::{
     DeError, EndNodeId, Id, Indices, Keys, Labels, Nodes, Offset, Relationships, StartNodeId,
     Timezone, Type,
 };
-pub use crate::types::{BoltList, BoltMap, BoltString, BoltType};
+pub use crate::types::{
+    BoltBoolean, BoltBytes, BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltFloat,
+    BoltInteger, BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNode, BoltNull, BoltPath,
+    BoltPoint2D, BoltPoint3D, BoltRelation, BoltString, BoltTime, BoltType, BoltUnboundedRelation,
+};
 pub use crate::version::Version;
