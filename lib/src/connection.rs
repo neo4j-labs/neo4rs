@@ -1,9 +1,11 @@
 use crate::{
+    bolt::{from_bytes, ExpectedResponse, Message},
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
 use bytes::{Bytes, BytesMut};
+use serde::de::DeserializeOwned;
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
@@ -120,9 +122,36 @@ impl Connection {
         self.recv().await
     }
 
+    pub(crate) async fn send_recv_as<T: Message + ExpectedResponse>(
+        &mut self,
+        message: T,
+    ) -> Result<T::Response> {
+        self.send_as(message).await?;
+        self.recv_as().await
+    }
+
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
-        let end_marker: [u8; 2] = [0, 0];
         let bytes: Bytes = message.into_bytes(self.version)?;
+        self.send_bytes(bytes).await
+    }
+
+    pub(crate) async fn send_as<T: Message>(&mut self, message: T) -> Result<()> {
+        let bytes = message.to_bytes()?;
+        self.send_bytes(bytes).await
+    }
+
+    pub async fn recv(&mut self) -> Result<BoltResponse> {
+        let bytes = self.recv_bytes().await?;
+        BoltResponse::parse(self.version, bytes)
+    }
+
+    pub async fn recv_as<T: DeserializeOwned>(&mut self) -> Result<T> {
+        let bytes = self.recv_bytes().await?;
+        Ok(from_bytes(bytes)?)
+    }
+
+    async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
+        let end_marker: [u8; 2] = [0, 0];
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
             self.stream.write_all(c).await?;
@@ -132,7 +161,7 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn recv(&mut self) -> Result<BoltResponse> {
+    async fn recv_bytes(&mut self) -> Result<Bytes> {
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {
@@ -144,7 +173,7 @@ impl Connection {
             chunk_size = self.read_chunk_size().await?;
         }
 
-        BoltResponse::parse(self.version, bytes.freeze())
+        Ok(bytes.freeze())
     }
 
     async fn read_chunk_size(&mut self) -> Result<usize> {
