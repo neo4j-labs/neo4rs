@@ -2,9 +2,11 @@ use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
 
 mod packstream;
+mod summary;
 
 use packstream::ser::AsMap;
 pub use packstream::{de, ser};
+pub use summary::{Failure, Success, Summary};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.
