@@ -5,6 +5,9 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 
+#[cfg(feature = "uuid")]
+use uuid::Uuid;
+
 impl<A: TryFrom<BoltType, Error = Error>> TryFrom<BoltType> for Vec<A> {
     type Error = Error;
 
@@ -417,6 +420,27 @@ impl<T: Into<BoltType>> From<Option<T>> for BoltType {
     }
 }
 
+#[cfg(feature = "uuid")]
+impl From<Uuid> for BoltType {
+    fn from(value: Uuid) -> Self {
+        BoltType::String(value.to_string().into())
+    }
+}
+
+#[cfg(feature = "uuid")]
+impl TryFrom<BoltType> for Uuid {
+    type Error = Error;
+    fn try_from(input: BoltType) -> Result<Uuid> {
+        match input {
+            BoltType::String(s) => {
+                Uuid::parse_str(&s.value)
+                    .map_err(|_| Error::ConversionError)
+            },
+            _ => Err(Error::ConversionError),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -520,5 +544,41 @@ mod tests {
         let value: Option<Vec<i64>> = None;
         let value: BoltType = value.into();
         assert_eq!(value, BoltType::Null(BoltNull));
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "uuid")]
+mod uuid_tests {
+    use super::*;
+
+    #[test]
+    fn convert_from_uuid() {
+        let value = Uuid::from_u128(0x9e9ced81aad1423aadf1b56d05893ed4);
+        let value: BoltType = value.into();
+        assert_eq!(
+            value,
+            BoltType::String(BoltString {
+                value: "9e9ced81-aad1-423a-adf1-b56d05893ed4".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn convert_into_uuid() {
+        let value: BoltType = BoltType::String(BoltString {
+            value: "9e9ced81-aad1-423a-adf1-b56d05893ed4".to_string()
+        });
+        let value: Uuid = value.try_into().unwrap();
+        assert_eq!(
+            value,
+            Uuid::from_u128(0x9e9ced81aad1423aadf1b56d05893ed4)
+        );
+
+        let value: BoltType = BoltType::String(BoltString {
+            value: "Absolute rubbish. Utter trash.".to_string()
+        });
+        let value: Result<Uuid, _> = value.try_into();
+        assert!(value.is_err());
     }
 }
