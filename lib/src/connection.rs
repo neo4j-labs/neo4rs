@@ -3,7 +3,7 @@ use crate::{
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
