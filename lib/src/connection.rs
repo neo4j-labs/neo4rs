@@ -3,7 +3,7 @@ use crate::{
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
@@ -154,36 +154,17 @@ impl Connection {
         //     let pos = bytes.len();
         //     bytes.resize(pos + chunk_size, 0);
         //     self.stream.read_exact(&mut bytes[pos..]).await?;
-        //
-        // Alternatively, this an unsafe variant of the following except
-        // it does read extactly `chunk_size` bytes and not maybe more
-        //
-        //     bytes.reserve(chunk_size);
-        //     self.stream.read_buf(&mut bytes).await?;
-
-        buf.reserve(chunk_size);
-        let read = {
-            // shadowing `buf` and the extra block help with
-            // maintaining the safety invariants
-            let buf = buf.chunk_mut();
-            let available = buf.len();
-            assert!(available >= chunk_size);
-
-            // SAFETY:
-            // We are only passing the buffer to `read_buf` which will
-            // never read and never write uninitialized data.
-            let buf = unsafe { buf.as_uninit_slice_mut() };
-            let mut buf = &mut buf[..chunk_size];
-
-            let read = self.stream.read_buf(&mut buf).await?;
-            assert!(read <= chunk_size);
-
-            read
-        };
-
-        // SAFETY: We have asserted to have read `read` bytes into the buffer.
-        unsafe { buf.advance_mut(read) };
-
+        let pos = buf.len();
+        let new_len = pos + chunk_size;
+        // Ensure the buffer has enough capacity
+        if buf.capacity() < new_len {
+            buf.reserve(new_len - buf.capacity());
+        }
+        // Unsafe to set the length of the buffer, but we will fill it with read_exact
+        unsafe {
+            buf.set_len(new_len);
+        }
+        self.stream.read_exact(&mut buf[pos..]).await?;
         Ok(())
     }
 }
