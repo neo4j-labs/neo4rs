@@ -92,3 +92,8 @@ impl Graph {
         q.execute(db, self.config.fetch_size, connection).await
     }
 }
+
+const _: () = {
+    const fn assert_send_sync<T: ?Sized + Send + Sync>() {}
+    assert_send_sync::<Graph>();
+};

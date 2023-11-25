@@ -79,6 +79,11 @@ impl Txn {
     }
 }
 
+const _: () = {
+    const fn assert_send_sync<T: ?Sized + Send + Sync>() {}
+    assert_send_sync::<Txn>();
+};
+
 pub trait TransactionHandle: private::Handle {}
 
 impl TransactionHandle for Txn {}
