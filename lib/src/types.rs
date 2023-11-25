@@ -68,11 +68,10 @@ pub enum BoltType {
 
 impl Display for BoltType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            BoltType::String(s) => s.to_string(),
-            _ => "to_string not implemented".to_owned(),
-        };
-        write!(f, "{}", value)
+        match self {
+            BoltType::String(s) => f.write_str(&s.value),
+            _ => f.write_str("to_string not implemented"),
+        }
     }
 }
 
