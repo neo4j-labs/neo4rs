@@ -1,9 +1,9 @@
 use lenient_semver::Version;
-use neo4j_testcontainers::{Neo4j, Neo4jImage};
 use neo4rs::{ConfigBuilder, Graph};
-use testcontainers::{clients::Cli, Container};
+use testcontainers::{clients::Cli, Container, RunnableImage};
+use testcontainers_modules::neo4j::{Neo4j, Neo4jImage};
 
-use std::error::Error;
+use std::{error::Error, io::BufRead as _};
 
 #[allow(dead_code)]
 #[derive(Default)]
@@ -60,21 +60,19 @@ impl Neo4jContainer {
     ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
         let _ = pretty_env_logger::try_init();
 
+        let connection = Self::create_test_endpoint();
         let server = Self::server_from_env();
 
-        let (connection, _container) = match server {
+        let (uri, _container) = match server {
             TestServer::TestContainer => {
-                let (connection, container) = Self::create_testcontainer(enterprise_edition)?;
-                (connection, Some(container))
+                let (uri, container) = Self::create_testcontainer(&connection, enterprise_edition)?;
+                (uri, Some(container))
             }
-            TestServer::External(uri) => {
-                let connection = Self::create_test_endpoint(uri);
-                (connection, None)
-            }
+            TestServer::External(uri) => (uri, None),
         };
 
         let version = connection.version;
-        let graph = Self::connect(config, connection.uri, &connection.auth).await;
+        let graph = Self::connect(config, uri, &connection.auth).await;
         Ok(Self {
             graph,
             version,
@@ -105,39 +103,62 @@ impl Neo4jContainer {
     }
 
     fn create_testcontainer(
+        connection: &TestConnection,
         enterprise: bool,
-    ) -> Result<
-        (TestConnection, Container<'static, Neo4jImage>),
-        Box<dyn Error + Send + Sync + 'static>,
-    > {
-        let image = Neo4j::default();
-        let image = if enterprise {
-            image.with_enterprise_edition()?
-        } else {
-            image
-        };
+    ) -> Result<(String, Container<'static, Neo4jImage>), Box<dyn Error + Send + Sync + 'static>>
+    {
+        let image = Neo4j::new()
+            .with_user(connection.auth.user.to_owned())
+            .with_password(connection.auth.pass.to_owned());
 
         let docker = Cli::default();
         let docker = Box::leak(Box::new(docker));
 
-        let container = docker.run(image);
+        let container = if enterprise {
+            const ACCEPTANCE_FILE_NAME: &str = "container-license-acceptance.txt";
 
-        let uri = container.image().bolt_uri_ipv4();
-        let version = container.image().version().to_owned();
-        let user = container.image().user().expect("default user").to_owned();
-        let pass = container
-            .image()
-            .password()
-            .expect("default password")
-            .to_owned();
-        let auth = TestAuth { user, pass };
+            let version = format!("{}-enterprise", connection.version);
+            let image_name = format!("neo4j:{}", version);
 
-        let connection = TestConnection { uri, version, auth };
+            let acceptance_file = std::env::current_dir()
+                .ok()
+                .map(|o| o.join(ACCEPTANCE_FILE_NAME));
 
-        Ok((connection, container))
+            let has_license_acceptance = acceptance_file
+                .as_deref()
+                .and_then(|o| std::fs::File::open(o).ok())
+                .into_iter()
+                .flat_map(|o| std::io::BufReader::new(o).lines())
+                .any(|o| o.map_or(false, |line| line.trim() == image_name));
+
+            if !has_license_acceptance {
+                return Err(format!(
+                    concat!(
+                        "You need to accept the Neo4j Enterprise Edition license by ",
+                        "creating the file `{}` with the following content:\n\n\t{}",
+                    ),
+                    acceptance_file.map_or_else(
+                        || ACCEPTANCE_FILE_NAME.to_owned(),
+                        |o| { o.display().to_string() }
+                    ),
+                    image_name
+                )
+                .into());
+            }
+            let image: RunnableImage<Neo4jImage> = image.with_version(version).into();
+            let image = image.with_env_var(("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes"));
+
+            docker.run(image)
+        } else {
+            docker.run(image.with_version(connection.version.to_owned()))
+        };
+
+        let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4());
+
+        Ok((uri, container))
     }
 
-    fn create_test_endpoint(uri: String) -> TestConnection {
+    fn create_test_endpoint() -> TestConnection {
         const USER_VAR: &str = "NEO4J_TEST_USER";
         const PASS_VAR: &str = "NEO4J_TEST_PASS";
         const VERSION_VAR: &str = "NEO4J_VERSION_TAG";
@@ -153,7 +174,7 @@ impl Neo4jContainer {
         let auth = TestAuth { user, pass };
         let version = var(VERSION_VAR).unwrap_or_else(|_| DEFAULT_VERSION_TAG.to_owned());
 
-        TestConnection { uri, auth, version }
+        TestConnection { auth, version }
     }
 
     async fn connect(config: ConfigBuilder, uri: String, auth: &TestAuth) -> Graph {
@@ -174,7 +195,6 @@ struct TestAuth {
 }
 
 struct TestConnection {
-    uri: String,
     version: String,
     auth: TestAuth,
 }
