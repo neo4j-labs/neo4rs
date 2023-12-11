@@ -9,9 +9,11 @@ pub(super) struct Serializer {
 
 impl Serializer {
     pub(super) fn empty() -> Self {
-        Self {
-            bytes: BytesMut::new(),
-        }
+        Self::new(BytesMut::new())
+    }
+
+    pub(super) fn new(bytes: BytesMut) -> Self {
+        Self { bytes }
     }
 
     pub(super) fn end(self) -> Bytes {

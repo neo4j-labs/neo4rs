@@ -6,6 +6,7 @@ mod packstream;
 pub use packstream::{de, from_bytes, ser, to_bytes};
 
 pub(crate) trait Message: Serialize {
+    /// Serialize this type into a packstream encoded byte slice.
     fn to_bytes(&self) -> Result<Bytes, ser::Error>;
 }
 
@@ -16,6 +17,7 @@ impl<T: Serialize> Message for T {
 }
 
 pub(crate) trait MessageResponse: DeserializeOwned {
+    /// Deserialize this type from a packstream encoded byte slice.
     fn parse(bytes: Bytes) -> Result<Self, de::Error>;
 }
 
