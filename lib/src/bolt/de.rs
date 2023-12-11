@@ -1,5 +1,8 @@
-use std::fmt;
-use std::marker::PhantomData;
+use std::{
+    fmt,
+    marker::PhantomData,
+    ops::{BitOr, BitOrAssign},
+};
 
 use bytes::{Buf, Bytes};
 use serde::{
@@ -19,7 +22,7 @@ impl<'a: 'de, 'de> de::Deserializer<'de> for Deserializer<'a> {
 
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 str
-        string newtype_struct seq tuple tuple_struct ignored_any
+        string newtype_struct tuple_struct ignored_any
         map unit_struct struct enum identifier
     }
 
@@ -27,7 +30,21 @@ impl<'a: 'de, 'de> de::Deserializer<'de> for Deserializer<'a> {
     where
         V: Visitor<'de>,
     {
-        self.parse_next_item(BytesVisitation::SeqOfU8, visitor)
+        self.parse_next_item(Visitation::default(), visitor)
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.parse_next_item(Visitation::MAP_AS_SEQ, visitor)
+    }
+
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_seq(ItemsParser::new(len, self.bytes))
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -83,7 +100,7 @@ impl<'a: 'de, 'de> de::Deserializer<'de> for Deserializer<'a> {
     where
         V: Visitor<'de>,
     {
-        self.parse_next_item(BytesVisitation::Bytes, visitor)
+        self.parse_next_item(Visitation::BYTES_AS_BYTES, visitor)
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -126,18 +143,18 @@ impl<'de> Deserializer<'de> {
 
     fn parse_next_item<V: Visitor<'de>>(
         self,
-        bv: BytesVisitation,
+        v: Visitation,
         visitor: V,
     ) -> Result<V::Value, Error> {
         if self.bytes.is_empty() {
             return Err(Error::Empty);
         }
 
-        Self::parse(bv, self.bytes, visitor)
+        Self::parse(v, self.bytes, visitor)
     }
 
     fn parse<V: Visitor<'de>>(
-        bv: BytesVisitation,
+        v: Visitation,
         bytes: &mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
@@ -148,7 +165,7 @@ impl<'de> Deserializer<'de> {
         match hi {
             0x8 => Self::parse_string(lo as _, bytes, visitor),
             0x9 => Self::parse_list(lo as _, bytes, visitor),
-            0xA => Self::parse_map(lo as _, bytes, visitor),
+            0xA => Self::parse_map(v, lo as _, bytes, visitor),
             0xB => Self::parse_struct(lo as _, bytes, visitor),
             0xC => match lo {
                 0x0 => visitor.visit_unit(),
@@ -159,9 +176,9 @@ impl<'de> Deserializer<'de> {
                 0x9 => visitor.visit_i16(bytes.get_i16()),
                 0xA => visitor.visit_i32(bytes.get_i32()),
                 0xB => visitor.visit_i64(bytes.get_i64()),
-                0xC => Self::parse_bytes(bv, bytes.get_u8() as _, bytes, visitor),
-                0xD => Self::parse_bytes(bv, bytes.get_u16() as _, bytes, visitor),
-                0xE => Self::parse_bytes(bv, bytes.get_u32() as _, bytes, visitor),
+                0xC => Self::parse_bytes(v, bytes.get_u8() as _, bytes, visitor),
+                0xD => Self::parse_bytes(v, bytes.get_u16() as _, bytes, visitor),
+                0xE => Self::parse_bytes(v, bytes.get_u32() as _, bytes, visitor),
                 _ => Err(Error::UnknownMarker(marker)),
             },
             0xD => match lo {
@@ -171,9 +188,9 @@ impl<'de> Deserializer<'de> {
                 0x4 => Self::parse_list(bytes.get_u8() as _, bytes, visitor),
                 0x5 => Self::parse_list(bytes.get_u16() as _, bytes, visitor),
                 0x6 => Self::parse_list(bytes.get_u32() as _, bytes, visitor),
-                0x8 => Self::parse_map(bytes.get_u8() as _, bytes, visitor),
-                0x9 => Self::parse_map(bytes.get_u16() as _, bytes, visitor),
-                0xA => Self::parse_map(bytes.get_u32() as _, bytes, visitor),
+                0x8 => Self::parse_map(v, bytes.get_u8() as _, bytes, visitor),
+                0x9 => Self::parse_map(v, bytes.get_u16() as _, bytes, visitor),
+                0xA => Self::parse_map(v, bytes.get_u32() as _, bytes, visitor),
                 // C, D => struct 8/16
                 _ => Err(Error::UnknownMarker(marker)),
             },
@@ -183,7 +200,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bytes<V: Visitor<'de>>(
-        bv: BytesVisitation,
+        v: Visitation,
         len: usize,
         bytes: &mut Bytes,
         visitor: V,
@@ -191,9 +208,10 @@ impl<'de> Deserializer<'de> {
         debug_assert!(bytes.len() >= len);
 
         let bytes = bytes.split_to(len);
-        match bv {
-            BytesVisitation::SeqOfU8 => visitor.visit_seq(SeqDeserializer::new(bytes.into_iter())),
-            BytesVisitation::Bytes => visitor.visit_bytes(&bytes),
+        if v.visit_bytes_as_bytes() {
+            visitor.visit_bytes(&bytes)
+        } else {
+            visitor.visit_seq(SeqDeserializer::new(bytes.into_iter()))
         }
     }
 
@@ -221,11 +239,16 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_map<V: Visitor<'de>>(
+        v: Visitation,
         len: usize,
         bytes: &mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
-        visitor.visit_map(ItemsParser::new(len, bytes))
+        if v.visit_map_as_seq() {
+            visitor.visit_seq(ItemsParser::new(len, bytes))
+        } else {
+            visitor.visit_map(ItemsParser::new(len, bytes))
+        }
     }
 
     fn parse_struct<V: Visitor<'de>>(
@@ -411,9 +434,34 @@ impl<'a, 'de> EnumAccess<'de> for StructParser<'a> {
     }
 }
 
-enum BytesVisitation {
-    SeqOfU8,
-    Bytes,
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+struct Visitation(u8);
+
+impl Visitation {
+    const BYTES_AS_BYTES: Self = Self(1);
+    const MAP_AS_SEQ: Self = Self(2);
+
+    fn visit_bytes_as_bytes(self) -> bool {
+        self.0 & Self::BYTES_AS_BYTES.0 != 0
+    }
+
+    fn visit_map_as_seq(self) -> bool {
+        self.0 & Self::MAP_AS_SEQ.0 != 0
+    }
+}
+
+impl BitOr for Visitation {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for Visitation {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
 }
 
 struct SharedBytes<'a> {
@@ -456,15 +504,5 @@ impl de::Error for Error {
         T: fmt::Display,
     {
         Self::DeserializationError(msg.to_string())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-
-    #[test]
-    fn test_name() {
-        // TODO: test serde token stuff
     }
 }
