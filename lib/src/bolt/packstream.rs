@@ -37,6 +37,181 @@ where
 }
 
 #[cfg(test)]
+pub mod value {
+    use bytes::{BufMut, Bytes, BytesMut};
+
+    pub fn bolt() -> BoltBytesBuilder {
+        BoltBytesBuilder::new()
+    }
+
+    pub struct BoltBytesBuilder {
+        data: BytesMut,
+    }
+
+    #[allow(unused)]
+    impl BoltBytesBuilder {
+        pub fn new() -> Self {
+            Self {
+                data: BytesMut::new(),
+            }
+        }
+
+        pub fn null(mut self) -> Self {
+            self.data.put_u8(0xC0);
+            self
+        }
+
+        pub fn bool(mut self, value: bool) -> Self {
+            self.data.put_u8(if value { 0xC3 } else { 0xC2 });
+            self
+        }
+
+        pub fn tiny_int(mut self, value: i8) -> Self {
+            self.data.put_i8(value);
+            self
+        }
+
+        pub fn int8(mut self, value: i8) -> Self {
+            self.data.put_u8(0xC8);
+            self.data.put_i8(value);
+            self
+        }
+
+        pub fn int16(mut self, value: i16) -> Self {
+            self.data.put_u8(0xC9);
+            self.data.put_i16(value);
+            self
+        }
+
+        pub fn int32(mut self, value: i32) -> Self {
+            self.data.put_u8(0xCA);
+            self.data.put_i32(value);
+            self
+        }
+
+        pub fn int64(mut self, value: i64) -> Self {
+            self.data.put_u8(0xCB);
+            self.data.put_i64(value);
+            self
+        }
+
+        pub fn float(mut self, value: f64) -> Self {
+            self.data.put_u8(0xC1);
+            self.data.put_f64(value);
+            self
+        }
+
+        pub fn bytes8(mut self, len: u8, value: &[u8]) -> Self {
+            self.data.put_u8(0xCC);
+            self.data.put_u8(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn bytes16(mut self, len: u16, value: &[u8]) -> Self {
+            self.data.put_u8(0xCD);
+            self.data.put_u16(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn bytes32(mut self, len: u32, value: &[u8]) -> Self {
+            self.data.put_u8(0xCE);
+            self.data.put_u32(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn tiny_string(mut self, value: &str) -> Self {
+            assert!(value.len() <= 15);
+            self.data.put_u8(0x80 | value.len() as u8);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string8(mut self, value: &str) -> Self {
+            assert!(value.len() <= 255);
+            self.data.put_u8(0xD0);
+            self.data.put_u8(value.len() as u8);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string16(mut self, value: &str) -> Self {
+            assert!(value.len() <= 65535);
+            self.data.put_u8(0xD1);
+            self.data.put_u16(value.len() as u16);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string32(mut self, value: &str) -> Self {
+            assert!(value.len() <= 2147483647);
+            self.data.put_u8(0xD2);
+            self.data.put_u32(value.len() as u32);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn tiny_list(mut self, len: u8) -> Self {
+            self.data.put_u8(0x90 | len);
+            self
+        }
+
+        pub fn list8(mut self, len: u8) -> Self {
+            self.data.put_u8(0xD4);
+            self.data.put_u8(len);
+            self
+        }
+
+        pub fn list16(mut self, len: u16) -> Self {
+            self.data.put_u8(0xD5);
+            self.data.put_u16(len);
+            self
+        }
+
+        pub fn list32(mut self, len: u32) -> Self {
+            self.data.put_u8(0xD6);
+            self.data.put_u32(len);
+            self
+        }
+
+        pub fn tiny_map(mut self, len: u8) -> Self {
+            self.data.put_u8(0xA0 | len);
+            self
+        }
+
+        pub fn map8(mut self, len: u8) -> Self {
+            self.data.put_u8(0xD8);
+            self.data.put_u8(len);
+            self
+        }
+
+        pub fn map16(mut self, len: u16) -> Self {
+            self.data.put_u8(0xD9);
+            self.data.put_u16(len);
+            self
+        }
+
+        pub fn map32(mut self, len: u32) -> Self {
+            self.data.put_u8(0xDA);
+            self.data.put_u32(len);
+            self
+        }
+
+        pub fn structure(mut self, len: u8, tag: u8) -> Self {
+            self.data.put_u8(0xB0 | len);
+            self.data.put_u8(tag);
+            self
+        }
+
+        pub fn build(self) -> Bytes {
+            self.data.freeze()
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, fmt::Debug};
 
