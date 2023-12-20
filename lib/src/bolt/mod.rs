@@ -3,6 +3,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 mod packstream;
 
+use packstream::ser::AsMap;
 pub use packstream::{de, ser};
 
 pub(crate) trait Message: Serialize {
