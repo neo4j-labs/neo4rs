@@ -11,11 +11,14 @@ pub fn from_bytes<T>(mut bytes: Bytes) -> Result<T, de::Error>
 where
     T: DeserializeOwned,
 {
-    from_bytes_ref(&mut bytes)
+    let de = de::Deserializer::new(&mut bytes);
+    let value = T::deserialize(de)?;
+
+    Ok(value)
 }
 
 /// Parse and deserialize a packstream value from the given bytes.
-pub fn from_bytes_ref<'de, T>(bytes: &'de mut Bytes) -> Result<T, de::Error>
+pub fn from_bytes_ref<'de, T: 'de>(bytes: &'de mut Bytes) -> Result<T, de::Error>
 where
     T: Deserialize<'de>,
 {

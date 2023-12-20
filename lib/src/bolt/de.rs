@@ -155,7 +155,7 @@ impl<'de> Deserializer<'de> {
 
     fn parse<V: Visitor<'de>>(
         v: Visitation,
-        bytes: &mut Bytes,
+        bytes: &'de mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
         let marker = bytes.get_u8();
@@ -202,14 +202,15 @@ impl<'de> Deserializer<'de> {
     fn parse_bytes<V: Visitor<'de>>(
         v: Visitation,
         len: usize,
-        bytes: &mut Bytes,
+        bytes: &'de mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
         debug_assert!(bytes.len() >= len);
 
         let bytes = bytes.split_to(len);
         if v.visit_bytes_as_bytes() {
-            visitor.visit_bytes(&bytes)
+            let bytes: &'de [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
+            visitor.visit_borrowed_bytes(bytes)
         } else {
             visitor.visit_seq(SeqDeserializer::new(bytes.into_iter()))
         }
@@ -217,15 +218,16 @@ impl<'de> Deserializer<'de> {
 
     fn parse_string<V: Visitor<'de>>(
         len: usize,
-        bytes: &mut Bytes,
+        bytes: &'de mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
         debug_assert!(bytes.len() >= len);
 
         let bytes = bytes.split_to(len);
+        let bytes: &'de [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
 
-        match std::str::from_utf8(&bytes) {
-            Ok(s) => visitor.visit_str(s),
+        match std::str::from_utf8(bytes) {
+            Ok(s) => visitor.visit_borrowed_str(s),
             Err(e) => Err(Error::InvalidUtf8(e)),
         }
     }

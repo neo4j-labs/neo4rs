@@ -16,7 +16,7 @@ impl<T: Serialize> Message for T {
     }
 }
 
-pub(crate) trait MessageResponse: DeserializeOwned {
+pub(crate) trait MessageResponse: Sized {
     /// Deserialize this type from a packstream encoded byte slice.
     fn parse(bytes: Bytes) -> Result<Self, de::Error>;
 }
