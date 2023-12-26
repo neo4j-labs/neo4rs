@@ -13,9 +13,7 @@ async fn missing_properties() {
         .execute(query("CREATE (ts:TestStruct {a: $a}) RETURN ts").param("a", a_val))
         .await
         .unwrap();
-    let Ok(Some(row)) = result.next().await else {
-        panic!()
-    };
+    let row = result.next().await.unwrap().unwrap();
     let expected = StructWithOption { a: None, b: None };
 
     let test_struct: StructWithOption = row.to().unwrap();
