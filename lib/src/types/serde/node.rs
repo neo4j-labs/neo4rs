@@ -279,6 +279,35 @@ mod tests {
     }
 
     #[test]
+    fn extract_missing_properties_with_option() {
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            favorite_rust_crate: Option<String>,
+        }
+
+        test_extract_node(Person {
+            favorite_rust_crate: None,
+        });
+    }
+
+    #[test]
+    fn extract_missing_properties_with_default() {
+        fn favorite_rust_crate() -> String {
+            "graph".to_owned()
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+        struct Person {
+            #[serde(default = "favorite_rust_crate")]
+            favorite_rust_crate: String,
+        }
+
+        let node = test_node();
+        let actual = node.to::<Person>().unwrap_err();
+        assert!(matches!(actual, DeError::PropertyMissingButRequired));
+    }
+
+    #[test]
     fn extract_node_id() {
         test_extract_node_extra(Id(1337));
     }

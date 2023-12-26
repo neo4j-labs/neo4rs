@@ -338,18 +338,23 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
         visitor.visit_unit()
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_none()
+    }
+
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option seq tuple map enum identifier
+        bytes byte_buf seq tuple map enum identifier
     }
 
     fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        Err(DeError::custom(
-            "deserializing additional data requires a struct",
-        ))
+        Err(DeError::PropertyMissingButRequired)
     }
 }
 
@@ -499,6 +504,7 @@ impl<'de> IntoDeserializer<'de, DeError> for BorrowedStr<'de> {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 enum AdditionalData<'de, T> {
     Property(&'de BoltType),
     Element(T),
