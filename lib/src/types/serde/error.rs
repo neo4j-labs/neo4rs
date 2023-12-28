@@ -54,6 +54,15 @@ pub enum DeError {
     #[error("The property does not exist")]
     NoSuchProperty,
 
+    #[error(
+        "The property is missing but the deserializer still expects a value. \
+        If you have an optional property with a default value, you need to \
+        use an Option<T> instead (the default attribute does not work in \
+        this particular instance). If you meant to extract additional data \
+        other than properties, you need to use the appropriate struct wrapper."
+    )]
+    PropertyMissingButRequired,
+
     #[error("{0}")]
     Other(String),
 
