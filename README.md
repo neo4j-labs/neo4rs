@@ -58,6 +58,15 @@ A change in the MSRV in *not* considered a breaking change.
 For versions past 1.0.0, a change in the MSRV can be done in a minor version increment (1.1.3 -> 1.2.0)
 for versions before 1.0.0, a change in the MSRV can be done in a patch version increment (0.1.3 -> 0.1.4).
 
+## Implementation progress
+
+> [!IMPORTANT]
+> This driver is a work in progress, and not all features are implemented yet.
+
+Only Bolt versions 4.0 and 4.1 are supported.
+Support for later versions is planned and in progress.
+
+This means, that certain features like bookmarks or element IDs are not supported yet.
 
 ## Development
 
