@@ -1,5 +1,5 @@
 use crate::{
-    errors::{unexpected, Result},
+    errors::Result,
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
     stream::{DetachedRowStream, RowStream},
@@ -47,9 +47,9 @@ impl Query {
         match connection.send_recv(run).await? {
             BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
                 BoltResponse::Success(_) => Ok(()),
-                msg => Err(unexpected(msg, "DISCARD")),
+                otherwise => Err(otherwise.into_error("DISCARD")),
             },
-            msg => Err(unexpected(msg, "RUN")),
+            msg => Err(msg.into_error("RUN")),
         }
     }
 
@@ -76,7 +76,8 @@ impl Query {
                 let qid: i64 = success.get("qid").unwrap_or(-1);
                 Ok(RowStream::new(qid, fields, fetch_size))
             }
-            msg => Err(unexpected(msg, "RUN")),
+            Ok(msg) => Err(msg.into_error("RUN")),
+            Err(e) => Err(e),
         }
     }
 }

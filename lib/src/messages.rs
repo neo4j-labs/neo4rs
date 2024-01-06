@@ -123,4 +123,15 @@ impl BoltResponse {
             response
         )))
     }
+
+    pub fn into_error(self, msg: &'static str) -> Error {
+        match self {
+            BoltResponse::Failure(failure) => Error::Failure {
+                code: failure.code().to_string(),
+                message: failure.message().to_string(),
+                msg,
+            },
+            _ => Error::UnexpectedMessage(format!("unexpected response for {}: {:?}", msg, self)),
+        }
+    }
 }

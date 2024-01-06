@@ -1,5 +1,5 @@
 use crate::{
-    errors::{unexpected, Error, Result},
+    errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
     row::Row,
@@ -78,7 +78,8 @@ impl RowStream {
                             let row = Row::new(self.fields.clone(), record.data);
                             self.buffer.push_back(row);
                         }
-                        msg => return Err(unexpected(msg, "PULL")),
+                        Ok(msg) => return Err(msg.into_error("PULL")),
+                        Err(e) => return Err(e),
                     }
                 }
                 State::Buffered => {

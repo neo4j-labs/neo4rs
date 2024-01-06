@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::FixedOffset;
-pub use error::{DeError, Unexpected};
+pub use error::DeError;
 pub use kind::BoltKind;
 
 mod builder;

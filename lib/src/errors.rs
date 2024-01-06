@@ -40,6 +40,13 @@ pub enum Error {
     #[error("{0}")]
     UnsupportedVersion(String),
 
+    #[error("FAILURE response to {msg} [{code}]: {message}")]
+    Failure {
+        code: String,
+        message: String,
+        msg: &'static str,
+    },
+
     #[error("{0}")]
     UnexpectedMessage(String),
 
@@ -78,11 +85,4 @@ impl std::convert::From<deadpool::managed::BuildError<Error>> for Error {
             _ => Error::ConnectionError,
         }
     }
-}
-
-pub fn unexpected<T: std::fmt::Debug>(response: T, request: &str) -> Error {
-    Error::UnexpectedMessage(format!(
-        "unexpected response for {}: {:?}",
-        request, response
-    ))
 }

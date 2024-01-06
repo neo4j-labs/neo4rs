@@ -1,6 +1,6 @@
 use crate::{
     config::Database,
-    errors::{unexpected, Result},
+    errors::Result,
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
     query::Query,
@@ -30,7 +30,7 @@ impl Txn {
                 fetch_size,
                 connection,
             }),
-            msg => Err(unexpected(msg, "BEGIN")),
+            msg => Err(msg.into_error("BEGIN")),
         }
     }
 
@@ -61,7 +61,7 @@ impl Txn {
         let commit = BoltRequest::commit();
         match self.connection.send_recv(commit).await? {
             BoltResponse::Success(_) => Ok(()),
-            msg => Err(unexpected(msg, "COMMIT")),
+            msg => Err(msg.into_error("COMMIT")),
         }
     }
 
@@ -70,7 +70,7 @@ impl Txn {
         let rollback = BoltRequest::rollback();
         match self.connection.send_recv(rollback).await? {
             BoltResponse::Success(_) => Ok(()),
-            msg => Err(unexpected(msg, "ROLLBACK")),
+            msg => Err(msg.into_error("ROLLBACK")),
         }
     }
 

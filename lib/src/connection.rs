@@ -1,5 +1,5 @@
 use crate::{
-    errors::{unexpected, Error, Result},
+    errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
@@ -99,15 +99,19 @@ impl Connection {
             BoltResponse::Failure(msg) => {
                 Err(Error::AuthenticationError(msg.get("message").unwrap()))
             }
-
-            msg => Err(unexpected(msg, "HELLO")),
+            msg => Err(msg.into_error("HELLO")),
         }
     }
 
     pub async fn reset(&mut self) -> Result<()> {
         match self.send_recv(BoltRequest::reset()).await? {
             BoltResponse::Success(_) => Ok(()),
-            msg => Err(unexpected(msg, "RESET")),
+            BoltResponse::Failure(f) => Err(Error::Failure {
+                code: f.code().into(),
+                message: f.message().into(),
+                msg: "RESET",
+            }),
+            msg => Err(msg.into_error("RESET")),
         }
     }
 

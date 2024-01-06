@@ -15,6 +15,14 @@ impl Failure {
     {
         self.metadata.get::<T>(key)
     }
+
+    pub fn code(&self) -> &str {
+        self.get("code").unwrap()
+    }
+
+    pub fn message(&self) -> &str {
+        self.get("message").unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -40,12 +48,9 @@ mod tests {
 
         let failure: Failure = Failure::parse(Version::V4_1, &mut data).unwrap();
 
+        assert_eq!(failure.code(), "Neo.ClientError.Security.Unauthorized");
         assert_eq!(
-            failure.get::<String>("code").unwrap(),
-            "Neo.ClientError.Security.Unauthorized"
-        );
-        assert_eq!(
-            failure.get::<String>("message").unwrap(),
+            failure.message(),
             "The client is unauthorized due to authentication failure."
         );
     }
