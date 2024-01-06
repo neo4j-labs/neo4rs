@@ -37,8 +37,14 @@ pub enum Error {
     #[error("invalid config")]
     InvalidConfig,
 
-    #[error("{0}")]
-    UnsupportedVersion(String),
+    #[error("Bolt Version {0}.{1} is not supported")]
+    UnsupportedVersion(u8, u8),
+
+    #[error(
+        "Protocol mismatch: Expected a Bolt version as response, \
+             got {0:08x} instead (maybe you connected to the HTTP port?)"
+    )]
+    ProtocolMismatch(u32),
 
     #[error("FAILURE response to {msg} [{code}]: {message}")]
     Failure {
