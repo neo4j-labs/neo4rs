@@ -22,10 +22,8 @@ async fn txn_changes_db() {
 
     let mut txn = graph.start_txn_on("system").await.unwrap();
     txn.run_queries([
-        "CREATE DATABASE deebee",
+        "CREATE DATABASE deebee IF NOT EXISTS",
         "START DATABASE deebee",
-        "STOP DATABASE neo4j",
-        "DROP DATABASE neo4j",
     ])
     .await
     .unwrap();
@@ -33,22 +31,31 @@ async fn txn_changes_db() {
 
     #[derive(Deserialize)]
     struct Database {
-        name: String,
+        database: String,
     }
 
     let mut txn = graph.start_txn().await.unwrap();
-    let databases = txn.execute(query("SHOW DATABASES")).await.unwrap();
+    let databases = txn
+        .execute(
+            query(concat!(
+                "SHOW TRANSACTIONS YIELD * WHERE username = $username AND currentQuery ",
+                "STARTS WITH $query AND currentQueryStatus = $status RETURN database"
+            ))
+            .param("username", "neo4j")
+            .param("query", "SHOW TRANSACTIONS YIELD ")
+            .param("status", "running"),
+        )
+        .await
+        .unwrap();
 
-    let mut names = databases
+    let names = databases
         .into_stream_as::<Database>(txn.handle())
-        .map_ok(|db| db.name)
+        .map_ok(|db| db.database)
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
-    names.sort();
-
-    assert_eq!(names, vec!["deebee", "system"]);
+    assert_eq!(names, vec!["deebee"]);
 
     txn.commit().await.unwrap();
 }
