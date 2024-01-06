@@ -115,10 +115,7 @@ mod tests {
             0xB2, 0x54, 0xCB, 0x00, 0x00, 0x17, 0x5D, 0x2F, 0xB8, 0x3A, 0x64, 0xC9, 0x1C, 0x20,
         ]);
 
-        let (time, offset) = BoltTime::parse(Version::V4_1, &mut bytes)
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let (time, offset) = BoltTime::parse(Version::V4_1, &mut bytes).unwrap().into();
 
         assert_eq!(time.to_string(), "07:08:09.000000100");
         assert_eq!(offset, FixedOffset::east_opt(2 * 3600).unwrap());
@@ -146,8 +143,7 @@ mod tests {
 
         let time: NaiveTime = BoltLocalTime::parse(Version::V4_1, &mut bytes)
             .unwrap()
-            .try_into()
-            .unwrap();
+            .into();
 
         assert_eq!(time.to_string(), "07:08:09.000000100");
     }
