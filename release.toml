@@ -1,6 +1,6 @@
 publish = false
 shared-version = true
 consolidate-commits = false
-pre-release-commit-message = "Release {{version}}"
+pre-release-commit-message = "Set version to {{version}}"
 tag-message = "Release {{crate_name}} {{version}}"
 pre-release-hook = [ "cargo", "xtask", "msrv", "min" ]
