@@ -18,7 +18,7 @@ fn derive_impl(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
 
     let attr = ast
         .attrs
-        .get(0)
+        .first()
         .ok_or_else(|| syn::Error::new_spanned(&ast, "Missing #[signature]"))?;
 
     let signature = Signature::try_from(attr)?;
