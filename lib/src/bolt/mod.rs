@@ -6,7 +6,7 @@ mod summary;
 
 use packstream::ser::AsMap;
 pub use packstream::{de, ser};
-pub use summary::{Failure, Success, Summary};
+pub use summary::{Failure, Streaming, StreamingSummary, Success, Summary};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.
