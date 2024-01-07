@@ -467,7 +467,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                 let dtz = dtz.try_to_chrono().map_err(|_| {
                     Error::custom("Could not convert Neo4j DateTimeZoneId into chrono::DateTime")
                 })?;
-                let value = match dbg!(std::any::type_name::<V>()) {
+                let value = match std::any::type_name::<V>() {
                     "chrono::naive::datetime::serde::NaiveDateTimeVisitor" => {
                         format!("{:?}", dtz.naive_local())
                     }
@@ -728,10 +728,7 @@ impl<'de> BoltTypeDeserializer<'de> {
                     Some("MicroSecondsTimestampVisitor") => ldt.timestamp_micros(),
                     Some("MilliSecondsTimestampVisitor") => ldt.timestamp_millis(),
                     Some("SecondsTimestampVisitor") => ldt.timestamp(),
-                    otherwise => {
-                        dbg!(otherwise);
-                        ldt.timestamp_nanos()
-                    }
+                    _ => ldt.timestamp_nanos(),
                 },
                 Err(_) => return Err(DeError::DateTimeOutOfBounds(std::any::type_name::<T>())),
             },
