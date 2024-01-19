@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
 
+mod detail;
 mod packstream;
 mod summary;
 
