@@ -218,6 +218,8 @@ pub mod value {
 mod tests {
     use std::{collections::BTreeMap, fmt::Debug};
 
+    use crate::bolt::packstream::value::bolt;
+
     use super::*;
 
     use serde::{Deserialize, Serialize};
@@ -319,6 +321,18 @@ mod tests {
     #[test_case(&[0xD4, 0x28, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28], (1..=40).collect(); "list_3")]
     fn list(input: &'static [u8], expected: Vec<i64>) {
         roundtrip(input, expected)
+    }
+
+    #[test]
+    fn tuple1() {
+        let input = bolt().tiny_list(1).tiny_int(42).build();
+        roundtrip(&input, (42,))
+    }
+
+    #[test]
+    fn tuple2() {
+        let input = bolt().tiny_list(2).tiny_int(42).tiny_string("1337").build();
+        roundtrip(&input, (42, "1337".to_owned()))
     }
 
     #[test_case(&[0xA0], BTreeMap::new(); "empty")]
