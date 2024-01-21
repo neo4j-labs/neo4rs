@@ -277,9 +277,10 @@ mod tests {
 
         let success = Summary::<()>::parse(data).unwrap();
 
-        let Summary::Success(Success { metadata: () }) = success else {
-            panic!("Expected success");
-        };
+        match success {
+            Summary::Success(Success { metadata: () }) => {}
+            _ => panic!("Expected success"),
+        }
     }
 
     #[test]
@@ -304,8 +305,9 @@ mod tests {
 
         let failure = Summary::<()>::parse(data).unwrap();
 
-        let Summary::Failure(failure) = failure else {
-            panic!("Expected failure");
+        let failure = match failure {
+            Summary::Failure(failure) => failure,
+            _ => panic!("Expected failure"),
         };
 
         assert_eq!(failure.code, "Neo.ClientError.Security.Unauthorized");
@@ -373,11 +375,13 @@ mod tests {
         };
 
         let actual = Summary::<Streaming>::parse(data).unwrap();
-        let Summary::Success(actual) = actual else {
-            panic!("Expected success");
+        let actual = match actual {
+            Summary::Success(actual) => actual,
+            _ => panic!("Expected success"),
         };
-        let Streaming::Done(actual) = actual.metadata else {
-            panic!("Expected done");
+        let actual = match actual.metadata {
+            Streaming::Done(actual) => actual,
+            _ => panic!("Expected done"),
         };
 
         assert_eq!(*actual, expected);
