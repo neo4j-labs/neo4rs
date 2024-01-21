@@ -71,7 +71,7 @@ pub enum Streaming {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Mode {
+pub enum Type {
     Read,
     Write,
     ReadWrite,
@@ -82,7 +82,7 @@ pub enum Mode {
 pub struct StreamingSummary {
     pub(crate) bookmark: Option<String>,
     pub(crate) t_last: Option<i64>,
-    pub(crate) r#type: Option<Mode>,
+    pub(crate) r#type: Option<Type>,
     pub(crate) db: Option<String>,
     pub(crate) stats: Option<crate::BoltMap>,
     pub(crate) plan: Option<crate::BoltMap>,
@@ -90,7 +90,7 @@ pub struct StreamingSummary {
     pub(crate) notifications: Option<Vec<crate::BoltMap>>,
 }
 
-impl<'de> Deserialize<'de> for Mode {
+impl<'de> Deserialize<'de> for Type {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for Mode {
         struct Visit;
 
         impl<'de> Visitor<'de> for Visit {
-            type Value = Mode;
+            type Value = Type;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a valid type string")
@@ -109,10 +109,10 @@ impl<'de> Deserialize<'de> for Mode {
                 E: de::Error,
             {
                 match v {
-                    "r" => Ok(Mode::Read),
-                    "w" => Ok(Mode::Write),
-                    "rw" => Ok(Mode::ReadWrite),
-                    "s" => Ok(Mode::SchemaOnly),
+                    "r" => Ok(Type::Read),
+                    "w" => Ok(Type::Write),
+                    "rw" => Ok(Type::ReadWrite),
+                    "s" => Ok(Type::SchemaOnly),
                     _ => Err(E::custom(format!("invalid type string: {}", v))),
                 }
             }
@@ -339,7 +339,7 @@ mod tests {
         let expected = StreamingSummary {
             bookmark: Some("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ".to_owned()),
             t_last: Some(42),
-            r#type: Some(Mode::ReadWrite),
+            r#type: Some(Type::ReadWrite),
             db: Some("neo4j".to_owned()),
             stats: Some(BoltMap::from_iter([
                 (BoltString::from("labels-added"), BoltType::from(1)),
