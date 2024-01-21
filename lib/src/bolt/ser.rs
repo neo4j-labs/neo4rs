@@ -560,6 +560,7 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Unknown sequence length. The length of a sequence must be known in advance.")]
     UnknownLength,

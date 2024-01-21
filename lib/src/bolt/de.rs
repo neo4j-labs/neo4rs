@@ -512,6 +512,7 @@ impl<'a> SharedBytes<'a> {
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Not enough data to parse a bolt stream.")]
     Empty,
