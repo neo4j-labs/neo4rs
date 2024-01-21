@@ -81,9 +81,9 @@ pub enum Mode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamingSummary {
     pub(crate) bookmark: Option<String>,
-    pub(crate) t_last: i64,
-    pub(crate) r#type: Mode,
-    pub(crate) db: String,
+    pub(crate) t_last: Option<i64>,
+    pub(crate) r#type: Option<Mode>,
+    pub(crate) db: Option<String>,
     pub(crate) stats: Option<crate::BoltMap>,
     pub(crate) plan: Option<crate::BoltMap>,
     pub(crate) profile: Option<crate::BoltMap>,
@@ -338,9 +338,9 @@ mod tests {
 
         let expected = StreamingSummary {
             bookmark: Some("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ".to_owned()),
-            t_last: 42,
-            r#type: Mode::ReadWrite,
-            db: "neo4j".to_owned(),
+            t_last: Some(42),
+            r#type: Some(Mode::ReadWrite),
+            db: Some("neo4j".to_owned()),
             stats: Some(BoltMap::from_iter([
                 (BoltString::from("labels-added"), BoltType::from(1)),
                 (BoltString::from("nodes-created"), BoltType::from(2)),
