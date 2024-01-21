@@ -1,4 +1,7 @@
-use crate::DeError;
+use crate::{
+    bolt::{de, ser},
+    DeError,
+};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -12,6 +15,12 @@ pub enum Error {
 
     #[error("Invalid URI: {0}")]
     UrlParseError(#[from] url::ParseError),
+
+    #[error(transparent)]
+    WriteError(#[from] ser::Error),
+
+    #[error(transparent)]
+    ParseError(#[from] de::Error),
 
     #[error("Unsupported URI scheme: {0}")]
     UnsupportedScheme(String),

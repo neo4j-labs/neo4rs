@@ -79,7 +79,7 @@ impl BoltWireFormat for BoltMap {
     fn parse(version: Version, input: &mut Bytes) -> Result<Self> {
         let marker = input.get_u8();
         let size = match marker {
-            0xA0..=0xAF => 0x0F & marker as usize,
+            0xA0..=0xAF => (marker & 0x0F) as usize,
             SMALL => input.get_u8() as usize,
             MEDIUM => input.get_u16() as usize,
             LARGE => input.get_u32() as usize,
