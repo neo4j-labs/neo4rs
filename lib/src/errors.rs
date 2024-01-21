@@ -6,6 +6,7 @@ use crate::{
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("an IO error occurred: {detail}")]
     IOError {
@@ -43,6 +44,12 @@ pub enum Error {
     #[error("attempted to serialize excessively long list")]
     ListTooLong,
 
+    #[error("Invalid integer for the parameter {0}: must be positive or -1, but was {1}")]
+    InvalidInteger(&'static str, i64),
+
+    #[error("The provided integer for {0} does not fit in the range of an i64: {1}")]
+    IntegerOverflow(&'static str, #[source] std::num::TryFromIntError),
+
     #[error("invalid config")]
     InvalidConfig,
 
@@ -64,6 +71,9 @@ pub enum Error {
 
     #[error("{0}")]
     UnexpectedMessage(String),
+
+    #[error("{0} message was ignored by the server")]
+    Ignored(&'static str),
 
     #[error("{0}")]
     UnknownType(String),

@@ -2,6 +2,7 @@ use serde::de::{Error, Expected, Unexpected as Unexp};
 use std::{fmt, sync::Arc};
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum DeError {
     /// Raised when a `Deserialize` receives a type different from what it was
     /// expecting.

@@ -11,11 +11,15 @@ pub fn from_bytes<T>(mut bytes: Bytes) -> Result<T, de::Error>
 where
     T: DeserializeOwned,
 {
-    from_bytes_ref(&mut bytes)
+    let de = de::Deserializer::new(&mut bytes);
+    let value = T::deserialize(de)?;
+
+    Ok(value)
 }
 
 /// Parse and deserialize a packstream value from the given bytes.
-pub fn from_bytes_ref<'de, T>(bytes: &'de mut Bytes) -> Result<T, de::Error>
+#[allow(unused)]
+pub fn from_bytes_ref<'de, T: 'de>(bytes: &'de mut Bytes) -> Result<T, de::Error>
 where
     T: Deserialize<'de>,
 {
@@ -37,8 +41,259 @@ where
 }
 
 #[cfg(test)]
+pub mod value {
+    use bytes::{BufMut, Bytes, BytesMut};
+
+    pub fn bolt() -> BoltBytesBuilder {
+        BoltBytesBuilder::new()
+    }
+
+    pub struct BoltBytesBuilder {
+        data: BytesMut,
+    }
+
+    #[allow(unused)]
+    impl BoltBytesBuilder {
+        pub fn new() -> Self {
+            Self {
+                data: BytesMut::new(),
+            }
+        }
+
+        pub fn null(mut self) -> Self {
+            self.data.put_u8(0xC0);
+            self
+        }
+
+        pub fn bool(mut self, value: bool) -> Self {
+            self.data.put_u8(if value { 0xC3 } else { 0xC2 });
+            self
+        }
+
+        pub fn tiny_int(mut self, value: i8) -> Self {
+            self.data.put_i8(value);
+            self
+        }
+
+        pub fn int8(mut self, value: i8) -> Self {
+            self.data.put_u8(0xC8);
+            self.data.put_i8(value);
+            self
+        }
+
+        pub fn int16(mut self, value: i16) -> Self {
+            self.data.put_u8(0xC9);
+            self.data.put_i16(value);
+            self
+        }
+
+        pub fn int32(mut self, value: i32) -> Self {
+            self.data.put_u8(0xCA);
+            self.data.put_i32(value);
+            self
+        }
+
+        pub fn int64(mut self, value: i64) -> Self {
+            self.data.put_u8(0xCB);
+            self.data.put_i64(value);
+            self
+        }
+
+        pub fn float(mut self, value: f64) -> Self {
+            self.data.put_u8(0xC1);
+            self.data.put_f64(value);
+            self
+        }
+
+        pub fn bytes8(mut self, len: u8, value: &[u8]) -> Self {
+            self.data.put_u8(0xCC);
+            self.data.put_u8(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn bytes16(mut self, len: u16, value: &[u8]) -> Self {
+            self.data.put_u8(0xCD);
+            self.data.put_u16(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn bytes32(mut self, len: u32, value: &[u8]) -> Self {
+            self.data.put_u8(0xCE);
+            self.data.put_u32(len);
+            self.data.put_slice(value);
+            self
+        }
+
+        pub fn tiny_string(mut self, value: &str) -> Self {
+            assert!(value.len() <= 15);
+            self.data.put_u8(0x80 | value.len() as u8);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string8(mut self, value: &str) -> Self {
+            assert!(value.len() <= 255);
+            self.data.put_u8(0xD0);
+            self.data.put_u8(value.len() as u8);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string16(mut self, value: &str) -> Self {
+            assert!(value.len() <= 65535);
+            self.data.put_u8(0xD1);
+            self.data.put_u16(value.len() as u16);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn string32(mut self, value: &str) -> Self {
+            assert!(value.len() <= 2147483647);
+            self.data.put_u8(0xD2);
+            self.data.put_u32(value.len() as u32);
+            self.data.put_slice(value.as_bytes());
+            self
+        }
+
+        pub fn tiny_list(mut self, len: u8) -> Self {
+            self.data.put_u8(0x90 | len);
+            self
+        }
+
+        pub fn list8(mut self, len: u8) -> Self {
+            self.data.put_u8(0xD4);
+            self.data.put_u8(len);
+            self
+        }
+
+        pub fn list16(mut self, len: u16) -> Self {
+            self.data.put_u8(0xD5);
+            self.data.put_u16(len);
+            self
+        }
+
+        pub fn list32(mut self, len: u32) -> Self {
+            self.data.put_u8(0xD6);
+            self.data.put_u32(len);
+            self
+        }
+
+        pub fn tiny_map(mut self, len: u8) -> Self {
+            self.data.put_u8(0xA0 | len);
+            self
+        }
+
+        pub fn map8(mut self, len: u8) -> Self {
+            self.data.put_u8(0xD8);
+            self.data.put_u8(len);
+            self
+        }
+
+        pub fn map16(mut self, len: u16) -> Self {
+            self.data.put_u8(0xD9);
+            self.data.put_u16(len);
+            self
+        }
+
+        pub fn map32(mut self, len: u32) -> Self {
+            self.data.put_u8(0xDA);
+            self.data.put_u32(len);
+            self
+        }
+
+        pub fn structure(mut self, len: u8, tag: u8) -> Self {
+            self.data.put_u8(0xB0 | len);
+            self.data.put_u8(tag);
+            self
+        }
+
+        pub fn build(self) -> Bytes {
+            self.data.freeze()
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+pub mod debug {
+    use bytes::{Buf as _, Bytes};
+
+    pub struct Dbg<'a>(pub &'a Bytes);
+
+    impl std::fmt::Debug for Dbg<'_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let mut bytes = self.0.clone();
+
+            macro_rules! string {
+                ($bytes:expr) => {
+                    match ::std::str::from_utf8(&$bytes) {
+                        Ok(str) => f.write_str(str),
+                        Err(e) => write!(f, "{:?} (invalid utf8: {:?})", bytes, e),
+                    }
+                };
+            }
+
+            macro_rules! split {
+                ($bytes:ident.split_to($len:expr)) => {{
+                    let len = $len;
+                    $bytes.split_to(len)
+                }};
+            }
+
+            while !bytes.is_empty() {
+                let marker = bytes.get_u8();
+                write!(f, " {:02X} ", marker)?;
+
+                let (hi, lo) = (marker >> 4, marker & 0x0F);
+
+                match hi {
+                    0x8 => string!(bytes.split_to(lo as _)),
+                    0x9 => write!(f, "List<{}>", lo),
+                    0xA => write!(f, "Map<{}>", lo),
+                    0xB => write!(f, "Struct<tag={:02X} len={}>", bytes.get_u8(), lo),
+                    0xC => match lo {
+                        0x0 => write!(f, "NULL"),
+                        0x1 => write!(f, "Float<{}>", bytes.get_f64()),
+                        0x2 => write!(f, "FALSE"),
+                        0x3 => write!(f, "TRUE"),
+                        0x8 => write!(f, "Int<{}>", bytes.get_i8()),
+                        0x9 => write!(f, "Int<{}>", bytes.get_i16()),
+                        0xA => write!(f, "Int<{}>", bytes.get_i32()),
+                        0xB => write!(f, "Int<{}>", bytes.get_i64()),
+                        0xC => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u8() as _))),
+                        0xD => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u16() as _))),
+                        0xE => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u32() as _))),
+                        _ => write!(f, "Unknown marker"),
+                    },
+                    0xD => match lo {
+                        0x0 => string!(split!(bytes.split_to(bytes.get_u8() as _))),
+                        0x1 => string!(split!(bytes.split_to(bytes.get_u16() as _))),
+                        0x2 => string!(split!(bytes.split_to(bytes.get_u32() as _))),
+                        0x4 => write!(f, "List<{}>", bytes.get_u8()),
+                        0x5 => write!(f, "List<{}>", bytes.get_u16()),
+                        0x6 => write!(f, "List<{}>", bytes.get_u32()),
+                        0x8 => write!(f, "Map<{}>", bytes.get_u8()),
+                        0x9 => write!(f, "Map<{}>", bytes.get_u16()),
+                        0xA => write!(f, "Map<{}>", bytes.get_u32()),
+                        // C, D => struct 8/16
+                        _ => write!(f, "Unknown marker"),
+                    },
+                    0xE => write!(f, "Unknown marker"),
+                    _ => write!(f, "Int<{}>", marker as i8),
+                }?
+            }
+
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, fmt::Debug};
+
+    use crate::bolt::packstream::value::bolt;
 
     use super::*;
 
@@ -141,6 +396,18 @@ mod tests {
     #[test_case(&[0xD4, 0x28, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28], (1..=40).collect(); "list_3")]
     fn list(input: &'static [u8], expected: Vec<i64>) {
         roundtrip(input, expected)
+    }
+
+    #[test]
+    fn tuple1() {
+        let input = bolt().tiny_list(1).tiny_int(42).build();
+        roundtrip(&input, (42,))
+    }
+
+    #[test]
+    fn tuple2() {
+        let input = bolt().tiny_list(2).tiny_int(42).tiny_string("1337").build();
+        roundtrip(&input, (42, "1337".to_owned()))
     }
 
     #[test_case(&[0xA0], BTreeMap::new(); "empty")]
