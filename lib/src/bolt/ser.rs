@@ -422,7 +422,11 @@ impl<'a> ser::SerializeMap for MapSerializer<'a> {
                 Ok(map_size) => match self {
                     MapSerializer::Known(ser) => ser,
                     MapSerializer::Unknown { ser, len, .. } => {
-                        *len = len.saturating_sub_unsigned(map_size);
+                        let rhs = map_size as isize;
+                        let (res, overflowed) = len.overflowing_sub(rhs);
+                        let overflowed = overflowed ^ (rhs < 0);
+                        let res = if overflowed { isize::MIN } else { res };
+                        *len = res;
                         ser
                     }
                 }
