@@ -41,10 +41,12 @@ impl<S: Serializer> AsMapSerializer<S> {
         Ok(Self { inner })
     }
 
+    #[allow(unused)]
     pub(crate) fn into_inner(self) -> S {
         self.inner
     }
 
+    #[allow(unused)]
     fn inner(&mut self) -> &mut S {
         &mut self.inner
     }
@@ -323,6 +325,7 @@ impl<S: SerializeMap> InnerMapSerializer<S> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn into_inner(self) -> S {
         self.inner
     }
@@ -331,6 +334,7 @@ impl<S: SerializeMap> InnerMapSerializer<S> {
         self.inner.end()
     }
 
+    #[allow(unused)]
     fn inner(&mut self) -> &mut S {
         &mut self.inner
     }
@@ -348,6 +352,7 @@ impl<S: SerializeMap> InnerMapSerializer<S> {
         Ok(())
     }
 
+    #[allow(unused)]
     fn key<T: ?Sized>(&mut self, key: &T) -> Result<(), S::Error>
     where
         T: Serialize,
@@ -826,7 +831,7 @@ pub(crate) struct ForwardingSerializer<S> {
     inner: S,
 }
 
-impl<'a, S: SerializeMap> SerializeMap for ForwardingSerializer<S> {
+impl<S: SerializeMap> SerializeMap for ForwardingSerializer<S> {
     type Ok = S::Ok;
     type Error = S::Error;
 

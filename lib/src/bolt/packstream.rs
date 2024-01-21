@@ -18,6 +18,7 @@ where
 }
 
 /// Parse and deserialize a packstream value from the given bytes.
+#[allow(unused)]
 pub fn from_bytes_ref<'de, T: 'de>(bytes: &'de mut Bytes) -> Result<T, de::Error>
 where
     T: Deserialize<'de>,
