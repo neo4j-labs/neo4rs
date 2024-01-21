@@ -12,6 +12,18 @@ pub enum Summary<R> {
     Failure(Failure),
 }
 
+impl<R: std::fmt::Debug> Summary<R> {
+    pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
+        match self {
+            Summary::Failure(f) => f.into_error(msg),
+            otherwise => crate::Error::UnexpectedMessage(format!(
+                "unexpected response for {}: {:?}",
+                msg, otherwise
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(transparent)]
 pub struct Success<R> {
@@ -22,6 +34,13 @@ pub struct Success<R> {
 pub struct Failure {
     pub(crate) code: String,
     pub(crate) message: String,
+}
+
+impl Failure {
+    pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
+        let Self { code, message } = self;
+        crate::errors::Error::Failure { code, message, msg }
+    }
 }
 
 impl<'de, R: Deserialize<'de>> Deserialize<'de> for Summary<R> {
