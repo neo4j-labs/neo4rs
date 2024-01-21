@@ -1,11 +1,10 @@
 use crate::{
-    bolt::{from_bytes, ExpectedResponse, Message},
+    bolt::{ExpectedResponse, Message, MessageResponse},
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
 use bytes::{Bytes, BytesMut};
-use serde::de::DeserializeOwned;
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
@@ -122,12 +121,12 @@ impl Connection {
         self.recv().await
     }
 
-    pub(crate) async fn send_recv_as<T: Message + ExpectedResponse>(
+    pub(crate) async fn _send_recv_as<T: Message + ExpectedResponse>(
         &mut self,
         message: T,
     ) -> Result<T::Response> {
-        self.send_as(message).await?;
-        self.recv_as().await
+        self._send_as(message).await?;
+        self._recv_as().await
     }
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
@@ -135,7 +134,7 @@ impl Connection {
         self.send_bytes(bytes).await
     }
 
-    pub(crate) async fn send_as<T: Message>(&mut self, message: T) -> Result<()> {
+    pub(crate) async fn _send_as<T: Message>(&mut self, message: T) -> Result<()> {
         let bytes = message.to_bytes()?;
         self.send_bytes(bytes).await
     }
@@ -145,9 +144,9 @@ impl Connection {
         BoltResponse::parse(self.version, bytes)
     }
 
-    pub async fn recv_as<T: DeserializeOwned>(&mut self) -> Result<T> {
+    pub(crate) async fn _recv_as<T: MessageResponse>(&mut self) -> Result<T> {
         let bytes = self.recv_bytes().await?;
-        Ok(from_bytes(bytes)?)
+        Ok(T::parse(bytes)?)
     }
 
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {

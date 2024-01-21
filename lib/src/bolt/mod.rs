@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 mod packstream;
 
-pub use packstream::{de, from_bytes, ser, to_bytes};
+pub use packstream::{de, ser};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.
