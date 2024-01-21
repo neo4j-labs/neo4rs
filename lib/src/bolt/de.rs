@@ -291,9 +291,7 @@ impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
         self.len -= 1;
 
         let bytes = self.bytes.get();
-        let result = seed.deserialize(Deserializer { bytes }).map(Some);
-
-        result
+        seed.deserialize(Deserializer { bytes }).map(Some)
     }
 }
 
@@ -310,9 +308,7 @@ impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
         self.len -= 1;
 
         let bytes = self.bytes.get();
-        let result = seed.deserialize(Deserializer { bytes }).map(Some);
-
-        result
+        seed.deserialize(Deserializer { bytes }).map(Some)
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
@@ -320,9 +316,7 @@ impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
         V: DeserializeSeed<'de>,
     {
         let bytes = self.bytes.get();
-        let result = seed.deserialize(Deserializer { bytes });
-
-        result
+        seed.deserialize(Deserializer { bytes })
     }
 }
 
