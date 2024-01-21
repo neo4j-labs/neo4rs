@@ -5,6 +5,8 @@ mod detail;
 mod packstream;
 mod summary;
 
+#[cfg(debug_assertions)]
+pub use packstream::debug::Dbg;
 use packstream::ser::AsMap;
 pub use packstream::{de, ser};
 pub use summary::{Failure, Streaming, StreamingSummary, Success, Summary};

@@ -214,6 +214,80 @@ pub mod value {
     }
 }
 
+#[cfg(debug_assertions)]
+pub mod debug {
+    use bytes::{Buf as _, Bytes};
+
+    pub struct Dbg<'a>(pub &'a Bytes);
+
+    impl std::fmt::Debug for Dbg<'_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let mut bytes = self.0.clone();
+
+            macro_rules! string {
+                ($bytes:expr) => {
+                    match ::std::str::from_utf8(&$bytes) {
+                        Ok(str) => f.write_str(str),
+                        Err(e) => write!(f, "{:?} (invalid utf8: {:?})", bytes, e),
+                    }
+                };
+            }
+
+            macro_rules! split {
+                ($bytes:ident.split_to($len:expr)) => {{
+                    let len = $len;
+                    $bytes.split_to(len)
+                }};
+            }
+
+            while !bytes.is_empty() {
+                let marker = bytes.get_u8();
+                write!(f, " {:02X} ", marker)?;
+
+                let (hi, lo) = (marker >> 4, marker & 0x0F);
+
+                match hi {
+                    0x8 => string!(bytes.split_to(lo as _)),
+                    0x9 => write!(f, "List<{}>", lo),
+                    0xA => write!(f, "Map<{}>", lo),
+                    0xB => write!(f, "Struct<tag={:02X} len={}>", bytes.get_u8(), lo),
+                    0xC => match lo {
+                        0x0 => write!(f, "NULL"),
+                        0x1 => write!(f, "Float<{}>", bytes.get_f64()),
+                        0x2 => write!(f, "FALSE"),
+                        0x3 => write!(f, "TRUE"),
+                        0x8 => write!(f, "Int<{}>", bytes.get_i8()),
+                        0x9 => write!(f, "Int<{}>", bytes.get_i16()),
+                        0xA => write!(f, "Int<{}>", bytes.get_i32()),
+                        0xB => write!(f, "Int<{}>", bytes.get_i64()),
+                        0xC => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u8() as _))),
+                        0xD => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u16() as _))),
+                        0xE => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u32() as _))),
+                        _ => write!(f, "Unknown marker"),
+                    },
+                    0xD => match lo {
+                        0x0 => string!(split!(bytes.split_to(bytes.get_u8() as _))),
+                        0x1 => string!(split!(bytes.split_to(bytes.get_u16() as _))),
+                        0x2 => string!(split!(bytes.split_to(bytes.get_u32() as _))),
+                        0x4 => write!(f, "List<{}>", bytes.get_u8()),
+                        0x5 => write!(f, "List<{}>", bytes.get_u16()),
+                        0x6 => write!(f, "List<{}>", bytes.get_u32()),
+                        0x8 => write!(f, "Map<{}>", bytes.get_u8()),
+                        0x9 => write!(f, "Map<{}>", bytes.get_u16()),
+                        0xA => write!(f, "Map<{}>", bytes.get_u32()),
+                        // C, D => struct 8/16
+                        _ => write!(f, "Unknown marker"),
+                    },
+                    0xE => write!(f, "Unknown marker"),
+                    _ => write!(f, "Int<{}>", marker as i8),
+                }?
+            }
+
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, fmt::Debug};
