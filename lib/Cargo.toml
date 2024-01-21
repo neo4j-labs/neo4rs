@@ -26,7 +26,7 @@ neo4rs-macros = { version = "0.3.0", path = "../macros" }
 paste = "1.0.0"
 pin-project-lite = "0.2.9"
 serde = "1.0.0"
-thiserror = "1.0.2"
+thiserror = "1.0.7"
 tokio = { version = "1.5.0", features = ["full"] }
 tokio-rustls = "0.24.0"
 url = "2.0.0"
