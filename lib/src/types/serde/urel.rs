@@ -3,11 +3,11 @@ use crate::{
         serde::{
             builder::{BoltUnboundedRelationBuilder, Id},
             element::{ElementDataDeserializer, ElementDataKey},
-            BoltKind,
+            BoltKind, Properties,
         },
         BoltString, BoltUnboundedRelation,
     },
-    DeError, Type, UnboundedRelation,
+    BoltMap, DeError, Type, UnboundedRelation,
 };
 
 use std::{fmt, result::Result};
@@ -45,6 +45,9 @@ impl<'de> Deserialize<'de> for BoltUnboundedRelation {
     {
         const ID: &str = "42.<id>";
         const TYP: &str = "42.<type>";
+        const PROPS: &str = "42.<properties>";
+
+        const FIELDS: &[&str] = &[ID, TYP, PROPS];
 
         struct BoltUnboundedRelationVisitor;
 
@@ -65,8 +68,11 @@ impl<'de> Deserialize<'de> for BoltUnboundedRelation {
                     match key {
                         ID => builder.id(|| map.next_value::<Id>().map(|i| i.0))?,
                         TYP => builder.typ(|| map.next_value::<Type<BoltString>>().map(|t| t.0))?,
-                        otherwise => builder
-                            .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
+                        PROPS => builder
+                            .properties(|| map.next_value::<Properties<BoltMap>>().map(|o| o.0))?,
+                        otherwise => Err(Error::unknown_field(otherwise, FIELDS))?,
+                        // otherwise => builder
+                        //     .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
                     }
                 }
 
@@ -77,7 +83,7 @@ impl<'de> Deserialize<'de> for BoltUnboundedRelation {
 
         deserializer.deserialize_struct(
             "BoltUnboundedRelation",
-            &[ID, TYP],
+            FIELDS,
             BoltUnboundedRelationVisitor,
         )
     }

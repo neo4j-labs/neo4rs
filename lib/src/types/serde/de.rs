@@ -9,8 +9,8 @@ use serde::{
 
 use crate::{
     types::{
-        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap, BoltNull, BoltString,
-        BoltType,
+        serde::Properties, BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap,
+        BoltNull, BoltString, BoltType,
     },
     EndNodeId, Id, Indices, Keys, Labels, Nodes, Offset, Relationships, StartNodeId, Timezone,
     Type,
@@ -139,6 +139,7 @@ newtype_deser!(
     Labels<Coll>(Coll) => Labels<Coll>,
     Type<T>(T) => Type<T>,
     Keys<Coll>(Coll) => Keys<Coll>,
+    Properties<Coll>(Coll) => Properties<Coll>,
     Timezone<T>(T) => Timezone<T>,
     Nodes<T>(Vec<T>) => Nodes<T>,
     Relationships<T>(Vec<T>) => Relationships<T>,
