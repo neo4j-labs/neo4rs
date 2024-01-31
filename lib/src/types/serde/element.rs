@@ -95,36 +95,6 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
     where
         V: Visitor<'de>,
     {
-        struct IterDeserializer<I>(I);
-
-        impl<'de, I, T> IntoDeserializer<'de, DeError> for IterDeserializer<I>
-        where
-            T: 'de,
-            I: Iterator<Item = &'de T>,
-            &'de T: IntoDeserializer<'de, DeError>,
-        {
-            type Deserializer = SeqDeserializer<I, DeError>;
-
-            fn into_deserializer(self) -> Self::Deserializer {
-                SeqDeserializer::new(self.0)
-            }
-        }
-
-        struct DictDeserializer<I>(I);
-
-        impl<'de, I, T> IntoDeserializer<'de, DeError> for DictDeserializer<I>
-        where
-            T: 'de,
-            I: Iterator<Item = (BorrowedStr<'de>, &'de T)>,
-            &'de T: IntoDeserializer<'de, DeError>,
-        {
-            type Deserializer = MapDeserializer<'de, I, DeError>;
-
-            fn into_deserializer(self) -> Self::Deserializer {
-                MapDeserializer::new(self.0)
-            }
-        }
-
         match name {
             "Id" => {
                 let id = match self.data.value(ElementDataKey::Id) {
@@ -384,6 +354,36 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
         V: Visitor<'de>,
     {
         Err(DeError::PropertyMissingButRequired)
+    }
+}
+
+struct IterDeserializer<I>(I);
+
+impl<'de, I, T> IntoDeserializer<'de, DeError> for IterDeserializer<I>
+where
+    T: 'de,
+    I: Iterator<Item = &'de T>,
+    &'de T: IntoDeserializer<'de, DeError>,
+{
+    type Deserializer = SeqDeserializer<I, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        SeqDeserializer::new(self.0)
+    }
+}
+
+struct DictDeserializer<I>(I);
+
+impl<'de, I, T> IntoDeserializer<'de, DeError> for DictDeserializer<I>
+where
+    T: 'de,
+    I: Iterator<Item = (BorrowedStr<'de>, &'de T)>,
+    &'de T: IntoDeserializer<'de, DeError>,
+{
+    type Deserializer = MapDeserializer<'de, I, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        MapDeserializer::new(self.0)
     }
 }
 
