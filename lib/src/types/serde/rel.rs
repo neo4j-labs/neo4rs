@@ -3,11 +3,11 @@ use crate::{
         serde::{
             builder::{BoltRelationBuilder, EndNodeId, Id, StartNodeId},
             element::{ElementDataDeserializer, ElementDataKey},
-            BoltKind,
+            BoltKind, Properties,
         },
         BoltRelation, BoltString,
     },
-    DeError, Relation, Type,
+    BoltMap, DeError, Relation, Type,
 };
 
 use std::{fmt, result::Result};
@@ -47,6 +47,9 @@ impl<'de> Deserialize<'de> for BoltRelation {
         const SID: &str = "42.<start_node_id>";
         const EID: &str = "42.<end_node_id>";
         const TYP: &str = "42.<type>";
+        const PROPS: &str = "42.<properties>";
+
+        const FIELDS: &[&str] = &[ID, SID, EID, TYP, PROPS];
 
         struct BoltRelationVisitor;
 
@@ -72,8 +75,9 @@ impl<'de> Deserialize<'de> for BoltRelation {
                             builder.end_node_id(|| map.next_value::<EndNodeId>().map(|i| i.0))?
                         }
                         TYP => builder.typ(|| map.next_value::<Type<BoltString>>().map(|t| t.0))?,
-                        otherwise => builder
-                            .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
+                        PROPS => builder
+                            .properties(|| map.next_value::<Properties<BoltMap>>().map(|t| t.0))?,
+                        otherwise => Err(Error::unknown_field(otherwise, FIELDS))?,
                     }
                 }
 
@@ -82,7 +86,7 @@ impl<'de> Deserialize<'de> for BoltRelation {
             }
         }
 
-        deserializer.deserialize_struct("BoltRelation", &[ID, SID, EID, TYP], BoltRelationVisitor)
+        deserializer.deserialize_struct("BoltRelation", FIELDS, BoltRelationVisitor)
     }
 }
 

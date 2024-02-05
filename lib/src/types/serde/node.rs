@@ -3,11 +3,11 @@ use crate::{
         serde::{
             builder::{BoltNodeBuilder, Id},
             element::{ElementDataDeserializer, ElementDataKey},
-            BoltKind,
+            BoltKind, Properties,
         },
-        BoltList, BoltNode, BoltString,
+        BoltList, BoltNode,
     },
-    DeError, Labels, Node,
+    BoltMap, DeError, Labels, Node,
 };
 
 use std::{fmt, result::Result};
@@ -45,6 +45,9 @@ impl<'de> Deserialize<'de> for BoltNode {
     {
         const ID: &str = "42.<id>";
         const LABELS: &str = "42.<labels>";
+        const PROPERTIES: &str = "42.<properties>";
+
+        const FIELDS: &[&str] = &[ID, LABELS, PROPERTIES];
 
         struct BoltNodeVisitor;
 
@@ -67,8 +70,9 @@ impl<'de> Deserialize<'de> for BoltNode {
                         LABELS => {
                             builder.labels(|| map.next_value::<Labels<BoltList>>().map(|l| l.0))?
                         }
-                        otherwise => builder
-                            .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
+                        PROPERTIES => builder
+                            .properties(|| map.next_value::<Properties<BoltMap>>().map(|l| l.0))?,
+                        otherwise => Err(Error::unknown_field(otherwise, FIELDS))?,
                     }
                 }
 
@@ -77,7 +81,7 @@ impl<'de> Deserialize<'de> for BoltNode {
             }
         }
 
-        deserializer.deserialize_struct("BoltNode", &[ID, LABELS], BoltNodeVisitor)
+        deserializer.deserialize_struct("BoltNode", FIELDS, BoltNodeVisitor)
     }
 }
 

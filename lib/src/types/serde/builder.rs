@@ -1,5 +1,5 @@
 use crate::types::{
-    BoltInteger, BoltList, BoltMap, BoltNode, BoltPath, BoltRelation, BoltString, BoltType,
+    BoltInteger, BoltList, BoltMap, BoltNode, BoltPath, BoltRelation, BoltString,
     BoltUnboundedRelation,
 };
 
@@ -19,7 +19,6 @@ impl BoltNodeBuilder {
             pub fn id<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E>;
             pub fn labels<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltList, E>) -> Result<(), E>;
             pub fn properties<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltMap, E>) -> Result<(), E>;
-            pub fn insert<E: Error>(&mut self, entry: impl FnOnce() -> Result<(BoltString, BoltType), E>) -> Result<(), E>;
         }
     }
 
@@ -52,7 +51,6 @@ impl BoltRelationBuilder {
             pub fn end_node_id<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E>;
             pub fn typ<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltString, E>) -> Result<(), E>;
             pub fn properties<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltMap, E>) -> Result<(), E>;
-            pub fn insert<E: Error>(&mut self, entry: impl FnOnce() -> Result<(BoltString, BoltType), E>) -> Result<(), E>;
         }
     }
 
@@ -90,7 +88,6 @@ impl BoltUnboundedRelationBuilder {
             pub fn id<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltInteger, E>) -> Result<(), E>;
             pub fn typ<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltString, E>) -> Result<(), E>;
             pub fn properties<E: Error>(&mut self, read: impl FnOnce() -> Result<BoltMap, E>) -> Result<(), E>;
-            pub fn insert<E: Error>(&mut self, entry: impl FnOnce() -> Result<(BoltString, BoltType), E>) -> Result<(), E>;
         }
     }
 
@@ -257,16 +254,6 @@ impl ElementBuilder {
             Err(_) => Err(Error::duplicate_field("indices")),
         }
     }
-
-    fn insert<E: Error>(
-        &mut self,
-        entry: impl FnOnce() -> Result<(BoltString, BoltType), E>,
-    ) -> Result<(), E> {
-        let props = self.properties.get_or_insert_with(Default::default);
-        let (key, value) = entry()?;
-        props.put(key, value);
-        Ok(())
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -285,24 +272,6 @@ impl<T> Default for SetOnce<T> {
 pub struct SetOnceError;
 
 impl<T> SetOnce<T> {
-    pub fn get_or_insert_with(&mut self, value: impl FnOnce() -> T) -> &mut T {
-        match self {
-            SetOnce::Empty => self.insert_with(value).unwrap(),
-            SetOnce::Set(value) => value,
-        }
-    }
-
-    pub fn insert_with(&mut self, value: impl FnOnce() -> T) -> Result<&mut T, SetOnceError> {
-        match self {
-            SetOnce::Empty => *self = Self::Set(value()),
-            SetOnce::Set(_) => return Err(SetOnceError),
-        };
-        match self {
-            SetOnce::Empty => unreachable!("value was just set"),
-            SetOnce::Set(value) => Ok(value),
-        }
-    }
-
     pub fn try_insert_with<E>(
         &mut self,
         value: impl FnOnce() -> Result<T, E>,

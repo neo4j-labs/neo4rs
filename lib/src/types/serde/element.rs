@@ -73,186 +73,102 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 ElementDataValue::Map(map) => Some(&map.value),
                 _ => None,
             });
-        let additional_fields = fields
-            .iter()
-            .copied()
-            .filter(|f| match properties {
-                Some(properties) => !properties.contains_key(*f),
-                None => true,
-            })
-            .map(|f| (f, AdditionalData::Element(self.data)));
-        let property_fields = properties
-            .into_iter()
-            .flatten()
-            .map(|(k, v)| (k.value.as_str(), AdditionalData::Property(v)));
-        let node_fields = property_fields
-            .chain(additional_fields)
-            .map(|(k, v)| (BorrowedStr(k), v));
+        let node_fields = fields.iter().map(|&f| {
+            (
+                BorrowedStr(f),
+                properties.and_then(|p| p.get(f)).map_or_else(
+                    || AdditionalData::Element(self.data),
+                    |v| AdditionalData::Property(v),
+                ),
+            )
+        });
 
         visitor.visit_map(MapDeserializer::new(node_fields))
     }
 
-    fn deserialize_any_struct<V>(
+    fn deserialize_any_struct<V, A>(
         self,
         name: &str,
         visitor: V,
-        visitation: Visitation,
+        visitation: A,
     ) -> Result<V::Value, DeError>
     where
         V: Visitor<'de>,
+        A: Visitation,
     {
-        struct IterDeserializer<I>(I);
-
-        impl<'de, I, T> IntoDeserializer<'de, DeError> for IterDeserializer<I>
-        where
-            T: 'de,
-            I: Iterator<Item = &'de T>,
-            &'de T: IntoDeserializer<'de, DeError>,
-        {
-            type Deserializer = SeqDeserializer<I, DeError>;
-
-            fn into_deserializer(self) -> Self::Deserializer {
-                SeqDeserializer::new(self.0)
-            }
-        }
-
         match name {
             "Id" => {
                 let id = match self.data.value(ElementDataKey::Id) {
                     Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
                     _ => return Err(DeError::missing_field("id")),
                 };
-                match visitation {
-                    Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
-                    Visitation::Struct(field) => {
-                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
-                    }
-                }
+                visitation.visit(id, visitor)
             }
             "StartNodeId" => {
                 let id = match self.data.value(ElementDataKey::StartNodeId) {
                     Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
                     _ => return Err(DeError::missing_field("start_node_id")),
                 };
-                match visitation {
-                    Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
-                    Visitation::Struct(field) => {
-                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
-                    }
-                }
+                visitation.visit(id, visitor)
             }
             "EndNodeId" => {
                 let id = match self.data.value(ElementDataKey::EndNodeId) {
                     Some(ElementDataValue::Int(&BoltInteger { value: id })) => id,
                     _ => return Err(DeError::missing_field("end_node_id")),
                 };
-                match visitation {
-                    Visitation::Newtype => visitor.visit_newtype_struct(I64Deserializer::new(id)),
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(id))),
-                    Visitation::Struct(field) => {
-                        visitor.visit_map(MapDeserializer::new(iter::once((field, id))))
-                    }
-                }
+                visitation.visit(id, visitor)
             }
             "Labels" => {
                 let labels = match self.data.value(ElementDataKey::Labels) {
                     Some(ElementDataValue::Lst(BoltList { value: labels })) => labels,
                     _ => return Err(DeError::missing_field("labels")),
                 };
-                match visitation {
-                    Visitation::Newtype => {
-                        visitor.visit_newtype_struct(SeqDeserializer::new(labels.iter()))
-                    }
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
-                        IterDeserializer(labels.iter()),
-                    ))),
-                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(labels.iter()))),
-                    )),
-                }
+                visitation.visit(IterDeserializer(labels.iter()), visitor)
             }
             "Type" => {
                 let typ = match self.data.value(ElementDataKey::Type) {
                     Some(ElementDataValue::Str(BoltString { value: typ })) => typ,
                     _ => return Err(DeError::missing_field("type")),
                 };
-                let typ = BorrowedStr(typ);
-                match visitation {
-                    Visitation::Newtype => visitor.visit_newtype_struct(typ.into_deserializer()),
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(typ))),
-                    Visitation::Struct(field) => {
-                        visitor.visit_map(MapDeserializer::new(iter::once((field, typ))))
-                    }
-                }
+                visitation.visit(BorrowedStr(typ), visitor)
             }
             "Keys" => {
                 let properties = match self.data.value(ElementDataKey::Properties) {
                     Some(ElementDataValue::Map(BoltMap { value: properties })) => properties,
                     _ => return Err(DeError::missing_field("properties")),
                 };
-                let keys = properties.keys();
-                match visitation {
-                    Visitation::Newtype => visitor.visit_newtype_struct(SeqDeserializer::new(keys)),
-                    Visitation::Tuple => {
-                        visitor.visit_seq(SeqDeserializer::new(iter::once(IterDeserializer(keys))))
-                    }
-                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(keys))),
-                    )),
-                }
+                visitation.visit(IterDeserializer(properties.keys()), visitor)
+            }
+            "Properties" => {
+                let properties = match self.data.value(ElementDataKey::Properties) {
+                    Some(ElementDataValue::Map(BoltMap { value: properties })) => properties,
+                    _ => return Err(DeError::missing_field("properties")),
+                };
+                let properties = properties
+                    .iter()
+                    .map(|(k, v)| (BorrowedStr(k.value.as_str()), v));
+                visitation.visit(DictDeserializer(properties), visitor)
             }
             "Nodes" => {
                 let nodes = match self.data.value(ElementDataKey::Nodes) {
                     Some(ElementDataValue::Lst(BoltList { value: nodes })) => nodes,
                     _ => return Err(DeError::missing_field("nodes")),
                 };
-                match visitation {
-                    Visitation::Newtype => {
-                        visitor.visit_newtype_struct(SeqDeserializer::new(nodes.iter()))
-                    }
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
-                        IterDeserializer(nodes.iter()),
-                    ))),
-                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(nodes.iter()))),
-                    )),
-                }
+                visitation.visit(IterDeserializer(nodes.iter()), visitor)
             }
             "Relationships" => {
                 let rels = match self.data.value(ElementDataKey::Relationships) {
                     Some(ElementDataValue::Lst(BoltList { value: rels })) => rels,
                     _ => return Err(DeError::missing_field("relationships")),
                 };
-                match visitation {
-                    Visitation::Newtype => {
-                        visitor.visit_newtype_struct(SeqDeserializer::new(rels.iter()))
-                    }
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
-                        IterDeserializer(rels.iter()),
-                    ))),
-                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(rels.iter()))),
-                    )),
-                }
+                visitation.visit(IterDeserializer(rels.iter()), visitor)
             }
             "Indices" => {
                 let ids = match self.data.value(ElementDataKey::Indices) {
                     Some(ElementDataValue::Lst(BoltList { value: ids })) => ids,
                     _ => return Err(DeError::missing_field("indices")),
                 };
-                match visitation {
-                    Visitation::Newtype => {
-                        visitor.visit_newtype_struct(SeqDeserializer::new(ids.iter()))
-                    }
-                    Visitation::Tuple => visitor.visit_seq(SeqDeserializer::new(iter::once(
-                        IterDeserializer(ids.iter()),
-                    ))),
-                    Visitation::Struct(field) => visitor.visit_map(MapDeserializer::new(
-                        iter::once((field, IterDeserializer(ids.iter()))),
-                    )),
-                }
+                visitation.visit(IterDeserializer(ids.iter()), visitor)
             }
             _ => Err(DeError::invalid_type(
                 Unexpected::Other(&format!("struct `{}`", name)),
@@ -276,7 +192,7 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
     where
         V: Visitor<'de>,
     {
-        self.deserialize_any_struct(name, visitor, Visitation::Newtype)
+        self.deserialize_any_struct(name, visitor, NewType)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -289,7 +205,7 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
         V: Visitor<'de>,
     {
         if len == 1 {
-            self.deserialize_any_struct(name, visitor, Visitation::Tuple)
+            self.deserialize_any_struct(name, visitor, Tuple)
         } else {
             Err(DeError::invalid_length(
                 len,
@@ -308,7 +224,7 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
         V: Visitor<'de>,
     {
         match fields {
-            [field] => self.deserialize_any_struct(name, visitor, Visitation::Struct(field)),
+            [field] => self.deserialize_any_struct(name, visitor, Struct(field)),
             _ => Err(DeError::invalid_length(fields.len(), &"1")),
         }
     }
@@ -358,10 +274,77 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
     }
 }
 
-enum Visitation {
-    Newtype,
-    Tuple,
-    Struct(&'static str),
+struct IterDeserializer<I>(I);
+
+impl<'de, I, T> IntoDeserializer<'de, DeError> for IterDeserializer<I>
+where
+    T: 'de,
+    I: Iterator<Item = &'de T>,
+    &'de T: IntoDeserializer<'de, DeError>,
+{
+    type Deserializer = SeqDeserializer<I, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        SeqDeserializer::new(self.0)
+    }
+}
+
+struct DictDeserializer<I>(I);
+
+impl<'de, I, T> IntoDeserializer<'de, DeError> for DictDeserializer<I>
+where
+    T: 'de,
+    I: Iterator<Item = (BorrowedStr<'de>, &'de T)>,
+    &'de T: IntoDeserializer<'de, DeError>,
+{
+    type Deserializer = MapDeserializer<'de, I, DeError>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        MapDeserializer::new(self.0)
+    }
+}
+
+trait Visitation {
+    fn visit<'de, A, V>(self, item: A, visitor: V) -> Result<V::Value, DeError>
+    where
+        A: IntoDeserializer<'de, DeError>,
+        V: Visitor<'de>;
+}
+
+struct NewType;
+
+impl Visitation for NewType {
+    fn visit<'de, A, V>(self, item: A, visitor: V) -> Result<V::Value, DeError>
+    where
+        A: IntoDeserializer<'de, DeError>,
+        V: Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(item.into_deserializer())
+    }
+}
+
+struct Tuple;
+
+impl Visitation for Tuple {
+    fn visit<'de, A, V>(self, item: A, visitor: V) -> Result<V::Value, DeError>
+    where
+        A: IntoDeserializer<'de, DeError>,
+        V: Visitor<'de>,
+    {
+        visitor.visit_seq(SeqDeserializer::new(iter::once(item)))
+    }
+}
+
+struct Struct(&'static str);
+
+impl Visitation for Struct {
+    fn visit<'de, A, V>(self, item: A, visitor: V) -> Result<V::Value, DeError>
+    where
+        A: IntoDeserializer<'de, DeError>,
+        V: Visitor<'de>,
+    {
+        visitor.visit_map(MapDeserializer::new(iter::once((self.0, item))))
+    }
 }
 
 impl<'de, T: ElementData<'de>> VariantAccess<'de> for ElementDataDeserializer<'de, T> {

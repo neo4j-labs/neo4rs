@@ -1,8 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use chrono::FixedOffset;
 pub use error::DeError;
 pub use kind::BoltKind;
+
+use crate::BoltType;
 
 mod builder;
 mod cenum;
@@ -39,9 +41,13 @@ pub struct Labels<Coll = Vec<String>>(pub Coll);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Type<T = String>(pub T);
 
-/// Newtype to extract the node property keys during deserialization.
+/// Newtype to extract the element property keys during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keys<Coll = HashSet<String>>(pub Coll);
+
+/// Newtype to extract the element property during deserialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Properties<Coll = HashMap<String, BoltType>>(pub Coll);
 
 /// Newtype to extract the timezone info of datetimes during deserialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
