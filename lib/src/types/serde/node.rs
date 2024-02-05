@@ -73,8 +73,6 @@ impl<'de> Deserialize<'de> for BoltNode {
                         PROPERTIES => builder
                             .properties(|| map.next_value::<Properties<BoltMap>>().map(|l| l.0))?,
                         otherwise => Err(Error::unknown_field(otherwise, FIELDS))?,
-                        // otherwise => builder
-                        //     .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
                     }
                 }
 

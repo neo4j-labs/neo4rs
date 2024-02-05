@@ -71,8 +71,6 @@ impl<'de> Deserialize<'de> for BoltUnboundedRelation {
                         PROPS => builder
                             .properties(|| map.next_value::<Properties<BoltMap>>().map(|o| o.0))?,
                         otherwise => Err(Error::unknown_field(otherwise, FIELDS))?,
-                        // otherwise => builder
-                        //     .insert(|| Ok((BoltString::from(otherwise), map.next_value()?)))?,
                     }
                 }
 
