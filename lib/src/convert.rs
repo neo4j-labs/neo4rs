@@ -417,6 +417,64 @@ impl<T: Into<BoltType>> From<Option<T>> for BoltType {
     }
 }
 
+#[cfg(feature = "json")]
+impl TryFrom<serde_json::Value> for BoltType {
+    type Error = Error;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Error> {
+        match value {
+            serde_json::Value::Null => Ok(BoltType::Null(BoltNull)),
+            serde_json::Value::Bool(value) => {
+                Ok(BoltType::Boolean(BoltBoolean { value }))
+            }
+            serde_json::Value::Number(value) => {
+                if value.is_i64() {
+                    let Some(value) = value.as_i64() else {
+                        return Err(Error::ConversionError);
+                    };
+                    Ok(BoltType::Integer(BoltInteger::new(value)))
+                } else if value.is_u64() {
+                    let Some(value) = value.as_u64() else {
+                        return Err(Error::ConversionError);
+                    };
+                    let Ok(value) = i64::try_from(value) else {
+                        return Err(Error::ConversionError);
+                    };
+                    Ok(BoltType::Integer(BoltInteger::new(value)))
+                } else if value.is_f64() {
+                    let Some(value) = value.as_f64() else {
+                        return Err(Error::ConversionError);
+                    };
+                    Ok(BoltType::Float(BoltFloat::new(value)))
+                } else {
+                    Err(Error::ConversionError)
+                }
+            }
+            serde_json::Value::String(value) => {
+                Ok(BoltType::String(BoltString { value }))
+            }
+            serde_json::Value::Array(values) => {
+                let values = values
+                    .into_iter()
+                    .map(|v| v.try_into())
+                    .collect::<Result<Vec<BoltType>>>()?;
+                Ok(BoltType::List(BoltList { value: values }))
+            }
+            serde_json::Value::Object(values) => {
+                let values = values
+                    .into_iter()
+                    .map(|(k, v)| {
+                        let k = BoltString { value: k };
+                        let v = v.try_into()?;
+                        Ok((k, v))
+                    })
+                    .collect::<Result<HashMap<BoltString, BoltType>>>()?;
+                Ok(BoltType::Map(BoltMap { value: values }))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -520,5 +578,41 @@ mod tests {
         let value: Option<Vec<i64>> = None;
         let value: BoltType = value.into();
         assert_eq!(value, BoltType::Null(BoltNull));
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn convert_from_json() {
+        fn json_to_bolt(value: serde_json::Value) -> Result<BoltType, Error> {
+            value.try_into()
+        }
+        assert_eq!(
+            json_to_bolt(serde_json::json!(42)).unwrap(),
+            42.into(),
+        );
+        assert!(json_to_bolt(serde_json::json!(u64::MAX)).is_err());
+        assert_eq!(json_to_bolt(serde_json::json!({
+            "nested": {
+                "value": 42
+            },
+            "array": [1, 2, 3.14],
+            "value": 1337,
+        })).unwrap(), BoltType::Map(BoltMap {
+            value: HashMap::from([
+                ("nested".into(), BoltType::Map(BoltMap {
+                    value: HashMap::from([
+                        ("value".into(), 42.into()),
+                    ]),
+                })),
+                ("array".into(), BoltType::List(BoltList {
+                    value: vec![
+                        1.into(),
+                        2.into(),
+                        3.14.into(),
+                    ],
+                })),
+                ("value".into(), 1337.into()),
+            ]),
+        }));
     }
 }
