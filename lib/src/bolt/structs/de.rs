@@ -164,6 +164,124 @@ impl<'a, 'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'a, T> 
     }
 }
 
+macro_rules! count_tts {
+    () => { 0 };
+    ($odd:tt $($a:tt $b:tt)*) => { ($crate::bolt::structs::de::count_tts!($($a)*) << 1) | 1 };
+    ($($a:tt $even:tt)*) => { $crate::bolt::structs::de::count_tts!($($a)*) << 1 };
+}
+
+macro_rules! impl_visitor_ref {
+    ($typ:ident <'de> ($($name:ident),+ $(,)? $([$($opt_name:ident),+ $(,)?])?) == $tag:literal) => {
+        impl<'de> $typ<'de> {
+            pub(super) fn visitor() -> impl ::serde::de::Visitor<'de, Value = Self> {
+                struct Vis;
+
+                impl<'de> ::serde::de::Visitor<'de> for Vis {
+                    type Value = $typ<'de>;
+
+                    $crate::bolt::structs::de::impl_visitor!(@__inner: $typ ($($name),+ $([$($opt_name),+])?) == $tag);
+                }
+
+                Vis
+            }
+        }
+    };
+}
+
+macro_rules! impl_visitor {
+    ($typ:ident ($($name:ident),+ $(,)? $([$($opt_name:ident),+ $(,)?])?) == $tag:literal) => {
+        impl $typ {
+            pub(super) fn visitor<'de>() -> impl ::serde::de::Visitor<'de, Value = Self> {
+                struct Vis<'de>(::std::marker::PhantomData<&'de ()>);
+
+                impl<'de> ::serde::de::Visitor<'de> for Vis<'de> {
+                    type Value = $typ;
+
+                    $crate::bolt::structs::de::impl_visitor!(@__inner: $typ ($($name),+ $([$($opt_name),+])?) == $tag);
+                }
+
+                Vis(::std::marker::PhantomData)
+            }
+        }
+    };
+
+    (@__inner: $typ:ident ($($name:ident),+ $(,)? $([$($opt_name:ident),+ $(,)?])? $({$($def_name:ident),+ $(,)?})?) == $tag:literal) => {
+        fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+            write!(formatter, concat!("a valid Bolt ", stringify!($typ), " struct (tag '{}' or 0x{:02X})"), $tag, $tag)
+        }
+
+        fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
+        where
+            A: ::serde::de::EnumAccess<'de>,
+        {
+            let (tag, data) = ::serde::de::EnumAccess::variant::<u8>(data)?;
+            if tag != $tag {
+                return Err(serde::de::Error::invalid_type(
+                    serde::de::Unexpected::Other(&format!("struct with tag {:02X}", tag)),
+                    &self,
+                ));
+            }
+            ::serde::de::VariantAccess::struct_variant(data, &[], self)
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: ::serde::de::SeqAccess<'de>,
+        {
+
+            let req_len = $crate::bolt::structs::de::count_tts!($($name)+);
+            let max_len = req_len + ($crate::bolt::structs::de::count_tts!($($($opt_name)+)?));
+
+            let len = ::serde::de::SeqAccess::size_hint(&seq).unwrap_or_default();
+            if len < req_len || len > max_len {
+                return Err(::serde::de::Error::invalid_length(
+                    len,
+                    &format!("a sequence of length {} to {}", req_len, max_len).as_str(),
+                ));
+            }
+
+            $(
+                let $name = ::serde::de::SeqAccess::next_element(&mut seq)?
+                    .ok_or_else(|| ::serde::de::Error::missing_field(stringify!($name)))?;
+            )+
+
+            $(
+                $(
+                    let $opt_name = seq.next_element()?;
+                )+
+            )?
+
+            Ok($typ {
+                $($name,)+
+                $($($opt_name,)+)?
+                $($($def_name: ::std::default::Default::default(),)+)?
+            })
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: ::serde::de::MapAccess<'de>,
+        {
+            let tag = ::serde::de::MapAccess::next_key::<u8>(&mut map)?;
+            match tag {
+                Some($tag) => {},
+                Some(tag) => return Err(serde::de::Error::invalid_type(
+                    serde::de::Unexpected::Other(&format!("struct with tag {:02X}", tag)),
+                    &self,
+                )),
+                None => return Err(serde::de::Error::missing_field("tag")),
+            };
+
+            let this = ::serde::de::MapAccess::next_value::<Self::Value>(&mut map)?;
+            Ok(this)
+        }
+    };
+}
+
+pub(crate) use count_tts;
+pub(crate) use impl_visitor;
+pub(crate) use impl_visitor_ref;
+
 #[cfg(test)]
 mod tests {
     use super::*;
