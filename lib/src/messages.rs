@@ -22,7 +22,6 @@ use bytes::Bytes;
 use commit::Commit;
 use discard::Discard;
 use failure::Failure;
-use hello::Hello;
 use pull::Pull;
 use record::Record;
 use reset::Reset;
@@ -38,8 +37,13 @@ pub enum BoltResponse {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
 pub enum BoltRequest {
-    Hello(Hello),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+    )]
+    Hello(hello::Hello),
     Run(Run),
     Pull(Pull),
     Discard(Discard),
@@ -54,7 +58,6 @@ pub struct HelloBuilder {
     principal: BoltString,
     credentials: BoltString,
     routing: Option<BoltMap>,
-    version: Version,
 }
 
 impl HelloBuilder {
@@ -64,7 +67,6 @@ impl HelloBuilder {
             principal: principal.into(),
             credentials: credentials.into(),
             routing: None,
-            version: Version::V4,
         }
     }
 
@@ -75,23 +77,24 @@ impl HelloBuilder {
         }
     }
 
-    pub fn with_version(self, version: Version) -> Self {
-        Self { version, ..self }
-    }
-
-    pub fn build(self) -> BoltRequest {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
+    pub fn build(self, version: Version) -> BoltRequest {
         let HelloBuilder {
             agent,
             principal,
             credentials,
             routing,
-            version,
         } = self;
         BoltRequest::hello(agent, principal, credentials, routing, version)
     }
 }
 
+#[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
 impl BoltRequest {
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+    )]
     pub fn hello(
         agent: BoltString,
         principal: BoltString,
@@ -109,7 +112,7 @@ impl BoltRequest {
                 data.put("routing".into(), BoltType::Map(context));
             }
         }
-        BoltRequest::Hello(Hello::new(data))
+        BoltRequest::Hello(hello::Hello::new(data))
     }
 
     pub fn run(db: &str, query: &str, params: BoltMap) -> BoltRequest {
@@ -143,6 +146,7 @@ impl BoltRequest {
 }
 
 impl BoltRequest {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
     pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let bytes: Bytes = match self {
             BoltRequest::Hello(hello) => hello.into_bytes(version)?,

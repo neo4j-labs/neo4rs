@@ -1,13 +1,20 @@
+#![cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
+
 use crate::types::*;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x01)]
+#[cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+)]
 pub struct Hello {
     extra: BoltMap,
 }
 
 impl Hello {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(dead_code))]
     pub fn new(extra: BoltMap) -> Hello {
         Hello { extra }
     }
