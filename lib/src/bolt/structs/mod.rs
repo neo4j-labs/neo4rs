@@ -4,7 +4,9 @@ pub use self::datetime::{
     LegacyDateTimeZoneIdRef, LocalDateTime,
 };
 pub use self::duration::Duration;
+pub use self::node::{Node, NodeRef};
 mod date;
 mod datetime;
 mod de;
 mod duration;
+mod node;
