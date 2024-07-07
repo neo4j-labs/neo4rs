@@ -1,3 +1,5 @@
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::bolt::{Discard, Summary, WrapExtra as _};
 use crate::{
     errors::Result,
     messages::{BoltRequest, BoltResponse},
@@ -85,9 +87,21 @@ impl Query {
 
     async fn try_run(request: BoltRequest, connection: &mut ManagedConnection) -> QueryResult<()> {
         let _ = Self::try_request(request, connection).await?;
-        match connection.send_recv(BoltRequest::discard()).await {
-            Ok(BoltResponse::Success(_)) => Ok(()),
-            otherwise => wrap_error(otherwise, "DISCARD"),
+
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match connection.send_recv(BoltRequest::discard()).await {
+                Ok(BoltResponse::Success(_)) => Ok(()),
+                otherwise => wrap_error(otherwise, "DISCARD"),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match connection.send_recv_as(Discard::all()).await {
+                Ok(Summary::Success(_discard_success)) => Ok(()),
+                otherwise => wrap_error(otherwise, "DISCARD"),
+            }
         }
     }
 
@@ -128,12 +142,8 @@ impl From<&str> for Query {
 
 type QueryResult<T> = Result<T, backoff::Error<Error>>;
 
-fn wrap_error<T>(resp: Result<BoltResponse>, req: &'static str) -> QueryResult<T> {
-    let error = match resp {
-        Ok(BoltResponse::Failure(failure)) => Error::Neo4j(failure.into_error()),
-        Ok(resp) => resp.into_error(req),
-        Err(e) => e,
-    };
+fn wrap_error<T>(resp: impl IntoError, req: &'static str) -> QueryResult<T> {
+    let error = resp.into_error(req);
     let can_retry = match &error {
         Error::Neo4j(e) => e.can_retry(),
         _ => false,
@@ -143,6 +153,30 @@ fn wrap_error<T>(resp: Result<BoltResponse>, req: &'static str) -> QueryResult<T
         Err(backoff::Error::transient(error))
     } else {
         Err(backoff::Error::permanent(error))
+    }
+}
+
+trait IntoError {
+    fn into_error(self, msg: &'static str) -> Error;
+}
+
+impl IntoError for Result<BoltResponse> {
+    fn into_error(self, msg: &'static str) -> Error {
+        match self {
+            Ok(BoltResponse::Failure(failure)) => Error::Neo4j(failure.into_error()),
+            Ok(resp) => resp.into_error(msg),
+            Err(e) => e,
+        }
+    }
+}
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+impl<R: std::fmt::Debug> IntoError for Result<Summary<R>> {
+    fn into_error(self, msg: &'static str) -> Error {
+        match self {
+            Ok(resp) => resp.into_error(msg),
+            Err(e) => e,
+        }
     }
 }
 

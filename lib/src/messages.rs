@@ -19,7 +19,6 @@ use crate::{
 };
 use begin::Begin;
 use bytes::Bytes;
-use discard::Discard;
 use failure::Failure;
 use pull::Pull;
 use record::Record;
@@ -44,7 +43,11 @@ pub enum BoltRequest {
     Hello(hello::Hello),
     Run(Run),
     Pull(Pull),
-    Discard(Discard),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
+    Discard(discard::Discard),
     Begin(Begin),
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
@@ -129,8 +132,12 @@ impl BoltRequest {
         BoltRequest::Pull(Pull::new(n as i64, qid))
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
     pub fn discard() -> BoltRequest {
-        BoltRequest::Discard(Discard::default())
+        BoltRequest::Discard(discard::Discard::default())
     }
 
     pub fn begin(db: &str) -> BoltRequest {
