@@ -424,9 +424,7 @@ impl TryFrom<serde_json::Value> for BoltType {
     fn try_from(value: serde_json::Value) -> Result<Self, Error> {
         match value {
             serde_json::Value::Null => Ok(BoltType::Null(BoltNull)),
-            serde_json::Value::Bool(value) => {
-                Ok(BoltType::Boolean(BoltBoolean { value }))
-            }
+            serde_json::Value::Bool(value) => Ok(BoltType::Boolean(BoltBoolean { value })),
             serde_json::Value::Number(value) => {
                 if value.is_i64() {
                     let Some(value) = value.as_i64() else {
@@ -450,9 +448,7 @@ impl TryFrom<serde_json::Value> for BoltType {
                     Err(Error::ConversionError)
                 }
             }
-            serde_json::Value::String(value) => {
-                Ok(BoltType::String(BoltString { value }))
-            }
+            serde_json::Value::String(value) => Ok(BoltType::String(BoltString { value })),
             serde_json::Value::Array(values) => {
                 let values = values
                     .into_iter()
@@ -586,33 +582,34 @@ mod tests {
         fn json_to_bolt(value: serde_json::Value) -> Result<BoltType, Error> {
             value.try_into()
         }
-        assert_eq!(
-            json_to_bolt(serde_json::json!(42)).unwrap(),
-            42.into(),
-        );
+        assert_eq!(json_to_bolt(serde_json::json!(42)).unwrap(), 42.into(),);
         assert!(json_to_bolt(serde_json::json!(u64::MAX)).is_err());
-        assert_eq!(json_to_bolt(serde_json::json!({
-            "nested": {
-                "value": 42
-            },
-            "array": [1, 2, 3.14],
-            "value": 1337,
-        })).unwrap(), BoltType::Map(BoltMap {
-            value: HashMap::from([
-                ("nested".into(), BoltType::Map(BoltMap {
-                    value: HashMap::from([
-                        ("value".into(), 42.into()),
-                    ]),
-                })),
-                ("array".into(), BoltType::List(BoltList {
-                    value: vec![
-                        1.into(),
-                        2.into(),
-                        3.14.into(),
-                    ],
-                })),
-                ("value".into(), 1337.into()),
-            ]),
-        }));
+        assert_eq!(
+            json_to_bolt(serde_json::json!({
+                "nested": {
+                    "value": 42
+                },
+                "array": [1, 2, 3.14],
+                "value": 1337,
+            }))
+            .unwrap(),
+            BoltType::Map(BoltMap {
+                value: HashMap::from([
+                    (
+                        "nested".into(),
+                        BoltType::Map(BoltMap {
+                            value: HashMap::from([("value".into(), 42.into()),]),
+                        })
+                    ),
+                    (
+                        "array".into(),
+                        BoltType::List(BoltList {
+                            value: vec![1.into(), 2.into(), 3.14.into(),],
+                        })
+                    ),
+                    ("value".into(), 1337.into()),
+                ]),
+            })
+        );
     }
 }
