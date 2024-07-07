@@ -1,3 +1,5 @@
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::bolt::{Commit, Summary};
 use crate::{
     config::Database,
     errors::Result,
@@ -58,10 +60,21 @@ impl Txn {
 
     /// Commits the transaction in progress
     pub async fn commit(mut self) -> Result<()> {
-        let commit = BoltRequest::commit();
-        match self.connection.send_recv(commit).await? {
-            BoltResponse::Success(_) => Ok(()),
-            msg => Err(msg.into_error("COMMIT")),
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            let commit = BoltRequest::commit();
+            match self.connection.send_recv(commit).await? {
+                BoltResponse::Success(_) => Ok(()),
+                msg => Err(msg.into_error("COMMIT")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match self.connection.send_recv_as(Commit).await? {
+                Summary::Success(_) => Ok(()),
+                msg => Err(msg.into_error("COMMIT")),
+            }
         }
     }
 

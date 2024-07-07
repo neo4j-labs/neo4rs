@@ -1,10 +1,17 @@
+#![cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
+
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB0, 0x12)]
+#[cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+)]
 pub struct Commit;
 
 impl Commit {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(dead_code))]
     pub fn new() -> Commit {
         Commit {}
     }

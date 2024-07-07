@@ -19,7 +19,6 @@ use crate::{
 };
 use begin::Begin;
 use bytes::Bytes;
-use commit::Commit;
 use discard::Discard;
 use failure::Failure;
 use pull::Pull;
@@ -48,7 +47,11 @@ pub enum BoltRequest {
     Pull(Pull),
     Discard(Discard),
     Begin(Begin),
-    Commit(Commit),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+    )]
+    Commit(commit::Commit),
     Rollback(Rollback),
     Reset(Reset),
 }
@@ -132,8 +135,12 @@ impl BoltRequest {
         BoltRequest::Begin(begin)
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+    )]
     pub fn commit() -> BoltRequest {
-        BoltRequest::Commit(Commit::new())
+        BoltRequest::Commit(commit::Commit::new())
     }
 
     pub fn rollback() -> BoltRequest {
