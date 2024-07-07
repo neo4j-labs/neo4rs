@@ -94,7 +94,7 @@ impl Query {
 
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
-            match connection.send_recv(BoltRequest::discard()).await {
+            match connection.send_recv(BoltRequest::discard_all()).await {
                 Ok(BoltResponse::Success(_)) => Ok(()),
                 otherwise => wrap_error(otherwise, "DISCARD"),
             }

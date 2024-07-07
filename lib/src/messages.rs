@@ -148,8 +148,16 @@ impl BoltRequest {
         feature = "unstable-bolt-protocol-impl-v2",
         deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
     )]
-    pub fn discard() -> BoltRequest {
+    pub fn discard_all() -> BoltRequest {
         BoltRequest::Discard(discard::Discard::default())
+    }
+
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
+    pub fn discard_all_for(query_id: i64) -> BoltRequest {
+        BoltRequest::Discard(discard::Discard::new(-1, query_id))
     }
 
     pub fn begin(db: Option<&str>) -> BoltRequest {
