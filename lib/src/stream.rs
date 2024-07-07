@@ -1,9 +1,16 @@
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+use crate::messages::{BoltRequest, BoltResponse};
 #[cfg(feature = "unstable-streaming-summary")]
 use crate::summary::StreamingSummary;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::{
+    bolt::{Bolt, Pull, Response, WrapExtra as _},
+    summary::Streaming,
+    BoltType,
+};
 
 use crate::{
     errors::{Error, Result},
-    messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
     row::Row,
     txn::TransactionHandle,
@@ -118,27 +125,60 @@ impl RowStream {
 
             match self.state {
                 State::Ready => {
-                    let pull = BoltRequest::pull(self.fetch_size, self.qid);
-                    let connection = handle.connection();
-                    connection.send(pull).await?;
+                    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                    {
+                        let pull = Pull::some(self.fetch_size as i64).for_query(self.qid);
+                        let connection = handle.connection();
+                        connection.send_as(pull).await?;
 
-                    self.state = loop {
-                        match connection.recv().await {
-                            Ok(BoltResponse::Success(s)) => {
-                                break if s.get("has_more").unwrap_or(false) {
-                                    State::Ready
-                                } else {
-                                    State::Complete(None)
-                                };
+                        self.state = loop {
+                            let response = connection
+                                .recv_as::<Response<Vec<Bolt>, Streaming>>()
+                                .await?;
+                            match response {
+                                Response::Detail(record) => {
+                                    let record = BoltList::from(
+                                        record
+                                            .into_iter()
+                                            .map(BoltType::from)
+                                            .collect::<Vec<BoltType>>(),
+                                    );
+                                    let row = Row::new(self.fields.clone(), record);
+                                    self.buffer.push_back(row);
+                                }
+                                Response::Success(Streaming::HasMore) => break State::Ready,
+                                Response::Success(Streaming::Done(s)) => {
+                                    break State::Complete(Some(s))
+                                }
+                                otherwise => return Err(otherwise.into_error("PULL")),
                             }
-                            Ok(BoltResponse::Record(record)) => {
-                                let row = Row::new(self.fields.clone(), record.data);
-                                self.buffer.push_back(row);
+                        };
+                    }
+
+                    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+                    {
+                        let pull = BoltRequest::pull(self.fetch_size, self.qid);
+                        let connection = handle.connection();
+                        connection.send(pull).await?;
+
+                        self.state = loop {
+                            match connection.recv().await {
+                                Ok(BoltResponse::Success(s)) => {
+                                    break if s.get("has_more").unwrap_or(false) {
+                                        State::Ready
+                                    } else {
+                                        State::Complete(None)
+                                    };
+                                }
+                                Ok(BoltResponse::Record(record)) => {
+                                    let row = Row::new(self.fields.clone(), record.data);
+                                    self.buffer.push_back(row);
+                                }
+                                Ok(msg) => return Err(msg.into_error("PULL")),
+                                Err(e) => return Err(e),
                             }
-                            Ok(msg) => return Err(msg.into_error("PULL")),
-                            Err(e) => return Err(e),
-                        }
-                    };
+                        };
+                    }
                 }
                 State::Complete(ref mut _summary) => {
                     #[cfg(feature = "unstable-streaming-summary")]
