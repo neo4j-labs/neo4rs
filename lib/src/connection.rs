@@ -123,12 +123,12 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
-    pub(crate) async fn _send_recv_as<T: Message + ExpectedResponse>(
+    pub(crate) async fn send_recv_as<T: Message + ExpectedResponse>(
         &mut self,
         message: T,
     ) -> Result<T::Response> {
-        self._send_as(message).await?;
-        self._recv_as().await
+        self.send_as(message).await?;
+        self.recv_as().await
     }
 
     pub async fn send(&mut self, message: BoltRequest) -> Result<()> {
@@ -137,7 +137,7 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
-    pub(crate) async fn _send_as<T: Message>(&mut self, message: T) -> Result<()> {
+    pub(crate) async fn send_as<T: Message>(&mut self, message: T) -> Result<()> {
         let bytes = message.to_bytes()?;
         self.send_bytes(bytes).await
     }
@@ -148,12 +148,14 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
-    pub(crate) async fn _recv_as<T: MessageResponse>(&mut self) -> Result<T> {
+    pub(crate) async fn recv_as<T: MessageResponse>(&mut self) -> Result<T> {
         let bytes = self.recv_bytes().await?;
         Ok(T::parse(bytes)?)
     }
 
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
+        #[cfg(debug_assertions)]
+        Self::dbg("send", &bytes);
         let end_marker: [u8; 2] = [0, 0];
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
@@ -176,7 +178,10 @@ impl Connection {
             chunk_size = self.read_chunk_size().await?;
         }
 
-        Ok(bytes.freeze())
+        let bytes = bytes.freeze();
+        #[cfg(debug_assertions)]
+        Self::dbg("recv", &bytes);
+        Ok(bytes)
     }
 
     async fn read_chunk_size(&mut self) -> Result<usize> {
@@ -202,6 +207,11 @@ impl Connection {
         }
         self.stream.read_exact(&mut buf[pos..]).await?;
         Ok(())
+    }
+
+    #[cfg(debug_assertions)]
+    fn dbg(tag: &str, bytes: &Bytes) {
+        eprintln!("[{}] {:?}", tag, crate::bolt::Dbg(bytes));
     }
 }
 
