@@ -33,6 +33,10 @@ pub enum Error {
     #[error("connection error")]
     ConnectionError,
 
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    #[error("The connection has been closed [{}]: {}", _0.code, _0.message)]
+    ConnectionClosed(crate::bolt::Failure),
+
     #[error("attempted to serialize excessively long string")]
     StringTooLong,
 

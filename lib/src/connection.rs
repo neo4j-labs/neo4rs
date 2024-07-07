@@ -1,5 +1,5 @@
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{ExpectedResponse, Hello, Message, MessageResponse, Summary};
+use crate::bolt::{ExpectedResponse, Hello, Message, MessageResponse, Reset, Summary};
 use crate::{
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
@@ -117,14 +117,29 @@ impl Connection {
     }
 
     pub async fn reset(&mut self) -> Result<()> {
-        match self.send_recv(BoltRequest::reset()).await? {
-            BoltResponse::Success(_) => Ok(()),
-            BoltResponse::Failure(f) => Err(Error::Failure {
-                code: f.code().into(),
-                message: f.message().into(),
-                msg: "RESET",
-            }),
-            msg => Err(msg.into_error("RESET")),
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match self.send_recv(BoltRequest::reset()).await? {
+                BoltResponse::Success(_) => Ok(()),
+                BoltResponse::Failure(f) => Err(Error::Failure {
+                    code: f.code().into(),
+                    message: f.message().into(),
+                    msg: "RESET",
+                }),
+                msg => Err(msg.into_error("RESET")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match self.send_recv_as(Reset).await? {
+                Summary::Success(_) => Ok(()),
+                Summary::Failure(err) => Err(Error::ConnectionClosed(err)),
+                msg => Err(Error::UnexpectedMessage(format!(
+                    "unexpected response for RESET: {:?}",
+                    msg
+                ))),
+            }
         }
     }
 
