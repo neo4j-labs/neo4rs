@@ -10,6 +10,7 @@ use serde::{
 
 mod detail;
 mod request;
+mod structs;
 mod summary;
 
 pub use request::{Commit, Discard, Goodbye, Hello, Reset, Rollback, WrapExtra};
