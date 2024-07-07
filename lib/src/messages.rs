@@ -24,7 +24,6 @@ use failure::Failure;
 use pull::Pull;
 use record::Record;
 use reset::Reset;
-use rollback::Rollback;
 use run::Run;
 pub(crate) use success::Success;
 
@@ -52,7 +51,11 @@ pub enum BoltRequest {
         deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
     )]
     Commit(commit::Commit),
-    Rollback(Rollback),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+    )]
+    Rollback(rollback::Rollback),
     Reset(Reset),
 }
 
@@ -143,8 +146,12 @@ impl BoltRequest {
         BoltRequest::Commit(commit::Commit::new())
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+    )]
     pub fn rollback() -> BoltRequest {
-        BoltRequest::Rollback(Rollback::new())
+        BoltRequest::Rollback(rollback::Rollback::new())
     }
 
     pub fn reset() -> BoltRequest {
