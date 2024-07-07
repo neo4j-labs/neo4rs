@@ -8,6 +8,320 @@ use serde::{
     Deserialize, Deserializer,
 };
 
+use super::{
+    Bolt, BoltRef, Date, DateTime, DateTimeZoneId, DateTimeZoneIdRef, Duration, LegacyDateTime,
+    LegacyDateTimeZoneId, LegacyDateTimeZoneIdRef, LocalDateTime, LocalTime, Node, NodeRef, Path,
+    PathRef, Point2D, Point3D, Relationship, RelationshipRef, Time,
+};
+
+impl<'de> Deserialize<'de> for BoltRef<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Vis<'de>(PhantomData<&'de ()>);
+
+        impl<'de> Visitor<'de> for Vis<'de> {
+            type Value = BoltRef<'de>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("A Bolt Node struct")
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::Null)
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::Boolean(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::Integer(v))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                // TODO
+                Ok(BoltRef::Integer(v as i64))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::Float(v))
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::String(v))
+            }
+
+            fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(BoltRef::Bytes(v))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut items = seq.size_hint().map_or_else(Vec::new, Vec::with_capacity);
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(BoltRef::List(items))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut items = map
+                    .size_hint()
+                    .map_or_else(HashMap::new, HashMap::with_capacity);
+
+                while let Some((key, value)) = map.next_entry::<&str, BoltRef>()? {
+                    items.insert(key, value);
+                }
+                Ok(BoltRef::Dictionary(items))
+            }
+
+            fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
+            where
+                A: EnumAccess<'de>,
+            {
+                let (tag, data) = data.variant::<u8>()?;
+                match tag {
+                    0x4E => data
+                        .struct_variant(&[], NodeRef::visitor())
+                        .map(BoltRef::Node),
+                    0x52 => data
+                        .struct_variant(&[], RelationshipRef::visitor())
+                        .map(BoltRef::Relationship),
+                    0x50 => data
+                        .struct_variant(&[], PathRef::visitor())
+                        .map(BoltRef::Path),
+                    0x44 => data.struct_variant(&[], Date::visitor()).map(BoltRef::Date),
+                    0x54 => data.struct_variant(&[], Time::visitor()).map(BoltRef::Time),
+                    0x74 => data
+                        .struct_variant(&[], LocalTime::visitor())
+                        .map(BoltRef::LocalTime),
+                    0x49 => data
+                        .struct_variant(&[], DateTime::visitor())
+                        .map(BoltRef::DateTime),
+                    0x69 => data
+                        .struct_variant(&[], DateTimeZoneIdRef::visitor())
+                        .map(BoltRef::DateTimeZoneId),
+                    0x64 => data
+                        .struct_variant(&[], LocalDateTime::visitor())
+                        .map(BoltRef::LocalDateTime),
+                    0x45 => data
+                        .struct_variant(&[], Duration::visitor())
+                        .map(BoltRef::Duration),
+                    0x58 => data
+                        .struct_variant(&[], Point2D::visitor())
+                        .map(BoltRef::Point2D),
+                    0x59 => data
+                        .struct_variant(&[], Point3D::visitor())
+                        .map(BoltRef::Point3D),
+                    0x46 => data
+                        .struct_variant(&[], LegacyDateTime::visitor())
+                        .map(BoltRef::LegacyDateTime),
+                    0x66 => data
+                        .struct_variant(&[], LegacyDateTimeZoneIdRef::visitor())
+                        .map(BoltRef::LegacyDateTimeZoneId),
+                    0x72 => Err(Error::invalid_type(
+                        serde::de::Unexpected::Other("unbounded relationship outside of a path"),
+                        &"a valid Bolt struct",
+                    )),
+                    _ => Err(Error::invalid_type(
+                        serde::de::Unexpected::Other(&format!("struct with tag {tag:02X}")),
+                        &"a valid Bolt struct",
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_bytes(Vis(PhantomData))
+    }
+}
+
+impl<'de> Deserialize<'de> for Bolt {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Vis;
+
+        impl<'de> Visitor<'de> for Vis {
+            type Value = Bolt;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("A Bolt Node struct")
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Null)
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Boolean(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Integer(v))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                // TODO
+                Ok(Bolt::Integer(v as i64))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Float(v))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::String(v.to_owned()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::String(v))
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Bytes(bytes::Bytes::copy_from_slice(v)))
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Bolt::Bytes(bytes::Bytes::from(v)))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut items = seq.size_hint().map_or_else(Vec::new, Vec::with_capacity);
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(Bolt::List(items))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut items = map
+                    .size_hint()
+                    .map_or_else(HashMap::new, HashMap::with_capacity);
+
+                while let Some((key, value)) = map.next_entry::<String, Bolt>()? {
+                    items.insert(key, value);
+                }
+                Ok(Bolt::Dictionary(items))
+            }
+
+            fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
+            where
+                A: EnumAccess<'de>,
+            {
+                let (tag, data) = data.variant::<u8>()?;
+                match tag {
+                    0x4E => data.struct_variant(&[], Node::visitor()).map(Bolt::Node),
+                    0x52 => data
+                        .struct_variant(&[], Relationship::visitor())
+                        .map(Bolt::Relationship),
+                    0x50 => data.struct_variant(&[], Path::visitor()).map(Bolt::Path),
+                    0x44 => data.struct_variant(&[], Date::visitor()).map(Bolt::Date),
+                    0x54 => data.struct_variant(&[], Time::visitor()).map(Bolt::Time),
+                    0x74 => data
+                        .struct_variant(&[], LocalTime::visitor())
+                        .map(Bolt::LocalTime),
+                    0x49 => data
+                        .struct_variant(&[], DateTime::visitor())
+                        .map(Bolt::DateTime),
+                    0x69 => data
+                        .struct_variant(&[], DateTimeZoneId::visitor())
+                        .map(Bolt::DateTimeZoneId),
+                    0x64 => data
+                        .struct_variant(&[], LocalDateTime::visitor())
+                        .map(Bolt::LocalDateTime),
+                    0x45 => data
+                        .struct_variant(&[], Duration::visitor())
+                        .map(Bolt::Duration),
+                    0x58 => data
+                        .struct_variant(&[], Point2D::visitor())
+                        .map(Bolt::Point2D),
+                    0x59 => data
+                        .struct_variant(&[], Point3D::visitor())
+                        .map(Bolt::Point3D),
+                    0x46 => data
+                        .struct_variant(&[], LegacyDateTime::visitor())
+                        .map(Bolt::LegacyDateTime),
+                    0x66 => data
+                        .struct_variant(&[], LegacyDateTimeZoneId::visitor())
+                        .map(Bolt::LegacyDateTimeZoneId),
+                    0x72 => Err(Error::invalid_type(
+                        serde::de::Unexpected::Other("unbounded relationship outside of a path"),
+                        &"a valid Bolt struct",
+                    )),
+                    _ => Err(Error::invalid_type(
+                        serde::de::Unexpected::Other(&format!("struct with tag {tag:02X}")),
+                        &"a valid Bolt struct",
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_bytes(Vis)
+    }
+}
+
 pub(super) struct Keys<'de>(pub(super) Vec<&'de str>);
 
 impl<'de> Deserialize<'de> for Keys<'de> {
