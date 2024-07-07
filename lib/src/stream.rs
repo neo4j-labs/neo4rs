@@ -1,4 +1,5 @@
 use crate::{
+    bolt::StreamingSummary,
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
@@ -7,7 +8,10 @@ use crate::{
     types::BoltList,
     DeError,
 };
-use futures::{stream::try_unfold, TryStream};
+use futures::{
+    stream::{try_unfold, TryStreamExt as _},
+    TryStream,
+};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
@@ -23,16 +27,6 @@ pub struct RowStream {
     buffer: VecDeque<Row>,
 }
 
-/// An abstraction over a stream of rows, this is returned as a result of [`crate::Graph::execute`].
-///
-/// A stream will contain a connection from the connection pool which will be released to the pool
-/// when the stream is dropped.
-#[must_use = "Results must be streamed through with `next` in order to execute the query"]
-pub struct DetachedRowStream {
-    stream: RowStream,
-    connection: ManagedConnection,
-}
-
 impl RowStream {
     pub(crate) fn new(qid: i64, fields: BoltList, fetch_size: usize) -> Self {
         RowStream {
@@ -45,9 +39,55 @@ impl RowStream {
     }
 }
 
+/// An abstraction over a stream of rows, this is returned as a result of [`crate::Graph::execute`].
+///
+/// A stream will contain a connection from the connection pool which will be released to the pool
+/// when the stream is dropped.
+#[must_use = "Results must be streamed through with `next` in order to execute the query"]
+pub struct DetachedRowStream {
+    stream: RowStream,
+    connection: ManagedConnection,
+}
+
 impl DetachedRowStream {
     pub(crate) fn new(stream: RowStream, connection: ManagedConnection) -> Self {
         DetachedRowStream { stream, connection }
+    }
+}
+
+pub enum RowItem<T = Row> {
+    Row(T),
+    Summary(Box<StreamingSummary>),
+    Done,
+}
+
+impl<T> RowItem<T> {
+    pub fn row(&self) -> Option<&T> {
+        match self {
+            RowItem::Row(row) => Some(row),
+            _ => None,
+        }
+    }
+
+    pub fn summary(&self) -> Option<&StreamingSummary> {
+        match self {
+            RowItem::Summary(summary) => Some(summary),
+            _ => None,
+        }
+    }
+
+    pub fn into_row(self) -> Option<T> {
+        match self {
+            RowItem::Row(row) => Some(row),
+            _ => None,
+        }
+    }
+
+    pub fn into_summary(self) -> Option<Box<StreamingSummary>> {
+        match self {
+            RowItem::Summary(summary) => Some(summary),
+            _ => None,
+        }
     }
 }
 
@@ -55,41 +95,50 @@ impl RowStream {
     /// A call to next() will return a row from an internal buffer if the buffer has any entries,
     /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
     /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
-    pub async fn next(&mut self, mut handle: impl TransactionHandle) -> Result<Option<Row>> {
+    pub async fn next(&mut self, handle: impl TransactionHandle) -> Result<Option<Row>> {
+        self.next_or_summary(handle)
+            .await
+            .map(|item| item.into_row())
+    }
+
+    /// A call to next_or_summary() will return a row from an internal buffer if the buffer has any entries,
+    /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
+    /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
+    pub async fn next_or_summary(&mut self, mut handle: impl TransactionHandle) -> Result<RowItem> {
         loop {
+            if let Some(row) = self.buffer.pop_front() {
+                return Ok(RowItem::Row(row));
+            }
+
             match self.state {
                 State::Ready => {
                     let pull = BoltRequest::pull(self.fetch_size, self.qid);
                     let connection = handle.connection();
                     connection.send(pull).await?;
-                    self.state = State::Streaming;
-                }
-                State::Streaming => {
-                    let connection = handle.connection();
-                    match connection.recv().await {
-                        Ok(BoltResponse::Success(s)) => {
-                            if s.get("has_more").unwrap_or(false) {
-                                self.state = State::Buffered;
-                            } else {
-                                self.state = State::Complete;
+
+                    self.state = loop {
+                        match connection.recv().await {
+                            Ok(BoltResponse::Success(s)) => {
+                                break if s.get("has_more").unwrap_or(false) {
+                                    State::Ready
+                                } else {
+                                    State::Complete(None)
+                                };
                             }
+                            Ok(BoltResponse::Record(record)) => {
+                                let row = Row::new(self.fields.clone(), record.data);
+                                self.buffer.push_back(row);
+                            }
+                            Ok(msg) => return Err(msg.into_error("PULL")),
+                            Err(e) => return Err(e),
                         }
-                        Ok(BoltResponse::Record(record)) => {
-                            let row = Row::new(self.fields.clone(), record.data);
-                            self.buffer.push_back(row);
-                        }
-                        Ok(msg) => return Err(msg.into_error("PULL")),
-                        Err(e) => return Err(e),
-                    }
+                    };
                 }
-                State::Buffered => {
-                    if !self.buffer.is_empty() {
-                        return Ok(self.buffer.pop_front());
-                    }
-                    self.state = State::Ready;
-                }
-                State::Complete => {
-                    return Ok(self.buffer.pop_front());
+                State::Complete(ref mut summary) => {
+                    return match summary.take() {
+                        Some(summary) => Ok(RowItem::Summary(summary)),
+                        None => Ok(RowItem::Done),
+                    };
                 }
             }
         }
@@ -101,13 +150,7 @@ impl RowStream {
         self,
         handle: impl TransactionHandle,
     ) -> impl TryStream<Ok = Row, Error = Error> {
-        try_unfold((self, handle), |(mut stream, mut hd)| async move {
-            match stream.next(&mut hd).await {
-                Ok(Some(row)) => Ok(Some((row, (stream, hd)))),
-                Ok(None) => Ok(None),
-                Err(e) => Err(e),
-            }
-        })
+        self.into_stream_convert(handle, Ok)
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -116,7 +159,7 @@ impl RowStream {
         self,
         handle: impl TransactionHandle,
     ) -> impl TryStream<Ok = T, Error = Error> {
-        self.into_stream_de(handle, |row| row.to::<T>())
+        self.into_stream_convert(handle, |row| row.to::<T>())
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -127,23 +170,35 @@ impl RowStream {
         handle: impl TransactionHandle + 'db,
         column: &'db str,
     ) -> impl TryStream<Ok = T, Error = Error> + 'db {
-        self.into_stream_de(handle, move |row| row.get::<T>(column))
+        self.into_stream_convert(handle, move |row| row.get::<T>(column))
     }
 
-    fn into_stream_de<T: DeserializeOwned>(
+    fn into_stream_convert<T>(
         self,
         handle: impl TransactionHandle,
-        deser: impl Fn(Row) -> Result<T, DeError>,
+        convert: impl Fn(Row) -> Result<T, DeError>,
     ) -> impl TryStream<Ok = T, Error = Error> {
+        self.into_stream_convert_and_summary(handle, convert)
+            .try_filter_map(|row| async { Ok(row.into_row()) })
+    }
+
+    fn into_stream_convert_and_summary<T>(
+        self,
+        handle: impl TransactionHandle,
+        convert: impl Fn(Row) -> Result<T, DeError>,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> {
         try_unfold(
-            (self, handle, deser),
+            (self, handle, convert),
             |(mut stream, mut hd, de)| async move {
-                match stream.next(&mut hd).await {
-                    Ok(Some(row)) => match de(row) {
-                        Ok(res) => Ok(Some((res, (stream, hd, de)))),
+                match stream.next_or_summary(&mut hd).await {
+                    Ok(RowItem::Row(row)) => match de(row) {
+                        Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
                         Err(e) => Err(Error::DeserializationError(e)),
                     },
-                    Ok(None) => Ok(None),
+                    Ok(RowItem::Summary(summary)) => {
+                        Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
+                    }
+                    Ok(RowItem::Done) => Ok(None),
                     Err(e) => Err(e),
                 }
             },
@@ -153,10 +208,17 @@ impl RowStream {
 
 impl DetachedRowStream {
     /// A call to next() will return a row from an internal buffer if the buffer has any entries,
-    /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the server (using the
-    /// fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
+    /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
+    /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
     pub async fn next(&mut self) -> Result<Option<Row>> {
         self.stream.next(&mut self.connection).await
+    }
+
+    /// A call to next_or_summary() will return a row from an internal buffer if the buffer has any entries,
+    /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
+    /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
+    pub async fn next_or_summary(&mut self) -> Result<RowItem> {
+        self.stream.next_or_summary(&mut self.connection).await
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -167,8 +229,6 @@ impl DetachedRowStream {
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every row is converted into a `T` by calling [`crate::row::Row::to`].
-    /// If the conversion fails and the result stream has exactly one column,
-    /// that single value will be converted by calling [`crate::BoltType::to`].
     pub fn into_stream_as<T: DeserializeOwned>(self) -> impl TryStream<Ok = T, Error = Error> {
         self.stream.into_stream_as(self.connection)
     }
@@ -184,10 +244,8 @@ impl DetachedRowStream {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum State {
     Ready,
-    Streaming,
-    Buffered,
-    Complete,
+    Complete(Option<Box<StreamingSummary>>),
 }
