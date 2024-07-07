@@ -22,7 +22,6 @@ use bytes::Bytes;
 use failure::Failure;
 use pull::Pull;
 use record::Record;
-use reset::Reset;
 use run::Run;
 pub(crate) use success::Success;
 
@@ -59,7 +58,11 @@ pub enum BoltRequest {
         deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
     )]
     Rollback(rollback::Rollback),
-    Reset(Reset),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+    )]
+    Reset(reset::Reset),
 }
 
 pub struct HelloBuilder {
@@ -161,8 +164,12 @@ impl BoltRequest {
         BoltRequest::Rollback(rollback::Rollback::new())
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+    )]
     pub fn reset() -> BoltRequest {
-        BoltRequest::Reset(Reset::new())
+        BoltRequest::Reset(reset::Reset::new())
     }
 }
 
