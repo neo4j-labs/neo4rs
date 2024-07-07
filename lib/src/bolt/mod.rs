@@ -13,11 +13,12 @@ mod packstream;
 mod request;
 mod summary;
 
-pub use detail::Detail;
 #[cfg(debug_assertions)]
 pub use packstream::debug::Dbg;
-use packstream::ser::AsMap;
-pub use packstream::{de, ser};
+#[cfg(test)]
+pub use packstream::value::{bolt, BoltBytesBuilder};
+pub use packstream::{de, from_bytes, ser, to_bytes};
+pub use request::{Commit, Discard, Goodbye, Hello, Reset, Rollback, WrapExtra};
 pub use summary::{Failure, Streaming, StreamingSummary, Success, Summary};
 
 pub(crate) trait Message: Serialize {
@@ -92,5 +93,17 @@ impl<'de, R: Deserialize<'de>, S: Deserialize<'de>> Deserialize<'de> for Respons
             &["Detail", "Success", "Ignore", "Failure"],
             Visitor(PhantomData),
         )
+    }
+}
+
+impl<R: std::fmt::Debug, S: std::fmt::Debug> Response<R, S> {
+    pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
+        match self {
+            Response::Failure(f) => f.into_error(msg),
+            otherwise => crate::Error::UnexpectedMessage(format!(
+                "unexpected response for {}: {:?}",
+                msg, otherwise
+            )),
+        }
     }
 }
