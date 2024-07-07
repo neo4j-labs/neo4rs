@@ -1,3 +1,8 @@
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::{
+    bolt::{Discard, Summary, WrapExtra as _},
+    Error,
+};
 use crate::{
     errors::Result,
     messages::{BoltRequest, BoltResponse},
@@ -44,12 +49,36 @@ impl Query {
 
     pub(crate) async fn run(self, db: &str, connection: &mut ManagedConnection) -> Result<()> {
         let run = BoltRequest::run(db, &self.query, self.params);
-        match connection.send_recv(run).await? {
-            BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
-                BoltResponse::Success(_) => Ok(()),
-                otherwise => Err(otherwise.into_error("DISCARD")),
-            },
-            msg => Err(msg.into_error("RUN")),
+
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match connection.send_recv(run).await? {
+                BoltResponse::Success(_) => {
+                    match connection.send_recv(BoltRequest::discard()).await? {
+                        BoltResponse::Success(_) => Ok(()),
+                        otherwise => Err(otherwise.into_error("DISCARD")),
+                    }
+                }
+                msg => Err(msg.into_error("RUN")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match connection.send_recv(run).await? {
+                BoltResponse::Success(_msg_success) => {
+                    match connection.send_recv_as(Discard::all()).await? {
+                        Summary::Success(_discard_success) => Ok(()),
+                        Summary::Ignored => Err(Error::Ignored("DISCARD")),
+                        Summary::Failure(f) => Err(Error::Failure {
+                            code: f.code,
+                            message: f.message,
+                            msg: "DISCARD",
+                        }),
+                    }
+                }
+                msg => Err(msg.into_error("RUN")),
+            }
         }
     }
 

@@ -1,12 +1,19 @@
+#![cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
+
 use crate::types::BoltMap;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x2F)]
+#[cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+)]
 pub struct Discard {
     extra: BoltMap,
 }
 
+#[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(dead_code))]
 impl Default for Discard {
     fn default() -> Self {
         Discard::new(-1, -1)
@@ -14,6 +21,7 @@ impl Default for Discard {
 }
 
 impl Discard {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(dead_code))]
     pub fn new(n: i64, qid: i64) -> Discard {
         let mut extra = BoltMap::default();
         extra.put("n".into(), n.into());
