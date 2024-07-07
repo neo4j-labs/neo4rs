@@ -10,6 +10,7 @@ use serde::{
 
 mod detail;
 mod packstream;
+mod request;
 mod summary;
 
 pub use detail::Detail;
