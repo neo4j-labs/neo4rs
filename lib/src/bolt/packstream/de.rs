@@ -18,8 +18,7 @@ impl<'a: 'de, 'de> de::Deserializer<'de> for Deserializer<'a> {
 
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 str
-        string newtype_struct ignored_any
-        map unit_struct struct enum identifier
+        string ignored_any map unit_struct struct enum identifier
     }
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -118,6 +117,21 @@ impl<'a: 'de, 'de> de::Deserializer<'de> for Deserializer<'a> {
         self.deserialize_bytes(visitor)
     }
 
+    fn deserialize_newtype_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if name == "__neo4rs::RawBytes" {
+            self.parse_next_item(Visitation::RawBytes, visitor)
+        } else {
+            self.parse_next_item(Visitation::default(), visitor)
+        }
+    }
+
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -158,14 +172,21 @@ impl<'de> Deserializer<'de> {
             return Err(Error::Empty);
         }
 
-        if let Visitation::SeqAsTuple(2) = v {
-            return if self.bytes[0] == 0x92 {
-                self.bytes.advance(1);
-                Self::parse_list(v, 2, self.bytes, visitor)
-            } else {
-                visitor.visit_seq(ItemsParser::new(2, self.bytes))
-            };
-        }
+        match v {
+            Visitation::SeqAsTuple(2) => {
+                return if self.bytes[0] == 0x92 {
+                    self.bytes.advance(1);
+                    Self::parse_list(v, 2, self.bytes, visitor)
+                } else {
+                    visitor.visit_seq(ItemsParser::new(2, self.bytes))
+                };
+            }
+            Visitation::RawBytes => {
+                let bytes = self.next_item_as_bytes()?;
+                return visitor.visit_bytes(&bytes);
+            }
+            _ => (),
+        };
 
         Self::parse(v, self.bytes, visitor)
     }
@@ -173,6 +194,22 @@ impl<'de> Deserializer<'de> {
     fn skip_next_item(self) -> Result<(), Error> {
         self.parse_next_item(Visitation::BytesAsBytes, de::IgnoredAny)
             .map(|_| ())
+    }
+
+    fn next_item_as_bytes(self) -> Result<Bytes, Error> {
+        let mut full_bytes = self.bytes.clone();
+
+        {
+            let this = Deserializer { bytes: self.bytes };
+            this.skip_next_item()?;
+        }
+
+        let start = full_bytes.as_ptr();
+        let end = self.bytes.as_ptr();
+
+        let len = unsafe { end.offset_from(start) };
+        full_bytes.truncate(len.unsigned_abs());
+        Ok(full_bytes)
     }
 
     fn parse<V: Visitor<'de>>(
@@ -227,12 +264,11 @@ impl<'de> Deserializer<'de> {
         bytes: &'de mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
-        debug_assert!(bytes.len() >= len);
-
-        let bytes = bytes.split_to(len);
+        let bytes = Self::take_slice(len, bytes);
         if v.visit_bytes_as_bytes() {
-            let bytes: &'de [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
-            visitor.visit_borrowed_bytes(bytes)
+            visitor.visit_borrowed_bytes(unsafe {
+                std::slice::from_raw_parts(bytes.as_ptr(), bytes.len())
+            })
         } else {
             visitor.visit_seq(SeqDeserializer::new(bytes.into_iter()))
         }
@@ -243,15 +279,18 @@ impl<'de> Deserializer<'de> {
         bytes: &'de mut Bytes,
         visitor: V,
     ) -> Result<V::Value, Error> {
-        debug_assert!(bytes.len() >= len);
-
-        let bytes = bytes.split_to(len);
-        let bytes: &'de [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
-
-        match std::str::from_utf8(bytes) {
-            Ok(s) => visitor.visit_borrowed_str(s),
+        let bytes = Self::take_slice(len, bytes);
+        match std::str::from_utf8(&bytes) {
+            Ok(s) => visitor.visit_borrowed_str(unsafe {
+                std::str::from_utf8_unchecked(std::slice::from_raw_parts(s.as_ptr(), s.len()))
+            }),
             Err(e) => Err(Error::InvalidUtf8(e)),
         }
+    }
+
+    fn take_slice(len: usize, bytes: &mut Bytes) -> Bytes {
+        debug_assert!(bytes.len() >= len);
+        bytes.split_to(len)
     }
 
     fn parse_list<V: Visitor<'de>>(
@@ -299,6 +338,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+#[derive(Debug)]
 struct ItemsParser<'a> {
     len: usize,
     excess: usize,
@@ -339,6 +379,10 @@ impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
         let bytes = self.bytes.get();
         seed.deserialize(Deserializer { bytes }).map(Some)
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len)
+    }
 }
 
 impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
@@ -364,6 +408,10 @@ impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
         let bytes = self.bytes.get();
         seed.deserialize(Deserializer { bytes })
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len)
+    }
 }
 
 impl<'a, 'de> VariantAccess<'de> for ItemsParser<'a> {
@@ -371,13 +419,6 @@ impl<'a, 'de> VariantAccess<'de> for ItemsParser<'a> {
 
     fn unit_variant(mut self) -> Result<(), Self::Error> {
         self.next_value()
-        // if self.len != 0 {
-        //     return Err(Error::InvalidLength {
-        //         expected: 0,
-        //         actual: self.len,
-        //     });
-        // }
-        // Ok(())
     }
 
     fn newtype_variant_seed<T>(mut self, seed: T) -> Result<T::Value, Self::Error>
@@ -385,73 +426,24 @@ impl<'a, 'de> VariantAccess<'de> for ItemsParser<'a> {
         T: DeserializeSeed<'de>,
     {
         self.next_value_seed(seed)
-        // let bytes = self.bytes.get();
-        // seed.deserialize(Deserializer { bytes })
     }
 
-    fn tuple_variant<V>(mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        struct TupleVariant<V> {
-            len: usize,
-            visitor: V,
-        }
-
-        impl<'de, V> DeserializeSeed<'de> for TupleVariant<V>
-        where
-            V: Visitor<'de>,
-        {
-            type Value = V::Value;
-
-            fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_tuple(self.len, self.visitor)
-            }
-        }
-
-        self.next_value_seed(TupleVariant { len, visitor })
-
-        // if len != self.len {
-        //     return Err(Error::InvalidLength {
-        //         expected: len,
-        //         actual: self.len,
-        //     });
-        // }
-        // visitor.visit_seq(self)
+        visitor.visit_seq(self)
     }
 
     fn struct_variant<V>(
-        mut self,
+        self,
         _fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        struct StructVariant<V> {
-            visitor: V,
-        }
-
-        impl<'de, V> DeserializeSeed<'de> for StructVariant<V>
-        where
-            V: Visitor<'de>,
-        {
-            type Value = V::Value;
-
-            fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_map(self.visitor)
-            }
-        }
-
-        self.next_value_seed(StructVariant { visitor })
-
-        // visitor.visit_map(self)
+        visitor.visit_seq(self)
     }
 }
 
@@ -479,6 +471,7 @@ enum Visitation {
     #[default]
     Default,
     BytesAsBytes,
+    RawBytes,
     MapAsSeq,
     SeqAsTuple(usize),
 }
@@ -496,6 +489,13 @@ impl Visitation {
 struct SharedBytes<'a> {
     bytes: *mut Bytes,
     _lifetime: PhantomData<&'a mut ()>,
+}
+
+#[cfg(debug_assertions)]
+impl<'a> fmt::Debug for SharedBytes<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::bolt::Dbg(unsafe { &*self.bytes }).fmt(f)
+    }
 }
 
 impl<'a> SharedBytes<'a> {
