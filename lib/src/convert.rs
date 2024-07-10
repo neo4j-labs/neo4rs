@@ -427,21 +427,25 @@ impl TryFrom<serde_json::Value> for BoltType {
             serde_json::Value::Bool(value) => Ok(BoltType::Boolean(BoltBoolean { value })),
             serde_json::Value::Number(value) => {
                 if value.is_i64() {
-                    let Some(value) = value.as_i64() else {
-                        return Err(Error::ConversionError);
+                    let value = match value.as_i64() {
+                        Some(value) => value,
+                        _ => return Err(Error::ConversionError),
                     };
                     Ok(BoltType::Integer(BoltInteger::new(value)))
                 } else if value.is_u64() {
-                    let Some(value) = value.as_u64() else {
-                        return Err(Error::ConversionError);
+                    let value = match value.as_u64() {
+                        Some(value) => value,
+                        _ => return Err(Error::ConversionError),
                     };
-                    let Ok(value) = i64::try_from(value) else {
-                        return Err(Error::ConversionError);
+                    let value = match i64::try_from(value) {
+                        Ok(value) => value,
+                        _ => return Err(Error::ConversionError),
                     };
                     Ok(BoltType::Integer(BoltInteger::new(value)))
                 } else if value.is_f64() {
-                    let Some(value) = value.as_f64() else {
-                        return Err(Error::ConversionError);
+                    let value = match value.as_f64() {
+                        Some(value) => value,
+                        _ => return Err(Error::ConversionError),
                     };
                     Ok(BoltType::Float(BoltFloat::new(value)))
                 } else {
