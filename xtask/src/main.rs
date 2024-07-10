@@ -66,7 +66,7 @@ fn update_msrv_lock() -> Result {
         }
     }
 
-    cmd!(sh, "cargo +1.63.0 test --no-run").run_if(dry_run)?;
+    cmd!(sh, "cargo +1.63.0 test --no-run --all-features").run_if(dry_run)?;
 
     cmd!(sh, "cp {lockfile} {ci_dir}/Cargo.lock.msrv").run_if(dry_run)?;
 
@@ -107,9 +107,12 @@ fn update_min_lock() -> Result {
 
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    cmd!(sh, "cargo +nightly -Z minimal-versions test --no-run")
-        .env("RUST_LOG", "debug")
-        .run_if(dry_run)?;
+    cmd!(
+        sh,
+        "cargo +nightly -Z minimal-versions test --no-run --all-features"
+    )
+    .env("RUST_LOG", "debug")
+    .run_if(dry_run)?;
 
     cmd!(sh, "cp {lockfile} {ci_dir}/Cargo.lock.min").run_if(dry_run)?;
 
