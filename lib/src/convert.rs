@@ -581,6 +581,7 @@ mod tests {
     }
 
     #[cfg(feature = "json")]
+    #[allow(clippy::approx_constant)]
     #[test]
     fn convert_from_json() {
         fn json_to_bolt(value: serde_json::Value) -> Result<BoltType, Error> {
