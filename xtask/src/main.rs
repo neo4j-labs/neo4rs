@@ -48,8 +48,10 @@ fn update_msrv_lock() -> Result {
     let sh = Shell::new()?;
 
     let pin_versions = [
+        ("cc".into(), "1.0.105"),
         ("chrono-tz".into(), "0.8.3"),
         ("chrono".into(), "0.4.23"),
+        ("deadpool-runtime".into(), "0.1.3"),
         ("regex".into(), "1.9.6"),
         (latest_version(&sh, "serde_with")?, "3.1.0"),
         (latest_version(&sh, "time")?, "0.3.20"),
