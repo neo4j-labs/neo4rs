@@ -3,11 +3,11 @@ name: checks
 on:
   push:
     branches:
-      - master
+      - main
   merge_group:
   pull_request:
     branches:
-      - master
+      - main
   workflow_dispatch:
     inputs:
       crate:
