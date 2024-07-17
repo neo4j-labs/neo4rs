@@ -21,7 +21,7 @@ on:
 env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
-  MSRV: 1.63.0
+  MSRV: 1.75.0
 
 jobs:
   check:
@@ -97,16 +97,6 @@ jobs:
         os: [windows-latest, macOS-latest, ubuntu-latest]
         rust: [stable]
         flags: ['', --all-features]
-        include:
-          - os: ubuntu-latest
-            rust: 1.63.0
-            flags: ''
-          - os: ubuntu-latest
-            rust: 1.63.0
-            flags: '--all-features'
-          - os: ubuntu-latest
-            rust: beta
-            flags: '--all-features'
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -123,7 +113,7 @@ jobs:
         uses: taiki-e/install-action@nextest
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
-        if: matrix.rust == '1.63.0'
+        if: matrix.rust == '1.75.0'
       - name: Run unit tests
         run: cargo +${{ matrix.rust }} nextest run --lib ${{ matrix.flags }}
 

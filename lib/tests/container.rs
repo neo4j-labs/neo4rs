@@ -1,6 +1,6 @@
 use lenient_semver::Version;
 use neo4rs::{ConfigBuilder, Graph};
-use testcontainers::{clients::Cli, Container, RunnableImage};
+use testcontainers::{runners::SyncRunner, Container, ImageExt};
 use testcontainers_modules::neo4j::{Neo4j, Neo4jImage};
 
 use std::{error::Error, io::BufRead as _};
@@ -41,7 +41,7 @@ impl Neo4jContainerBuilder {
 pub struct Neo4jContainer {
     graph: Graph,
     version: String,
-    _container: Option<Container<'static, Neo4jImage>>,
+    _container: Option<Container<Neo4jImage>>,
 }
 
 impl Neo4jContainer {
@@ -105,14 +105,10 @@ impl Neo4jContainer {
     fn create_testcontainer(
         connection: &TestConnection,
         enterprise: bool,
-    ) -> Result<(String, Container<'static, Neo4jImage>), Box<dyn Error + Send + Sync + 'static>>
-    {
+    ) -> Result<(String, Container<Neo4jImage>), Box<dyn Error + Send + Sync + 'static>> {
         let image = Neo4j::new()
             .with_user(connection.auth.user.to_owned())
             .with_password(connection.auth.pass.to_owned());
-
-        let docker = Cli::default();
-        let docker = Box::leak(Box::new(docker));
 
         let container = if enterprise {
             const ACCEPTANCE_FILE_NAME: &str = "container-license-acceptance.txt";
@@ -145,15 +141,16 @@ impl Neo4jContainer {
                 )
                 .into());
             }
-            let image: RunnableImage<Neo4jImage> = image.with_version(version).into();
-            let image = image.with_env_var(("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes"));
 
-            docker.run(image)
+            image
+                .with_version(version)
+                .with_env_var("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
+                .start()?
         } else {
-            docker.run(image.with_version(connection.version.to_owned()))
+            image.with_version(connection.version.to_owned()).start()?
         };
 
-        let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4());
+        let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4()?);
 
         Ok((uri, container))
     }
