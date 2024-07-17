@@ -1,10 +1,14 @@
 #[macro_export]
 macro_rules! cenum {
     ($name:ident { $($variants:ident),+ $(,)? }) => {
+        $crate::cenum!(pub $name { $($variants),+ });
+    };
+
+    ($vis:vis $name:ident { $($variants:ident),+ $(,)? }) => {
 
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
         #[repr(u8)]
-        pub enum $name {
+        $vis enum $name {
             $(
                 $variants,
             )+

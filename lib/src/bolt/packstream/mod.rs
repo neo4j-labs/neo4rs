@@ -1,10 +1,104 @@
 use bytes::Bytes;
-use serde::de::{Deserialize, DeserializeOwned};
+use serde::{
+    de::{Deserialize, DeserializeOwned, DeserializeSeed},
+    Deserializer,
+};
 
-#[path = "de.rs"]
 pub mod de;
-#[path = "ser.rs"]
 pub mod ser;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Data {
+    bytes: Bytes,
+    keep_alive: Bytes,
+}
+
+impl Data {
+    pub fn new(bytes: Bytes) -> Self {
+        let keep_alive = bytes.clone();
+        Self { bytes, keep_alive }
+    }
+
+    #[cfg(test)]
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn bytes_mut(&mut self) -> &mut Bytes {
+        &mut self.bytes
+    }
+
+    pub fn reset(&mut self) {
+        self.bytes = self.keep_alive.clone();
+    }
+
+    pub fn into_inner(self) -> Bytes {
+        self.keep_alive
+    }
+
+    pub(crate) fn reset_to(&mut self, bytes: Bytes) -> Bytes {
+        let old = std::mem::replace(&mut self.keep_alive, bytes.clone());
+        self.bytes = bytes;
+        old
+    }
+}
+
+impl<'de> Deserialize<'de> for Data {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        RawBytes::deserialize(deserializer).map(|bytes| Self::new(bytes.0))
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct RawBytes(pub(crate) Bytes);
+
+impl<'de> Deserialize<'de> for RawBytes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RawBytesVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for RawBytesVisitor {
+            type Value = Bytes;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a pointer to a Bytes instance")
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                let bytes = v as usize as *mut Bytes;
+                let bytes = unsafe { Box::from_raw(bytes) };
+                let bytes = *bytes;
+                Ok(bytes)
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Bytes::copy_from_slice(v))
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Bytes::from(v))
+            }
+        }
+
+        deserializer
+            .deserialize_newtype_struct("__neo4rs::RawBytes", RawBytesVisitor)
+            .map(Self)
+    }
+}
 
 /// Parse and deserialize a packstream value from the given bytes.
 pub fn from_bytes<T>(mut bytes: Bytes) -> Result<T, de::Error>
@@ -18,15 +112,23 @@ where
 }
 
 /// Parse and deserialize a packstream value from the given bytes.
-#[allow(unused)]
-pub fn from_bytes_ref<'de, T: 'de>(bytes: &'de mut Bytes) -> Result<T, de::Error>
+pub(crate) fn from_bytes_ref<'de, T>(bytes: &'de mut Data) -> Result<T, de::Error>
 where
-    T: Deserialize<'de>,
+    T: Deserialize<'de> + 'de,
 {
-    let de = de::Deserializer::new(bytes);
+    let de = de::Deserializer::new(bytes.bytes_mut());
     let value = T::deserialize(de)?;
 
     Ok(value)
+}
+
+/// Parse and deserialize a packstream value from the given bytes.
+pub(crate) fn from_bytes_seed<'de, S>(bytes: &'de mut Data, seed: S) -> Result<S::Value, de::Error>
+where
+    S: DeserializeSeed<'de>,
+{
+    let de = de::Deserializer::new(bytes.bytes_mut());
+    seed.deserialize(de)
 }
 
 /// Serialize and packstream encode the given value.
@@ -209,8 +311,25 @@ pub mod value {
             self
         }
 
+        pub fn extend(mut self, bytes: impl AsRef<[u8]>) -> Self {
+            self.data.put_slice(bytes.as_ref());
+            self
+        }
+
         pub fn build(self) -> Bytes {
             self.data.freeze()
+        }
+    }
+
+    impl Default for BoltBytesBuilder {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl From<BoltBytesBuilder> for Bytes {
+        fn from(builder: BoltBytesBuilder) -> Self {
+            builder.build()
         }
     }
 }
@@ -221,6 +340,18 @@ pub mod debug {
 
     pub struct Dbg<'a>(pub &'a Bytes);
 
+    struct Tag(u8);
+
+    impl std::fmt::Display for Tag {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if self.0.is_ascii_alphanumeric() {
+                write!(f, "'{}' (0x{:02X})", self.0 as char, self.0)
+            } else {
+                write!(f, "0x{:02X}", self.0)
+            }
+        }
+    }
+
     impl std::fmt::Debug for Dbg<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let mut bytes = self.0.clone();
@@ -228,8 +359,8 @@ pub mod debug {
             macro_rules! string {
                 ($bytes:expr) => {
                     match ::std::str::from_utf8(&$bytes) {
-                        Ok(str) => f.write_str(str),
-                        Err(e) => write!(f, "{:?} (invalid utf8: {:?})", bytes, e),
+                        Ok(s) => write!(f, "\"{}\"", s),
+                        Err(e) => write!(f, "[{:?}] (invalid utf8: {:?})", bytes, e),
                     }
                 };
             }
@@ -249,38 +380,38 @@ pub mod debug {
 
                 match hi {
                     0x8 => string!(bytes.split_to(lo as _)),
-                    0x9 => write!(f, "List<{}>", lo),
-                    0xA => write!(f, "Map<{}>", lo),
-                    0xB => write!(f, "Struct<tag={:02X} len={}>", bytes.get_u8(), lo),
+                    0x9 => write!(f, "(List[{}])", lo),
+                    0xA => write!(f, "(Map[{}])", lo),
+                    0xB => write!(f, "(Struct<tag={} len={1}>)", Tag(bytes.get_u8()), lo),
                     0xC => match lo {
                         0x0 => write!(f, "NULL"),
-                        0x1 => write!(f, "Float<{}>", bytes.get_f64()),
+                        0x1 => write!(f, "Float({})", bytes.get_f64()),
                         0x2 => write!(f, "FALSE"),
                         0x3 => write!(f, "TRUE"),
-                        0x8 => write!(f, "Int<{}>", bytes.get_i8()),
-                        0x9 => write!(f, "Int<{}>", bytes.get_i16()),
-                        0xA => write!(f, "Int<{}>", bytes.get_i32()),
-                        0xB => write!(f, "Int<{}>", bytes.get_i64()),
-                        0xC => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u8() as _))),
-                        0xD => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u16() as _))),
-                        0xE => write!(f, "{:0X}", split!(bytes.split_to(bytes.get_u32() as _))),
+                        0x8 => write!(f, "Int({})", bytes.get_i8()),
+                        0x9 => write!(f, "Int({})", bytes.get_i16()),
+                        0xA => write!(f, "Int({})", bytes.get_i32()),
+                        0xB => write!(f, "Int({})", bytes.get_i64()),
+                        0xC => write!(f, "[{:0X}]", split!(bytes.split_to(bytes.get_u8() as _))),
+                        0xD => write!(f, "[{:0X}]", split!(bytes.split_to(bytes.get_u16() as _))),
+                        0xE => write!(f, "[{:0X}]", split!(bytes.split_to(bytes.get_u32() as _))),
                         _ => write!(f, "Unknown marker"),
                     },
                     0xD => match lo {
                         0x0 => string!(split!(bytes.split_to(bytes.get_u8() as _))),
                         0x1 => string!(split!(bytes.split_to(bytes.get_u16() as _))),
                         0x2 => string!(split!(bytes.split_to(bytes.get_u32() as _))),
-                        0x4 => write!(f, "List<{}>", bytes.get_u8()),
-                        0x5 => write!(f, "List<{}>", bytes.get_u16()),
-                        0x6 => write!(f, "List<{}>", bytes.get_u32()),
-                        0x8 => write!(f, "Map<{}>", bytes.get_u8()),
-                        0x9 => write!(f, "Map<{}>", bytes.get_u16()),
-                        0xA => write!(f, "Map<{}>", bytes.get_u32()),
+                        0x4 => write!(f, "(List[{}])", bytes.get_u8()),
+                        0x5 => write!(f, "(List[{}])", bytes.get_u16()),
+                        0x6 => write!(f, "(List[{}])", bytes.get_u32()),
+                        0x8 => write!(f, "(Map[{}])", bytes.get_u8()),
+                        0x9 => write!(f, "(Map[{}])", bytes.get_u16()),
+                        0xA => write!(f, "(Map[{}])", bytes.get_u32()),
                         // C, D => struct 8/16
                         _ => write!(f, "Unknown marker"),
                     },
                     0xE => write!(f, "Unknown marker"),
-                    _ => write!(f, "Int<{}>", marker as i8),
+                    _ => write!(f, "Int({})", marker as i8),
                 }?
             }
 
