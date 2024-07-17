@@ -1,5 +1,6 @@
+#[cfg(feature = "bolt-protocol-impl-v2")]
+use crate::bolt::{ExpectedResponse, Message, MessageResponse};
 use crate::{
-    bolt::{ExpectedResponse, Message, MessageResponse},
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
@@ -121,6 +122,7 @@ impl Connection {
         self.recv().await
     }
 
+    #[cfg(feature = "bolt-protocol-impl-v2")]
     pub(crate) async fn _send_recv_as<T: Message + ExpectedResponse>(
         &mut self,
         message: T,
@@ -134,6 +136,7 @@ impl Connection {
         self.send_bytes(bytes).await
     }
 
+    #[cfg(feature = "bolt-protocol-impl-v2")]
     pub(crate) async fn _send_as<T: Message>(&mut self, message: T) -> Result<()> {
         let bytes = message.to_bytes()?;
         self.send_bytes(bytes).await
@@ -144,6 +147,7 @@ impl Connection {
         BoltResponse::parse(self.version, bytes)
     }
 
+    #[cfg(feature = "bolt-protocol-impl-v2")]
     pub(crate) async fn _recv_as<T: MessageResponse>(&mut self) -> Result<T> {
         let bytes = self.recv_bytes().await?;
         Ok(T::parse(bytes)?)
