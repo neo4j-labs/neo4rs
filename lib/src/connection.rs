@@ -13,7 +13,10 @@ use tokio::{
     net::TcpStream,
 };
 use tokio_rustls::{
-    rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName},
+    rustls::{
+        pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName},
+        ClientConfig, RootCertStore,
+    },
     TlsConnector,
 };
 use url::{Host, Url};
@@ -51,19 +54,9 @@ impl Connection {
         password: &str,
     ) -> Result<Connection> {
         let mut root_cert_store = RootCertStore::empty();
-        #[allow(deprecated)]
-        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
-            |ta| {
-                OwnedTrustAnchor::from_subject_spki_name_constraints(
-                    ta.subject,
-                    ta.spki,
-                    ta.name_constraints,
-                )
-            },
-        ));
+        root_cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().map(ToOwned::to_owned));
 
         let config = ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_cert_store)
             .with_no_client_auth();
 
@@ -71,10 +64,10 @@ impl Connection {
         let connector = TlsConnector::from(config);
 
         let domain = match host {
-            Host::Domain(domain) => ServerName::try_from(domain.as_ref())
+            Host::Domain(domain) => ServerName::try_from(domain.as_ref().to_owned())
                 .map_err(|_| Error::InvalidDnsName(domain.as_ref().to_owned()))?,
-            Host::Ipv4(ip) => ServerName::IpAddress((*ip).into()),
-            Host::Ipv6(ip) => ServerName::IpAddress((*ip).into()),
+            Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(Ipv4Addr::from(*ip))),
+            Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(Ipv6Addr::from(*ip))),
         };
 
         let stream = connector.connect(domain, stream).await?;

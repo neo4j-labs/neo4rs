@@ -103,12 +103,3 @@ impl std::convert::From<deadpool::managed::PoolError<Error>> for Error {
         }
     }
 }
-
-impl std::convert::From<deadpool::managed::BuildError<Error>> for Error {
-    fn from(value: deadpool::managed::BuildError<Error>) -> Self {
-        match value {
-            deadpool::managed::BuildError::Backend(e) => e,
-            _ => Error::ConnectionError,
-        }
-    }
-}
