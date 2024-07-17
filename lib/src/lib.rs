@@ -148,6 +148,33 @@
 //!
 //! ```
 //!
+#![cfg_attr(
+    feature = "unstable-streaming-summary",
+    doc = r##"### Streaming summary
+
+To get access to the result summary after streaming a [`RowStream`], use the [`RowStream::next_or_summary`] method.
+
+```no_run
+use neo4rs::*;
+
+#[tokio::main]
+async fn main() {
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Graph::new(uri, user, pass).await.unwrap();
+
+"##
+)]
+#![cfg_attr(feature="unstable-streaming-summary", doc = include_str!("../include/streaming_summary.rs"))]
+#![cfg_attr(
+    feature = "unstable-streaming-summary",
+    doc = r"
+}
+```
+
+"
+)]
 //! ### Rollback a transaction
 //! ```no_run
 //! use neo4rs::*;
