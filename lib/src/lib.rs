@@ -421,7 +421,8 @@
 //! ```
 //!
 //!
-mod bolt;
+#[cfg(feature = "bolt-protocol-impl-v2")]
+pub mod bolt;
 mod config;
 mod connection;
 mod convert;

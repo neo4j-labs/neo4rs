@@ -1,7 +1,6 @@
-use crate::{
-    bolt::{de, ser},
-    DeError,
-};
+#[cfg(feature = "bolt-protocol-impl-v2")]
+use crate::bolt::{de, ser};
+use crate::DeError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -17,9 +16,11 @@ pub enum Error {
     #[error("Invalid URI: {0}")]
     UrlParseError(#[from] url::ParseError),
 
+    #[cfg(feature = "bolt-protocol-impl-v2")]
     #[error(transparent)]
     WriteError(#[from] ser::Error),
 
+    #[cfg(feature = "bolt-protocol-impl-v2")]
     #[error(transparent)]
     ParseError(#[from] de::Error),
 
