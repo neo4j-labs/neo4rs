@@ -97,16 +97,6 @@ jobs:
         os: [windows-latest, macOS-latest, ubuntu-latest]
         rust: [stable]
         flags: ['', --all-features]
-        include:
-          - os: ubuntu-latest
-            rust: 1.75.0
-            flags: ''
-          - os: ubuntu-latest
-            rust: 1.75.0
-            flags: '--all-features'
-          - os: ubuntu-latest
-            rust: beta
-            flags: '--all-features'
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
