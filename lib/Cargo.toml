@@ -18,7 +18,7 @@ rust-version = "1.63"
 
 [features]
 json = ["serde_json"]
-unstable-v0_8 = ["bolt-protocol-impl-v2"]
+unstable-v1 = ["bolt-protocol-impl-v2"]
 bolt-protocol-impl-v2 = []
 
 [dependencies]
