@@ -10,12 +10,18 @@ use serde::{
 
 mod detail;
 mod request;
+mod structs;
 mod summary;
 
 pub use request::{Commit, Discard, Goodbye, Hello, Reset, Rollback, WrapExtra};
+pub use structs::{
+    Bolt, BoltRef, Date, DateDuration, DateTime, DateTimeZoneId, DateTimeZoneIdRef, Duration,
+    LegacyDateTime, LegacyDateTimeZoneId, LegacyDateTimeZoneIdRef, LocalDateTime, LocalTime, Node,
+    NodeRef, Path, PathRef, Point2D, Point3D, Relationship, RelationshipRef, Segment, Time,
+};
 pub use summary::{Failure, Success, Summary};
 
-use crate::packstream::{self, de, from_bytes, ser, to_bytes};
+use crate::packstream::{self, de, from_bytes, from_bytes_ref, ser, to_bytes, Data};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.
@@ -24,7 +30,7 @@ pub(crate) trait Message: Serialize {
 
 impl<T: Serialize> Message for T {
     fn to_bytes(&self) -> Result<Bytes, ser::Error> {
-        packstream::to_bytes(self)
+        to_bytes(self)
     }
 }
 
@@ -33,9 +39,20 @@ pub(crate) trait MessageResponse: Sized {
     fn parse(bytes: Bytes) -> Result<Self, de::Error>;
 }
 
-impl<T: DeserializeOwned> MessageResponse for T {
+pub(crate) trait MessageResponseRef<'de>: Sized {
+    /// Deserialize this type from a packstream encoded byte slice.
+    fn parse_ref(bytes: &'de mut Data) -> Result<Self, de::Error>;
+}
+
+impl<T: DeserializeOwned + std::fmt::Debug> MessageResponse for T {
     fn parse(bytes: Bytes) -> Result<Self, de::Error> {
-        packstream::from_bytes(bytes)
+        from_bytes(bytes)
+    }
+}
+
+impl<'de, T: Deserialize<'de> + std::fmt::Debug + 'de> MessageResponseRef<'de> for T {
+    fn parse_ref(bytes: &'de mut Data) -> Result<Self, de::Error> {
+        from_bytes_ref(bytes)
     }
 }
 
