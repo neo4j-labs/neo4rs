@@ -57,7 +57,8 @@ mod tests {
     use serde::de::DeserializeOwned;
 
     use super::*;
-    use crate::bolt::{packstream::value::bolt, MessageResponse as _};
+
+    use crate::{bolt::MessageResponse as _, packstream::bolt};
 
     #[test]
     fn parse_empty_record() {

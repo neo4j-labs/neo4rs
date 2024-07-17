@@ -1,5 +1,5 @@
-#[cfg(feature = "bolt-protocol-impl-v2")]
-use crate::bolt::{de, ser};
+#[cfg(feature = "unstable-serde-packstream-format")]
+use crate::packstream::{de, ser};
 use crate::DeError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -16,11 +16,11 @@ pub enum Error {
     #[error("Invalid URI: {0}")]
     UrlParseError(#[from] url::ParseError),
 
-    #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[cfg(feature = "unstable-serde-packstream-format")]
     #[error(transparent)]
     WriteError(#[from] ser::Error),
 
-    #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[cfg(feature = "unstable-serde-packstream-format")]
     #[error(transparent)]
     ParseError(#[from] de::Error),
 

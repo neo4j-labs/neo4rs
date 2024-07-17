@@ -421,7 +421,7 @@
 //! ```
 //!
 //!
-#[cfg(feature = "bolt-protocol-impl-v2")]
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub mod bolt;
 mod config;
 mod connection;
@@ -429,10 +429,14 @@ mod convert;
 mod errors;
 mod graph;
 mod messages;
+#[cfg(feature = "unstable-serde-packstream-format")]
+mod packstream;
 mod pool;
 mod query;
 mod row;
 mod stream;
+#[cfg(feature = "unstable-streaming-summary")]
+pub mod summary;
 mod txn;
 mod types;
 mod version;

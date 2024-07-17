@@ -1,3 +1,5 @@
+#![allow(unused_imports, dead_code)]
+
 use bytes::Bytes;
 use serde::{
     de::{Deserialize, DeserializeOwned, DeserializeSeed},
@@ -6,6 +8,10 @@ use serde::{
 
 pub mod de;
 pub mod ser;
+#[cfg(all(test, debug_assertions))]
+pub use debug::Dbg;
+#[cfg(test)]
+pub use value::{bolt, BoltBytesBuilder};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Data {
@@ -143,7 +149,7 @@ where
 }
 
 #[cfg(test)]
-pub mod value {
+mod value {
     use bytes::{BufMut, Bytes, BytesMut};
 
     pub fn bolt() -> BoltBytesBuilder {
@@ -424,7 +430,7 @@ pub mod debug {
 mod tests {
     use std::{collections::BTreeMap, fmt::Debug};
 
-    use crate::bolt::packstream::value::bolt;
+    use crate::packstream::bolt;
 
     use super::*;
 

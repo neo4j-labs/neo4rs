@@ -491,10 +491,17 @@ struct SharedBytes<'a> {
     _lifetime: PhantomData<&'a mut ()>,
 }
 
-#[cfg(debug_assertions)]
+#[cfg(all(test, debug_assertions))]
 impl<'a> fmt::Debug for SharedBytes<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        crate::bolt::Dbg(unsafe { &*self.bytes }).fmt(f)
+        crate::packstream::Dbg(unsafe { &*self.bytes }).fmt(f)
+    }
+}
+
+#[cfg(not(all(test, debug_assertions)))]
+impl<'a> fmt::Debug for SharedBytes<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SharedBytes").finish_non_exhaustive()
     }
 }
 
@@ -513,6 +520,7 @@ impl<'a> SharedBytes<'a> {
 
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
+#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[error("Not enough data to parse a bolt stream.")]
     Empty,

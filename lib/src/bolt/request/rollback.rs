@@ -21,7 +21,7 @@ impl ExpectedResponse for Rollback {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bolt::{packstream::value::bolt, Message as _};
+    use crate::{bolt::Message as _, packstream::bolt};
 
     #[test]
     fn serialize() {

@@ -48,7 +48,10 @@ impl<'a> Serialize for Hello<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bolt::{packstream::value::bolt, Message as _, MessageResponse as _};
+    use crate::{
+        bolt::{Message as _, MessageResponse as _},
+        packstream::bolt,
+    };
 
     #[test]
     fn serialize() {

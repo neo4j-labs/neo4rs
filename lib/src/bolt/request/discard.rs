@@ -1,9 +1,10 @@
 use crate::{
     bolt::{
         request::extra::{Extra, WrapExtra},
-        ExpectedResponse, Streaming, Summary,
+        ExpectedResponse, Summary,
     },
     errors::Result,
+    summary::Streaming,
 };
 use serde::Serialize;
 
@@ -38,7 +39,10 @@ impl ExpectedResponse for Discard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bolt::{packstream::value::bolt, Message as _, MessageResponse as _};
+    use crate::{
+        bolt::{Message as _, MessageResponse as _},
+        packstream::bolt,
+    };
 
     #[test]
     fn serialize() {
