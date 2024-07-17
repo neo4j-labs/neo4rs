@@ -1,4 +1,4 @@
-#[cfg(feature = "streaming-summary")]
+#[cfg(feature = "unstable-streaming-summary")]
 use crate::summary::StreamingSummary;
 
 use crate::{
@@ -60,7 +60,7 @@ impl DetachedRowStream {
 #[derive(Clone, Debug)]
 pub enum RowItem<T = Row> {
     Row(T),
-    #[cfg(feature = "streaming-summary")]
+    #[cfg(feature = "unstable-streaming-summary")]
     Summary(Box<StreamingSummary>),
     Done,
 }
@@ -73,7 +73,7 @@ impl<T> RowItem<T> {
         }
     }
 
-    #[cfg(feature = "streaming-summary")]
+    #[cfg(feature = "unstable-streaming-summary")]
     pub fn summary(&self) -> Option<&StreamingSummary> {
         match self {
             RowItem::Summary(summary) => Some(summary),
@@ -88,7 +88,7 @@ impl<T> RowItem<T> {
         }
     }
 
-    #[cfg(feature = "streaming-summary")]
+    #[cfg(feature = "unstable-streaming-summary")]
     pub fn into_summary(self) -> Option<Box<StreamingSummary>> {
         match self {
             RowItem::Summary(summary) => Some(summary),
@@ -141,12 +141,12 @@ impl RowStream {
                     };
                 }
                 State::Complete(ref mut _summary) => {
-                    #[cfg(feature = "streaming-summary")]
+                    #[cfg(feature = "unstable-streaming-summary")]
                     return match _summary.take() {
                         Some(summary) => Ok(RowItem::Summary(summary)),
                         None => Ok(RowItem::Done),
                     };
-                    #[cfg(not(feature = "streaming-summary"))]
+                    #[cfg(not(feature = "unstable-streaming-summary"))]
                     return Ok(RowItem::Done);
                 }
             }
@@ -204,7 +204,7 @@ impl RowStream {
                         Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
                         Err(e) => Err(Error::DeserializationError(e)),
                     },
-                    #[cfg(feature = "streaming-summary")]
+                    #[cfg(feature = "unstable-streaming-summary")]
                     Ok(RowItem::Summary(summary)) => {
                         Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
                     }
@@ -257,8 +257,8 @@ impl DetachedRowStream {
 #[derive(Clone, PartialEq, Debug)]
 enum State {
     Ready,
-    #[cfg(feature = "streaming-summary")]
+    #[cfg(feature = "unstable-streaming-summary")]
     Complete(Option<Box<StreamingSummary>>),
-    #[cfg(not(feature = "streaming-summary"))]
+    #[cfg(not(feature = "unstable-streaming-summary"))]
     Complete(Option<()>),
 }

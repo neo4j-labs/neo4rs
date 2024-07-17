@@ -1,4 +1,4 @@
-#[cfg(feature = "bolt-protocol-impl-v2")]
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::bolt::{ExpectedResponse, Message, MessageResponse};
 use crate::{
     errors::{Error, Result},
@@ -122,7 +122,7 @@ impl Connection {
         self.recv().await
     }
 
-    #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     #[allow(unused)]
     pub(crate) async fn send_recv_as<T: Message + ExpectedResponse>(
         &mut self,
@@ -137,7 +137,7 @@ impl Connection {
         self.send_bytes(bytes).await
     }
 
-    #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     #[allow(unused)]
     pub(crate) async fn send_as<T: Message>(&mut self, message: T) -> Result<()> {
         let bytes = message.to_bytes()?;
@@ -149,7 +149,7 @@ impl Connection {
         BoltResponse::parse(self.version, bytes)
     }
 
-    #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     #[allow(unused)]
     pub(crate) async fn recv_as<T: MessageResponse>(&mut self) -> Result<T> {
         let bytes = self.recv_bytes().await?;
@@ -210,10 +210,10 @@ impl Connection {
         Ok(())
     }
 
-    #[cfg(not(all(feature = "serde-packstream-format", test, debug_assertions)))]
+    #[cfg(not(all(feature = "unstable-serde-packstream-format", test, debug_assertions)))]
     fn dbg(_tag: &str, _bytes: &Bytes) {}
 
-    #[cfg(all(feature = "serde-packstream-format", test, debug_assertions))]
+    #[cfg(all(feature = "unstable-serde-packstream-format", test, debug_assertions))]
     fn dbg(tag: &str, bytes: &Bytes) {
         eprintln!("[{}] {:?}", tag, crate::packstream::Dbg(bytes));
     }
