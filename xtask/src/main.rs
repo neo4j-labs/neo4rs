@@ -1,3 +1,5 @@
+#![allow(dead_code, clippy::const_is_empty)]
+
 use std::env;
 
 use xshell::{cmd, Shell};
@@ -46,27 +48,31 @@ fn update_msrv_lock() -> Result {
     } = task_env();
 
     let sh = Shell::new()?;
+    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
 
-    let pin_versions = [
-        ("cc".into(), "1.0.105"),
-        ("chrono-tz".into(), "0.8.3"),
-        ("chrono".into(), "0.4.23"),
-        ("deadpool-runtime".into(), "0.1.3"),
-        ("regex".into(), "1.9.6"),
-        (latest_version(&sh, "serde_with")?, "3.1.0"),
-        (latest_version(&sh, "time")?, "0.3.20"),
-    ];
+    let msrv = {
+        let metadata = cmd!(sh, "{cargo} metadata --no-deps --format-version=1").read()?;
+        let package = "neo4rs";
+
+        cmd!(
+            sh,
+            "jq --raw-output '.packages[] | select(.name == \"'{package}'\") | .rust_version'"
+        )
+        .stdin(metadata)
+        .read()
+    }?;
+
+    let pin_versions: [(String, &str); 0] = [];
 
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
     if !pin_versions.is_empty() {
-        let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
         for (krate, version) in pin_versions {
             cmd!(sh, "{cargo} update --package {krate} --precise {version}").run_if(dry_run)?;
         }
     }
 
-    cmd!(sh, "cargo +1.63.0 test --no-run --all-features").run_if(dry_run)?;
+    cmd!(sh, "cargo +{msrv} test --no-run --all-features").run_if(dry_run)?;
 
     cmd!(sh, "cp {lockfile} {ci_dir}/Cargo.lock.msrv").run_if(dry_run)?;
 
@@ -126,10 +132,7 @@ struct Env {
 }
 
 fn task_env() -> Env {
-    let dry_run = env::var("DRY_RUN")
-        .ok()
-        .and_then(|o| o.parse().ok())
-        .unwrap_or(false);
+    let dry_run = env::var("DRY_RUN").is_ok();
 
     let workspace = env::var("WORKSPACE_ROOT");
 
