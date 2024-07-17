@@ -34,12 +34,21 @@ async fn txn_changes_db() {
         database: String,
     }
 
+    let status_field = if neo4j.version().major >= 5 {
+        "currentQueryStatus"
+    } else {
+        "status"
+    };
+
     let mut txn = graph.start_txn().await.unwrap();
     let databases = txn
         .execute(
-            query(concat!(
-                "SHOW TRANSACTIONS YIELD * WHERE username = $username AND currentQuery ",
-                "STARTS WITH $query AND currentQueryStatus = $status RETURN database"
+            query(&format!(
+                concat!(
+                    "SHOW TRANSACTIONS YIELD * WHERE username = $username AND currentQuery ",
+                    "STARTS WITH $query AND toLower({status_field}) = $status RETURN database"
+                ),
+                status_field = status_field
             ))
             .param("username", "neo4j")
             .param("query", "SHOW TRANSACTIONS YIELD ")
