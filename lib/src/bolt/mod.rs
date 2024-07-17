@@ -9,17 +9,13 @@ use serde::{
 };
 
 mod detail;
-mod packstream;
 mod request;
 mod summary;
 
-#[cfg(debug_assertions)]
-pub use packstream::debug::Dbg;
-#[cfg(test)]
-pub use packstream::value::{bolt, BoltBytesBuilder};
-pub use packstream::{de, from_bytes, ser, to_bytes};
 pub use request::{Commit, Discard, Goodbye, Hello, Reset, Rollback, WrapExtra};
-pub use summary::{Failure, Streaming, StreamingSummary, Success, Summary};
+pub use summary::{Failure, Success, Summary};
+
+use crate::packstream::{self, de, from_bytes, ser, to_bytes};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.

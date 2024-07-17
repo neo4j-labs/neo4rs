@@ -1,5 +1,5 @@
-#[cfg(feature = "bolt-protocol-impl-v2")]
-use crate::bolt::{de, ser};
+#[cfg(feature = "serde-packstream-format")]
+use crate::packstream::{de, ser};
 use crate::DeError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

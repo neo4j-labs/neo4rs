@@ -429,10 +429,14 @@ mod convert;
 mod errors;
 mod graph;
 mod messages;
+#[cfg(feature = "serde-packstream-format")]
+mod packstream;
 mod pool;
 mod query;
 mod row;
 mod stream;
+#[cfg(feature = "streaming-summary")]
+pub mod summary;
 mod txn;
 mod types;
 mod version;

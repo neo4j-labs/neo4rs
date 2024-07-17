@@ -18,8 +18,10 @@ rust-version = "1.63"
 
 [features]
 json = ["serde_json"]
-unstable-v1 = ["bolt-protocol-impl-v2"]
-bolt-protocol-impl-v2 = []
+unstable-v1 = ["bolt-protocol-impl-v2", "streaming-summary"]
+serde-packstream-format = []
+streaming-summary = ["serde-packstream-format"]
+bolt-protocol-impl-v2 = ["serde-packstream-format", "streaming-summary"]
 
 [dependencies]
 async-trait = "0.1.0"

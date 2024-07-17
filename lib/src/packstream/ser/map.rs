@@ -879,7 +879,7 @@ mod tests {
 
     use bytes::Bytes;
 
-    use crate::bolt::packstream::value::bolt;
+    use crate::packstream::bolt;
 
     use super::{
         super::{super::from_bytes, Error as OurError, Serializer as OurSerializer},

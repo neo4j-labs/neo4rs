@@ -123,6 +123,7 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[allow(unused)]
     pub(crate) async fn send_recv_as<T: Message + ExpectedResponse>(
         &mut self,
         message: T,
@@ -137,6 +138,7 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[allow(unused)]
     pub(crate) async fn send_as<T: Message>(&mut self, message: T) -> Result<()> {
         let bytes = message.to_bytes()?;
         self.send_bytes(bytes).await
@@ -148,13 +150,13 @@ impl Connection {
     }
 
     #[cfg(feature = "bolt-protocol-impl-v2")]
+    #[allow(unused)]
     pub(crate) async fn recv_as<T: MessageResponse>(&mut self) -> Result<T> {
         let bytes = self.recv_bytes().await?;
         Ok(T::parse(bytes)?)
     }
 
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
-        #[cfg(debug_assertions)]
         Self::dbg("send", &bytes);
         let end_marker: [u8; 2] = [0, 0];
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
@@ -179,7 +181,6 @@ impl Connection {
         }
 
         let bytes = bytes.freeze();
-        #[cfg(debug_assertions)]
         Self::dbg("recv", &bytes);
         Ok(bytes)
     }
@@ -209,9 +210,12 @@ impl Connection {
         Ok(())
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(not(all(feature = "serde-packstream-format", test, debug_assertions)))]
+    fn dbg(_tag: &str, _bytes: &Bytes) {}
+
+    #[cfg(all(feature = "serde-packstream-format", test, debug_assertions))]
     fn dbg(tag: &str, bytes: &Bytes) {
-        eprintln!("[{}] {:?}", tag, crate::bolt::Dbg(bytes));
+        eprintln!("[{}] {:?}", tag, crate::packstream::Dbg(bytes));
     }
 }
 
