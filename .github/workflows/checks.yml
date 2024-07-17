@@ -26,6 +26,10 @@ env:
 jobs:
   check:
     name: Compile on MSRV
+    strategy:
+      fail-fast: false
+      matrix:
+        flags: ['', --all-features]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -41,7 +45,7 @@ jobs:
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run cargo check
-        run: cargo +$MSRV check --all-targets --locked
+        run: cargo +$MSRV check --all-targets --locked ${{ matrix.flags }}
 
   fmt:
     name: Check formatting
@@ -63,6 +67,10 @@ jobs:
 
   clippy:
     name: Check clippy
+    strategy:
+      fail-fast: false
+      matrix:
+        flags: ['', --all-features]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -79,7 +87,7 @@ jobs:
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run clippy
-        run: cargo +$MSRV clippy --all-targets --all-features --locked -- -D warnings
+        run: cargo +$MSRV clippy --all-targets --locked ${{ matrix.flags }} -- -D warnings
 
   unit-tests:
     name: Run unit tests
@@ -88,6 +96,7 @@ jobs:
       matrix:
         os: [windows-latest, macOS-latest, ubuntu-latest]
         rust: [stable, beta, 1.63.0]
+        flags: ['', --all-features]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -106,7 +115,7 @@ jobs:
         run: cp ci/Cargo.lock.msrv Cargo.lock
         if: matrix.rust == '1.63.0'
       - name: Run unit tests
-        run: cargo +${{ matrix.rust }} nextest run --lib --all-features
+        run: cargo +${{ matrix.rust }} nextest run --lib ${{ matrix.flags }}
 
   integration-tests:
     name: Run integration tests
@@ -114,6 +123,7 @@ jobs:
       fail-fast: false
       matrix:
         neo4j: ["5.12", "5.11", "5.10", "5.9", "5.8", "5.7", "4.4", "4.3", "4.2", "4.1"]
+        flags: ['', --all-features]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -133,7 +143,7 @@ jobs:
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run integration tests
-        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --all-features --locked
+        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --locked ${{ matrix.flags }}
 
   msrv:
     name: Validate MSRV and minimal dependency versions
