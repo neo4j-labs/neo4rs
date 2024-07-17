@@ -719,7 +719,9 @@ impl<'de> BoltTypeDeserializer<'de> {
                     Some("MicroSecondsTimestampVisitor") => dt.timestamp_micros(),
                     Some("MilliSecondsTimestampVisitor") => dt.timestamp_millis(),
                     Some("SecondsTimestampVisitor") => dt.timestamp(),
-                    _ => dt.timestamp_nanos(),
+                    _ => dt
+                        .timestamp_nanos_opt()
+                        .ok_or_else(|| DeError::DateTimeOutOfBounds(std::any::type_name::<T>()))?,
                 },
                 Err(_) => return Err(DeError::DateTimeOutOfBounds(std::any::type_name::<T>())),
             },
@@ -728,7 +730,9 @@ impl<'de> BoltTypeDeserializer<'de> {
                     Some("MicroSecondsTimestampVisitor") => ldt.timestamp_micros(),
                     Some("MilliSecondsTimestampVisitor") => ldt.timestamp_millis(),
                     Some("SecondsTimestampVisitor") => ldt.timestamp(),
-                    _ => ldt.timestamp_nanos(),
+                    _ => ldt
+                        .timestamp_nanos_opt()
+                        .ok_or_else(|| DeError::DateTimeOutOfBounds(std::any::type_name::<T>()))?,
                 },
                 Err(_) => return Err(DeError::DateTimeOutOfBounds(std::any::type_name::<T>())),
             },

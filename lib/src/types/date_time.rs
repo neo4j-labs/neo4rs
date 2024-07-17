@@ -172,7 +172,7 @@ impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
         let datetime = NaiveDateTime::from_timestamp_opt(seconds, nanoseconds.value as u32)
             .ok_or(Error::ConversionError)?;
 
-        Ok(DateTime::from_utc(datetime, offset))
+        Ok(DateTime::from_naive_utc_and_offset(datetime, offset))
     }
 }
 
