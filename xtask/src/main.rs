@@ -1,4 +1,4 @@
-#![allow(dead_code, clippy::const_is_empty)]
+#![allow(dead_code)]
 
 use std::env;
 
@@ -66,10 +66,8 @@ fn update_msrv_lock() -> Result {
 
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    if !pin_versions.is_empty() {
-        for (krate, version) in pin_versions {
-            cmd!(sh, "{cargo} update --package {krate} --precise {version}").run_if(dry_run)?;
-        }
+    for (krate, version) in pin_versions {
+        cmd!(sh, "{cargo} update --package {krate} --precise {version}").run_if(dry_run)?;
     }
 
     cmd!(sh, "cargo +{msrv} test --no-run --all-features").run_if(dry_run)?;
