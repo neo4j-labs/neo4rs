@@ -727,10 +727,11 @@ impl<'de> BoltTypeDeserializer<'de> {
             },
             BoltType::LocalDateTime(ldt) => match ldt.try_to_chrono() {
                 Ok(ldt) => match std::any::type_name::<V>().rsplit("::").next() {
-                    Some("MicroSecondsTimestampVisitor") => ldt.timestamp_micros(),
-                    Some("MilliSecondsTimestampVisitor") => ldt.timestamp_millis(),
-                    Some("SecondsTimestampVisitor") => ldt.timestamp(),
+                    Some("MicroSecondsTimestampVisitor") => ldt.and_utc().timestamp_micros(),
+                    Some("MilliSecondsTimestampVisitor") => ldt.and_utc().timestamp_millis(),
+                    Some("SecondsTimestampVisitor") => ldt.and_utc().timestamp(),
                     _ => ldt
+                        .and_utc()
                         .timestamp_nanos_opt()
                         .ok_or_else(|| DeError::DateTimeOutOfBounds(std::any::type_name::<T>()))?,
                 },

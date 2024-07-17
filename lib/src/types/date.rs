@@ -30,12 +30,11 @@ impl TryFrom<&BoltDate> for NaiveDate {
     type Error = Error;
 
     fn try_from(value: &BoltDate) -> Result<Self> {
-        let epoch = NaiveDateTime::from_timestamp_opt(0, 0).expect("UNIX epoch is always valid");
         let days = Days::new(value.days.value.unsigned_abs());
         if value.days.value >= 0 {
-            epoch.checked_add_days(days)
+            NaiveDateTime::UNIX_EPOCH.checked_add_days(days)
         } else {
-            epoch.checked_sub_days(days)
+            NaiveDateTime::UNIX_EPOCH.checked_sub_days(days)
         }
         .map_or(Err(Error::ConversionError), |o| Ok(o.date()))
     }

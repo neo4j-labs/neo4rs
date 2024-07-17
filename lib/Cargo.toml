@@ -42,7 +42,7 @@ url = "2.0.0"
 webpki-roots = "0.26.0"
 
 [dependencies.chrono]
-version = "0.4.31"
+version = "0.4.35"
 default-features = false
 features = ["std", "serde"]
 
