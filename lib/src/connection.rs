@@ -183,23 +183,17 @@ impl Connection {
     }
 
     async fn read_chunk(&mut self, chunk_size: usize, buf: &mut BytesMut) -> Result<()> {
-        // This is an unsafe variant of doing the following
-        // but skips the zero-initialization of the buffer
-        //
-        //     let pos = bytes.len();
-        //     bytes.resize(pos + chunk_size, 0);
-        //     self.stream.read_exact(&mut bytes[pos..]).await?;
-        let pos = buf.len();
-        let new_len = pos + chunk_size;
         // Ensure the buffer has enough capacity
-        if buf.capacity() < new_len {
-            buf.reserve(new_len - buf.capacity());
+        if buf.capacity() < (buf.len() + chunk_size) {
+            buf.reserve(chunk_size);
         }
-        // Unsafe to set the length of the buffer, but we will fill it with read_exact
-        unsafe {
-            buf.set_len(new_len);
+        let mut remaining = chunk_size;
+        while remaining > 0 {
+            remaining -= (&mut self.stream)
+                .take(remaining as u64)
+                .read_buf(buf)
+                .await?;
         }
-        self.stream.read_exact(&mut buf[pos..]).await?;
         Ok(())
     }
 
