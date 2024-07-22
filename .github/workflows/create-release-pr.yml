@@ -49,6 +49,10 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+      - name: Install cargo-workspaces
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-workspaces
       - name: Install cargo-release
         uses: baptiste0928/cargo-install@v2
         with:
