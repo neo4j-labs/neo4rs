@@ -43,7 +43,8 @@ thiserror = "1.0.7"
 time = { version = "0.3.22", optional = true }
 tokio = { version = "1.5.0", features = ["full"] }
 url = "2.0.0"
-webpki-roots = "0.26.0"
+rustls-native-certs = "0.7.1"
+rustls-pemfile = "2.1.2"
 
 [dependencies.chrono]
 version = "0.4.35"
