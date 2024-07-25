@@ -312,10 +312,6 @@ impl ConnectionInfo {
                 Encryption::Tls
             }
             "bolt+ssc" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
                 Encryption::Tls
             }
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
