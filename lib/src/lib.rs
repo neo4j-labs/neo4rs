@@ -421,6 +421,7 @@
 //! ```
 //!
 //!
+mod auth;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub mod bolt;
 mod config;
@@ -441,6 +442,7 @@ mod txn;
 mod types;
 mod version;
 
+pub use crate::auth::ClientCertificate;
 pub use crate::config::{Config, ConfigBuilder, Database};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
