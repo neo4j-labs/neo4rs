@@ -1,4 +1,5 @@
 use crate::{
+    auth::ClientCertificate,
     config::Config,
     connection::{Connection, ConnectionInfo},
     errors::{Error, Result},
@@ -14,8 +15,13 @@ pub struct ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
-        let info = ConnectionInfo::new(uri, user, password)?;
+    pub fn new(
+        uri: &str,
+        user: &str,
+        password: &str,
+        client_certificate: Option<&ClientCertificate>,
+    ) -> Result<Self> {
+        let info = ConnectionInfo::new(uri, user, password, client_certificate)?;
         Ok(ConnectionManager { info })
     }
 }
@@ -25,7 +31,7 @@ impl deadpool::managed::Manager for ConnectionManager {
     type Type = Connection;
     type Error = Error;
 
-    async fn create(&self) -> std::result::Result<Connection, Error> {
+    async fn create(&self) -> Result<Connection, Error> {
         info!("creating new connection...");
         Connection::new(&self.info).await
     }
@@ -36,7 +42,12 @@ impl deadpool::managed::Manager for ConnectionManager {
 }
 
 pub async fn create_pool(config: &Config) -> Result<ConnectionPool, Error> {
-    let mgr = ConnectionManager::new(&config.uri, &config.user, &config.password)?;
+    let mgr = ConnectionManager::new(
+        &config.uri,
+        &config.user,
+        &config.password,
+        config.client_certificate.as_ref(),
+    )?;
     info!(
         "creating connection pool with max size {}",
         config.max_connections

@@ -1,4 +1,6 @@
+use crate::auth::ClientCertificate;
 use crate::errors::{Error, Result};
+use std::path::Path;
 use std::{ops::Deref, sync::Arc};
 
 const DEFAULT_DATABASE: &str = "neo4j";
@@ -58,6 +60,7 @@ pub struct Config {
     pub(crate) max_connections: usize,
     pub(crate) db: Database,
     pub(crate) fetch_size: usize,
+    pub(crate) client_certificate: Option<ClientCertificate>,
 }
 
 impl Config {
@@ -77,6 +80,7 @@ pub struct ConfigBuilder {
     db: Database,
     fetch_size: usize,
     max_connections: usize,
+    client_certificate: Option<ClientCertificate>,
 }
 
 impl ConfigBuilder {
@@ -128,6 +132,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
+        self.client_certificate = Some(ClientCertificate::new(client_cert));
+        self
+    }
+
     pub fn build(self) -> Result<Config> {
         if let (Some(uri), Some(user), Some(password)) = (self.uri, self.user, self.password) {
             Ok(Config {
@@ -137,6 +146,7 @@ impl ConfigBuilder {
                 fetch_size: self.fetch_size,
                 max_connections: self.max_connections,
                 db: self.db,
+                client_certificate: self.client_certificate,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -153,6 +163,7 @@ impl Default for ConfigBuilder {
             db: DEFAULT_DATABASE.into(),
             max_connections: DEFAULT_MAX_CONNECTIONS,
             fetch_size: DEFAULT_FETCH_SIZE,
+            client_certificate: None,
         }
     }
 }
@@ -178,6 +189,7 @@ mod tests {
         assert_eq!(&*config.db, "some_db");
         assert_eq!(config.fetch_size, 10);
         assert_eq!(config.max_connections, 5);
+        assert!(config.client_certificate.is_none());
     }
 
     #[test]
@@ -194,6 +206,7 @@ mod tests {
         assert_eq!(&*config.db, "neo4j");
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
+        assert!(config.client_certificate.is_none());
     }
 
     #[test]

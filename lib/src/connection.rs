@@ -1,15 +1,20 @@
 use crate::{
+    auth::ClientCertificate,
     errors::{unexpected, Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
 };
 use bytes::{Bytes, BytesMut};
+use log::warn;
+use std::fs::File;
+use std::io::BufReader;
 use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufStream},
     net::TcpStream,
 };
+use tokio_rustls::client::TlsStream;
 use tokio_rustls::{
     rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName},
     TlsConnector,
@@ -34,7 +39,20 @@ impl Connection {
 
         match info.encryption {
             Encryption::No => Self::new_unencrypted(stream, &info.user, &info.password).await,
-            Encryption::Tls => Self::new_tls(stream, &info.host, &info.user, &info.password).await,
+            Encryption::Tls => {
+                if let Some(certificate) = info.client_certificate.as_ref() {
+                    Self::new_tls_with_certificate(
+                        stream,
+                        &info.host,
+                        &info.user,
+                        &info.password,
+                        certificate,
+                    )
+                    .await
+                } else {
+                    Self::new_tls(stream, &info.host, &info.user, &info.password).await
+                }
+            }
         }
     }
 
@@ -48,18 +66,48 @@ impl Connection {
         user: &str,
         password: &str,
     ) -> Result<Connection> {
-        let mut root_cert_store = RootCertStore::empty();
-        #[allow(deprecated)]
-        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
-            |ta| {
-                OwnedTrustAnchor::from_subject_spki_name_constraints(
-                    ta.subject,
-                    ta.spki,
-                    ta.name_constraints,
-                )
-            },
-        ));
+        let root_cert_store = Self::build_cert_store();
+        let stream = Self::build_stream(stream, host, root_cert_store).await?;
 
+        Self::init(user, password, stream).await
+    }
+
+    async fn new_tls_with_certificate<T: AsRef<str>>(
+        stream: TcpStream,
+        host: &Host<T>,
+        user: &str,
+        password: &str,
+        certificate: &ClientCertificate,
+    ) -> Result<Connection> {
+        let mut root_cert_store = Self::build_cert_store();
+
+        let cert_file = File::open(certificate.cert_file.as_os_str())?;
+        let mut reader = BufReader::new(cert_file);
+        let certs = rustls_pemfile::certs(&mut reader).flatten();
+        root_cert_store.add_parsable_certificates(certs);
+
+        let stream = Self::build_stream(stream, host, root_cert_store).await?;
+        Self::init(user, password, stream).await
+    }
+
+    fn build_cert_store() -> RootCertStore {
+        let mut root_cert_store = RootCertStore::empty();
+        match rustls_native_certs::load_native_certs() {
+            Ok(certs) => {
+                root_cert_store.add_parsable_certificates(certs);
+            }
+            Err(e) => {
+                warn!("Failed to load native certificates: {e}");
+            }
+        }
+        root_cert_store
+    }
+
+    async fn build_stream<T: AsRef<str>>(
+        stream: TcpStream,
+        host: &Host<T>,
+        root_cert_store: RootCertStore,
+    ) -> Result<TlsStream<TcpStream>, Error> {
         let config = ClientConfig::builder()
             .with_safe_defaults()
             .with_root_certificates(root_cert_store)
@@ -76,8 +124,7 @@ impl Connection {
         };
 
         let stream = connector.connect(domain, stream).await?;
-
-        Self::init(user, password, stream).await
+        Ok(stream)
     }
 
     async fn init(
@@ -169,6 +216,7 @@ pub(crate) struct ConnectionInfo {
     host: Host<Arc<str>>,
     port: u16,
     encryption: Encryption,
+    client_certificate: Option<ClientCertificate>,
 }
 
 enum Encryption {
@@ -177,7 +225,12 @@ enum Encryption {
 }
 
 impl ConnectionInfo {
-    pub(crate) fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
+    pub(crate) fn new(
+        uri: &str,
+        user: &str,
+        password: &str,
+        client_certificate: Option<&ClientCertificate>,
+    ) -> Result<Self> {
         let url = NeoUrl::parse(uri)?;
         let port = url.port();
         let host = url.host();
@@ -199,6 +252,14 @@ impl ConnectionInfo {
                 ));
                 Encryption::Tls
             }
+            "neo4j+ssc" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Encryption::Tls
+            }
+            "bolt+ssc" => Encryption::Tls,
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
 
@@ -212,6 +273,7 @@ impl ConnectionInfo {
             },
             port,
             encryption,
+            client_certificate: client_certificate.cloned(),
         })
     }
 }

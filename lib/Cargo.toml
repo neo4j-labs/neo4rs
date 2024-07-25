@@ -1,7 +1,10 @@
 [package]
 name = "neo4rs"
 version = "0.7.2"
-authors = ["Neo4j Labs <devrel@neo4j.com>", "John Pradeep Vincent <yehohanan7@gmail.com>"]
+authors = [
+    "Neo4j Labs <devrel@neo4j.com>",
+    "John Pradeep Vincent <yehohanan7@gmail.com>",
+]
 edition = "2021"
 description = "Neo4j driver in rust"
 license = "MIT"
@@ -16,24 +19,37 @@ rust-version = "1.63"
 [dependencies]
 async-trait = "0.1.0"
 bytes = { version = "1.5.0", features = ["serde"] }
-chrono = { version = "0.4.23", features = [ "std", "serde"], default_features = false }
 chrono-tz = "0.8.3"
-deadpool = "0.9.0"
 delegate = "0.10.0"
 futures = { version = "0.3.0" }
 log = "0.4"
 neo4rs-macros = { version = "0.3.0", path = "../macros" }
 paste = "1.0.0"
 pin-project-lite = "0.2.9"
+rustls-native-certs = "0.7.1"
+rustls-pemfile = "2.1.2"
 serde = "1.0.0"
 thiserror = "1.0.2"
 tokio = { version = "1.5.0", features = ["full"] }
-tokio-rustls = "0.24.0"
 url = "2.0.0"
-webpki-roots = "0.23.0"
+webpki-roots = "0.26.0"
+
+[dependencies.chrono]
+version = "0.4.23"
+default-features = false
+features = ["std", "serde"]
+
+[dependencies.deadpool]
+version = "0.9,0"
+default-features = false
+features = ["managed"]
+
+[dependencies.tokio-rustls]
+version = "0.26.0"
+default-features = false
+features = ["tls12"]
 
 [dev-dependencies]
-lenient_semver = { version = "0.4.2", default_features = false, features = ["version_lite"] }
 pretty_env_logger = "0.4.0"
 serde = { version = "1.0.185", features = ["derive"] }
 serde_bytes = "0.11.0"
@@ -44,3 +60,8 @@ testcontainers = "0.15.0"
 testcontainers-modules = { version = "0.1.4", features = ["neo4j"] }
 time = { version = "0.3.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4"] }
+
+[dev-dependencies.lenient_semver]
+version = "0.4.2"
+default-features = false
+features = ["version_lite"]
