@@ -311,9 +311,7 @@ impl ConnectionInfo {
                 ));
                 Encryption::Tls
             }
-            "bolt+ssc" => {
-                Encryption::Tls
-            }
+            "bolt+ssc" => Encryption::Tls,
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
 
