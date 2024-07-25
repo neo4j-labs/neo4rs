@@ -315,7 +315,7 @@ impl ConnectionInfo {
             },
             port,
             encryption,
-            client_certificate: client_certificate.map(|c| c.clone())
+            client_certificate: client_certificate.cloned()
         })
     }
 }
