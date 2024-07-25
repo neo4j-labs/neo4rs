@@ -1,7 +1,7 @@
-use crate::errors::{Error, Result};
-use std::{ops::Deref, sync::Arc};
-use std::path::Path;
 use crate::auth::ClientCertificate;
+use crate::errors::{Error, Result};
+use std::path::Path;
+use std::{ops::Deref, sync::Arc};
 
 const DEFAULT_DATABASE: &str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;

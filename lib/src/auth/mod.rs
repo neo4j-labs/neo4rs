@@ -7,6 +7,8 @@ pub struct ClientCertificate {
 
 impl ClientCertificate {
     pub fn new(path: impl AsRef<Path>) -> Self {
-        ClientCertificate { cert_file: path.as_ref().to_path_buf() }
+        ClientCertificate {
+            cert_file: path.as_ref().to_path_buf(),
+        }
     }
 }

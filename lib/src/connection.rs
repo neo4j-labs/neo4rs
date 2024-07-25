@@ -1,3 +1,4 @@
+use crate::auth::ClientCertificate;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::bolt::{ExpectedResponse, Message, MessageResponse};
 use crate::{
@@ -6,15 +7,16 @@ use crate::{
     version::Version,
 };
 use bytes::{Bytes, BytesMut};
-use std::{mem, sync::Arc};
+use log::warn;
 use std::fs::File;
 use std::io::BufReader;
-use log::warn;
+use std::{mem, sync::Arc};
 use stream::ConnectionStream;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufStream},
     net::TcpStream,
 };
+use tokio_rustls::client::TlsStream;
 use tokio_rustls::{
     rustls::{
         pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName},
@@ -22,9 +24,7 @@ use tokio_rustls::{
     },
     TlsConnector,
 };
-use tokio_rustls::client::TlsStream;
 use url::{Host, Url};
-use crate::auth::ClientCertificate;
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
@@ -46,11 +46,18 @@ impl Connection {
             Encryption::No => Self::new_unencrypted(stream, &info.user, &info.password).await,
             Encryption::Tls => {
                 if let Some(certificate) = info.client_certificate.as_ref() {
-                    Self::new_tls_with_certificate(stream, &info.host, &info.user, &info.password, certificate).await
+                    Self::new_tls_with_certificate(
+                        stream,
+                        &info.host,
+                        &info.user,
+                        &info.password,
+                        certificate,
+                    )
+                    .await
                 } else {
                     Self::new_tls(stream, &info.host, &info.user, &info.password).await
                 }
-            },
+            }
         }
     }
 
@@ -101,7 +108,11 @@ impl Connection {
         root_cert_store
     }
 
-    async fn build_stream<T: AsRef<str>>(stream: TcpStream, host: &Host<T>, root_cert_store: RootCertStore) -> Result<TlsStream<TcpStream>, Error> {
+    async fn build_stream<T: AsRef<str>>(
+        stream: TcpStream,
+        host: &Host<T>,
+        root_cert_store: RootCertStore,
+    ) -> Result<TlsStream<TcpStream>, Error> {
         let config = ClientConfig::builder()
             .with_root_certificates(root_cert_store)
             .with_no_client_auth();
@@ -266,7 +277,12 @@ enum Encryption {
 }
 
 impl ConnectionInfo {
-    pub(crate) fn new(uri: &str, user: &str, password: &str, client_certificate: Option<&ClientCertificate>) -> Result<Self> {
+    pub(crate) fn new(
+        uri: &str,
+        user: &str,
+        password: &str,
+        client_certificate: Option<&ClientCertificate>,
+    ) -> Result<Self> {
         let url = NeoUrl::parse(uri)?;
         let port = url.port();
         let host = url.host();
@@ -315,7 +331,7 @@ impl ConnectionInfo {
             },
             port,
             encryption,
-            client_certificate: client_certificate.cloned()
+            client_certificate: client_certificate.cloned(),
         })
     }
 }
