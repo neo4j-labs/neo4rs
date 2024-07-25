@@ -1,6 +1,6 @@
 use crate::auth::ClientCertificate;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{ExpectedResponse, Message, MessageResponse};
+use crate::bolt::{ExpectedResponse, Hello, Message, MessageResponse, Reset, Summary};
 use crate::{
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
@@ -143,26 +143,59 @@ impl Connection {
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
-        let mut connection = Connection { version, stream };
-        let hello = BoltRequest::hello("neo4rs", user, password);
-        match connection.send_recv(hello).await? {
-            BoltResponse::Success(_msg) => Ok(connection),
-            BoltResponse::Failure(msg) => {
-                Err(Error::AuthenticationError(msg.get("message").unwrap()))
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            let mut connection = Connection { version, stream };
+
+            let hello = Hello::new("neo4rs", user, password);
+            let hello = connection.send_recv_as(hello).await?;
+
+            match hello {
+                Summary::Success(_msg) => Ok(connection),
+                Summary::Ignored => todo!(),
+                Summary::Failure(msg) => Err(Error::AuthenticationError(msg.message)),
             }
-            msg => Err(msg.into_error("HELLO")),
+        }
+
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            let mut connection = Connection { version, stream };
+            let hello = BoltRequest::hello("neo4rs", user, password);
+            match connection.send_recv(hello).await? {
+                BoltResponse::Success(_msg) => Ok(connection),
+                BoltResponse::Failure(msg) => {
+                    Err(Error::AuthenticationError(msg.get("message").unwrap()))
+                }
+                msg => Err(msg.into_error("HELLO")),
+            }
         }
     }
 
     pub async fn reset(&mut self) -> Result<()> {
-        match self.send_recv(BoltRequest::reset()).await? {
-            BoltResponse::Success(_) => Ok(()),
-            BoltResponse::Failure(f) => Err(Error::Failure {
-                code: f.code().into(),
-                message: f.message().into(),
-                msg: "RESET",
-            }),
-            msg => Err(msg.into_error("RESET")),
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match self.send_recv(BoltRequest::reset()).await? {
+                BoltResponse::Success(_) => Ok(()),
+                BoltResponse::Failure(f) => Err(Error::Failure {
+                    code: f.code().into(),
+                    message: f.message().into(),
+                    msg: "RESET",
+                }),
+                msg => Err(msg.into_error("RESET")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match self.send_recv_as(Reset).await? {
+                Summary::Success(_) => Ok(()),
+                Summary::Failure(err) => Err(Error::ConnectionClosed(err)),
+                msg => Err(Error::UnexpectedMessage(format!(
+                    "unexpected response for RESET: {:?}",
+                    msg
+                ))),
+            }
         }
     }
 

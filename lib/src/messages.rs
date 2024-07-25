@@ -18,14 +18,9 @@ use crate::{
 };
 use begin::Begin;
 use bytes::Bytes;
-use commit::Commit;
-use discard::Discard;
 use failure::Failure;
-use hello::Hello;
 use pull::Pull;
 use record::Record;
-use reset::Reset;
-use rollback::Rollback;
 use run::Run;
 use success::Success;
 
@@ -37,25 +32,51 @@ pub enum BoltResponse {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
 pub enum BoltRequest {
-    Hello(Hello),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+    )]
+    Hello(hello::Hello),
     Run(Run),
     Pull(Pull),
-    Discard(Discard),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
+    Discard(discard::Discard),
     Begin(Begin),
-    Commit(Commit),
-    Rollback(Rollback),
-    Reset(Reset),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+    )]
+    Commit(commit::Commit),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+    )]
+    Rollback(rollback::Rollback),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+    )]
+    Reset(reset::Reset),
 }
 
+#[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
 impl BoltRequest {
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+    )]
     pub fn hello(agent: &str, principal: &str, credentials: &str) -> BoltRequest {
         let mut data = BoltMap::default();
         data.put("user_agent".into(), agent.into());
         data.put("scheme".into(), "basic".into());
         data.put("principal".into(), principal.into());
         data.put("credentials".into(), credentials.into());
-        BoltRequest::Hello(Hello::new(data))
+        BoltRequest::Hello(hello::Hello::new(data))
     }
 
     pub fn run(db: &str, query: &str, params: BoltMap) -> BoltRequest {
@@ -66,8 +87,12 @@ impl BoltRequest {
         BoltRequest::Pull(Pull::new(n as i64, qid))
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
     pub fn discard() -> BoltRequest {
-        BoltRequest::Discard(Discard::default())
+        BoltRequest::Discard(discard::Discard::default())
     }
 
     pub fn begin(db: &str) -> BoltRequest {
@@ -75,20 +100,33 @@ impl BoltRequest {
         BoltRequest::Begin(begin)
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+    )]
     pub fn commit() -> BoltRequest {
-        BoltRequest::Commit(Commit::new())
+        BoltRequest::Commit(commit::Commit::new())
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+    )]
     pub fn rollback() -> BoltRequest {
-        BoltRequest::Rollback(Rollback::new())
+        BoltRequest::Rollback(rollback::Rollback::new())
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+    )]
     pub fn reset() -> BoltRequest {
-        BoltRequest::Reset(Reset::new())
+        BoltRequest::Reset(reset::Reset::new())
     }
 }
 
 impl BoltRequest {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
     pub fn into_bytes(self, version: Version) -> Result<Bytes> {
         let bytes: Bytes = match self {
             BoltRequest::Hello(hello) => hello.into_bytes(version)?,
