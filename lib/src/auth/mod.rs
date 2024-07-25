@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct ClientCertificate {
-    pub(crate) cert_file: PathBuf,  // Path to the TLS certificate file.
+    pub(crate) cert_file: PathBuf,
 }
 
 impl ClientCertificate {
