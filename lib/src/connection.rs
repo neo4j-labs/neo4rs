@@ -79,14 +79,10 @@ impl Connection {
     ) -> Result<Connection> {
         let mut root_cert_store = Self::build_cert_store();
 
-        let cert_file = File::open(certificate.cert_file.as_str())?;
+        let cert_file = File::open(certificate.cert_file.as_os_str())?;
         let mut reader = BufReader::new(cert_file);
-        let certs = rustls_pemfile::certs(&mut reader);
-        for certificate in certs {
-            if let Ok(cert) = certificate {
-                root_cert_store.add(cert).unwrap();
-            }
-        }
+        let certs = rustls_pemfile::certs(&mut reader).flatten();
+        root_cert_store.add_parsable_certificates(certs);
 
         let stream = Self::build_stream(stream, host, root_cert_store).await?;
         Self::init(user, password, stream).await
@@ -94,12 +90,13 @@ impl Connection {
 
     fn build_cert_store() -> RootCertStore {
         let mut root_cert_store = RootCertStore::empty();
-        if let Ok(certs) = rustls_native_certs::load_native_certs() {
-            for cert in certs {
-                root_cert_store.add(cert).unwrap();
+        match rustls_native_certs::load_native_certs() {
+            Ok(certs) => {
+                root_cert_store.add_parsable_certificates(certs);
             }
-        } else {
-            warn!("Failed to load native certificates!");
+            Err(e) => {
+                warn!("Failed to load native certificates: {e}");
+            }
         }
         root_cert_store
     }
@@ -269,7 +266,7 @@ enum Encryption {
 }
 
 impl ConnectionInfo {
-    pub(crate) fn new(uri: &str, user: &str, password: &str) -> Result<Self> {
+    pub(crate) fn new(uri: &str, user: &str, password: &str, client_certificate: Option<&ClientCertificate>) -> Result<Self> {
         let url = NeoUrl::parse(uri)?;
         let port = url.port();
         let host = url.host();
@@ -298,6 +295,13 @@ impl ConnectionInfo {
                 ));
                 Encryption::Tls
             }
+            "bolt+ssc" => {
+                log::warn!(concat!(
+                    "This driver does not yet implement client-side routing. ",
+                    "It is possible that operations against a cluster (such as Aura) will fail."
+                ));
+                Encryption::Tls
+            }
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
 
@@ -311,13 +315,8 @@ impl ConnectionInfo {
             },
             port,
             encryption,
-            client_certificate: None
+            client_certificate: client_certificate.map(|c| c.clone())
         })
-    }
-
-    pub fn with_client_certificate(&mut self, certificate: &ClientCertificate) -> &Self {
-        self.client_certificate = Some(certificate.clone());
-        self
     }
 }
 

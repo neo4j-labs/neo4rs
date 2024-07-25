@@ -442,7 +442,7 @@ mod types;
 mod version;
 mod auth;
 
-pub use crate::auth::{ClientCertificate, ClientCertificateProvider, StaticClientCertificateProvider};
+pub use crate::auth::ClientCertificate;
 pub use crate::config::{Config, ConfigBuilder, Database};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};

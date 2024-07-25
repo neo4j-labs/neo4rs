@@ -1,6 +1,7 @@
 use crate::errors::{Error, Result};
 use std::{ops::Deref, sync::Arc};
-use crate::auth::{ClientCertificate, ClientCertificateProvider};
+use std::path::Path;
+use crate::auth::ClientCertificate;
 
 const DEFAULT_DATABASE: &str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;
@@ -79,7 +80,7 @@ pub struct ConfigBuilder {
     db: Database,
     fetch_size: usize,
     max_connections: usize,
-    client_certificate_provider: Option<Box<dyn ClientCertificateProvider>>,
+    client_certificate: Option<ClientCertificate>,
 }
 
 impl ConfigBuilder {
@@ -131,8 +132,8 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn with_client_certificate_provider(mut self, provider: Box<dyn ClientCertificateProvider>) -> Self {
-        self.client_certificate_provider = Some(provider);
+    pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
+        self.client_certificate = Some(ClientCertificate::new(client_cert));
         self
     }
 
@@ -145,7 +146,7 @@ impl ConfigBuilder {
                 fetch_size: self.fetch_size,
                 max_connections: self.max_connections,
                 db: self.db,
-                client_certificate: self.client_certificate_provider.map(|p| p.get_certificate()),
+                client_certificate: self.client_certificate,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -162,7 +163,7 @@ impl Default for ConfigBuilder {
             db: DEFAULT_DATABASE.into(),
             max_connections: DEFAULT_MAX_CONNECTIONS,
             fetch_size: DEFAULT_FETCH_SIZE,
-            client_certificate_provider: None,
+            client_certificate: None,
         }
     }
 }

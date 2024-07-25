@@ -16,10 +16,7 @@ pub struct ConnectionManager {
 
 impl ConnectionManager {
     pub fn new(uri: &str, user: &str, password: &str, client_certificate: Option<&ClientCertificate>) -> Result<Self> {
-        let mut info = ConnectionInfo::new(uri, user, password)?;
-        if let Some(client_certificate) = client_certificate {
-            info.with_client_certificate(client_certificate);
-        }
+        let info = ConnectionInfo::new(uri, user, password, client_certificate)?;
         Ok(ConnectionManager { info })
     }
 }
