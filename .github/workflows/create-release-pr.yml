@@ -20,8 +20,7 @@ on:
 
 env:
   RUSTUP_TOOLCHAIN: stable
-  V_0_7: ${{ (github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '1' || '0' }}
-  MSRV: ${{ env.V_0_7 == '1' && '1.63.0' || '1.75.0' }}
+  MSRV: ${{ (github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '1.63.0' || '1.75.0' }}
 
 jobs:
   make-release-pr:
@@ -76,4 +75,4 @@ jobs:
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate }}
           check-semver: true
-          base-branch: ${{ env.V_0_7 == '1' && '0.7' || 'main' }}
+          base-branch: ${{ (github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '0.7' || 'main' }}
