@@ -20,7 +20,7 @@ on:
 
 env:
   RUSTUP_TOOLCHAIN: stable
-  MSRV: 1.63.0
+  MSRV: ${{ github.ref == 'refs/heads/0.7' && '1.63.0' || '1.75.0' }}
 
 jobs:
   make-release-pr:
@@ -30,34 +30,39 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - uses: chainguard-dev/actions/setup-gitsign@main
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
       - name: Set up Rust nightly
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+
       - name: Set up Rust MSRV
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
+
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+
       - name: Install cargo-workspaces
-        uses: baptiste0928/cargo-install@v2
-        with:
-          crate: cargo-workspaces
+        uses: taiki-e/install-action@cargo-workspaces
+
       - name: Install cargo-release
-        uses: baptiste0928/cargo-install@v2
-        with:
-          crate: cargo-release
-      - uses: cargo-bins/release-pr@v2.1.3
+        uses: taiki-e/install-action@cargo-release
+
+      - uses: cargo-bins/release-pr@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}

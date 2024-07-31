@@ -3,11 +3,13 @@ name: checks
 on:
   push:
     branches:
-      - master
-  merge_group:
+      - main
+      - "0.7"
   pull_request:
     branches:
-      - master
+      - main
+      - "0.7"
+  merge_group:
   workflow_dispatch:
     inputs:
       crate:
@@ -21,43 +23,57 @@ on:
 env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
-  MSRV: 1.63.0
+  MSRV: ${{ github.ref == 'refs/heads/0.7' && '1.63.0' || '1.75.0' }}
+  HACK: hack --package neo4rs --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-streaming-summary
+
 
 jobs:
   check:
     name: Compile on MSRV
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
+
       - name: Run cargo check
-        run: cargo +$MSRV check --all-targets --locked
+        run: cargo +$MSRV --locked ${{ env.HACK }} check
 
   fmt:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           components: rustfmt
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
       - name: Run cargo fmt
         run: cargo +stable fmt --all -- --check
 
@@ -65,21 +81,29 @@ jobs:
     name: Check clippy
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
           components: clippy
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
+
       - name: Run clippy
-        run: cargo +$MSRV clippy --all-targets --all-features --locked -- -D warnings
+        run: cargo +$MSRV --locked ${{ env.HACK }} clippy -- -D warnings
 
   unit-tests:
     name: Run unit tests
@@ -87,53 +111,77 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macOS-latest, ubuntu-latest]
-        rust: [stable, beta, 1.63.0]
     runs-on: ${{ matrix.os }}
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Prepare MSRV lockfile
-        run: cp ci/Cargo.lock.msrv Cargo.lock
-        if: matrix.rust == '1.63.0'
+
       - name: Run unit tests
-        run: cargo +${{ matrix.rust }} nextest run --lib --all-features
+        run: cargo ${{ env.HACK }} nextest run --lib
 
   integration-tests:
     name: Run integration tests
     strategy:
       fail-fast: false
       matrix:
-        neo4j: ["5.12", "5.11", "5.10", "5.9", "5.8", "5.7", "4.4", "4.3", "4.2", "4.1"]
+        neo4j: ["5", "4.4"]
     runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:${{ matrix.neo4j }}-enterprise
+        env:
+          NEO4J_ACCEPT_LICENSE_AGREEMENT: yes
+          NEO4J_AUTH: neo4j/integrationtest
+        ports:
+          - "7687:7687"
+    env:
+      NEO4J_TEST_URI: bolt://localhost:7687
+      NEO4J_TEST_USER: neo4j
+      NEO4J_TEST_PASS: integrationtest
+      NEO4J_VERSION_TAG: ${{ matrix.neo4j }}
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: Accept Neo4j Enterprise license
-        run: echo "neo4j:5-enterprise > lib/container-license-acceptance.txt"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
+
       - name: Run integration tests
-        run: env NEO4J_VERSION_TAG=${{ matrix.neo4j }} cargo +$MSRV nextest run --all-features --locked
+        run: cargo +$MSRV --locked ${{ env.HACK }} nextest run -E 'kind(test)'
 
   msrv:
     name: Validate MSRV and minimal dependency versions
@@ -147,18 +195,24 @@ jobs:
             name: minimal dependency versions
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
+
       - name: Prepare ${{ matrix.name }} lockfile
         run: cp ci/${{ matrix.file }} Cargo.lock
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+
       - name: Run ${{ matrix.name }} unit tests
         run: cargo +$MSRV nextest run --lib --all-features --locked
 
@@ -168,16 +222,20 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Set up Rust
         if: startsWith(github.ref, 'refs/tags/')
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+
       - name: Set up Rust cache
         if: startsWith(github.ref, 'refs/tags/')
         uses: Swatinem/rust-cache@v2
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         env:
