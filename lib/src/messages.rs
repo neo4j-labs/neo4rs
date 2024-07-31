@@ -15,6 +15,7 @@ use crate::{
     errors::{Error, Result},
     types::{BoltMap, BoltWireFormat},
     version::Version,
+    BoltString, BoltType,
 };
 use begin::Begin;
 use bytes::Bytes;
@@ -48,13 +49,63 @@ pub enum BoltRequest {
     Reset(Reset),
 }
 
+pub struct HelloBuilder {
+    agent: BoltString,
+    principal: BoltString,
+    credentials: BoltString,
+    routing: Option<BoltMap>,
+    version: Version,
+}
+
+impl HelloBuilder {
+    pub fn new(principal: impl Into<BoltString>, credentials: impl Into<BoltString>) -> Self {
+        Self {
+            agent: "neo4rs".into(),
+            principal: principal.into(),
+            credentials: credentials.into(),
+            routing: None,
+            version: Version::V4,
+        }
+    }
+
+    pub fn with_routing(&mut self, routing: BoltMap) {
+        self.routing = Some(routing);
+    }
+
+    pub fn version(self, version: Version) -> Self {
+        Self { version, ..self }
+    }
+
+    pub fn build(self) -> BoltRequest {
+        let HelloBuilder {
+            agent,
+            principal,
+            credentials,
+            routing,
+            version,
+        } = self;
+        BoltRequest::hello(agent, principal, credentials, routing, version)
+    }
+}
+
 impl BoltRequest {
-    pub fn hello(agent: &str, principal: &str, credentials: &str) -> BoltRequest {
+    pub fn hello(
+        agent: BoltString,
+        principal: BoltString,
+        credentials: BoltString,
+        routing: Option<BoltMap>,
+        version: Version,
+    ) -> BoltRequest {
         let mut data = BoltMap::default();
-        data.put("user_agent".into(), agent.into());
+        data.put("user_agent".into(), BoltType::String(agent));
         data.put("scheme".into(), "basic".into());
-        data.put("principal".into(), principal.into());
-        data.put("credentials".into(), credentials.into());
+        data.put("principal".into(), BoltType::String(principal));
+        data.put("credentials".into(), BoltType::String(credentials));
+        if version >= Version::V4_1 {
+            if let Some(context) = routing {
+                data.put("routing".into(), BoltType::Map(context));
+            }
+        }
         BoltRequest::Hello(Hello::new(data))
     }
 

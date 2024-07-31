@@ -3,10 +3,11 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Version {
-    V4_1,
     V4,
+    V4_1,
 }
 
 impl Version {
