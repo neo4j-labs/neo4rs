@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - "0.7"
   merge_group:
   pull_request:
     branches:
       - main
+      - "0.7"
   workflow_dispatch:
     inputs:
       crate:
@@ -21,7 +23,7 @@ on:
 env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
-  MSRV: 1.75.0
+  MSRV: ${{ github.ref == 'refs/heads/0.7' && '1.63.0' || '1.75.0' }}
 
 jobs:
   check:
@@ -113,7 +115,7 @@ jobs:
         uses: taiki-e/install-action@nextest
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
-        if: matrix.rust == '1.75.0'
+        if: matrix.rust == '${{ env.MSRV }}'
       - name: Run unit tests
         run: cargo +${{ matrix.rust }} nextest run --lib ${{ matrix.flags }}
 

@@ -20,7 +20,7 @@ on:
 
 env:
   RUSTUP_TOOLCHAIN: stable
-  MSRV: 1.75.0
+  MSRV: ${{ github.ref == 'refs/heads/0.7' && '1.63.0' || '1.75.0' }}
 
 jobs:
   make-release-pr:
