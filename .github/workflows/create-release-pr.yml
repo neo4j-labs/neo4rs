@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: chainguard-dev/actions/setup-gitsign@main
@@ -50,10 +50,10 @@ jobs:
         with:
           toolchain: stable
       - name: Install cargo-release
-        uses: baptiste0928/cargo-install@v2
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-release
-      - uses: cargo-bins/release-pr@v2.1.3
+      - uses: cargo-bins/release-pr@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}
