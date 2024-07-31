@@ -24,14 +24,12 @@ env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
   MSRV: ${{ github.ref == 'refs/heads/0.7' && '1.63.0' || '1.75.0' }}
+  HACK: hack --package neo4rs --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-streaming-summary
+
 
 jobs:
   check:
     name: Compile on MSRV
-    strategy:
-      fail-fast: false
-      matrix:
-        flags: ['', --all-features]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -44,10 +42,12 @@ jobs:
           toolchain: ${{ env.MSRV }}
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run cargo check
-        run: cargo +$MSRV check --all-targets --locked ${{ matrix.flags }}
+        run: cargo +$MSRV --locked ${{ env.HACK }} check
 
   fmt:
     name: Check formatting
@@ -69,10 +69,6 @@ jobs:
 
   clippy:
     name: Check clippy
-    strategy:
-      fail-fast: false
-      matrix:
-        flags: ['', --all-features]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -86,10 +82,12 @@ jobs:
           components: clippy
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run clippy
-        run: cargo +$MSRV clippy --all-targets --locked ${{ matrix.flags }} -- -D warnings
+        run: cargo +$MSRV --locked ${{ env.HACK }} clippy -- -D warnings
 
   unit-tests:
     name: Run unit tests
@@ -97,8 +95,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macOS-latest, ubuntu-latest]
-        rust: [stable]
-        flags: ['', --all-features]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -108,24 +104,22 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Prepare MSRV lockfile
-        run: cp ci/Cargo.lock.msrv Cargo.lock
-        if: matrix.rust == '${{ env.MSRV }}'
       - name: Run unit tests
-        run: cargo +${{ matrix.rust }} nextest run --lib ${{ matrix.flags }}
+        run: cargo ${{ env.HACK }} nextest run --lib
 
   integration-tests:
     name: Run integration tests
     strategy:
       fail-fast: false
       matrix:
-        neo4j: ["5.21", "5.20", "5.19", "4.4"]
-        flags: ['', --all-features]
+        neo4j: ["5", "4.4"]
     runs-on: ubuntu-latest
     services:
       neo4j:
@@ -151,12 +145,14 @@ jobs:
           toolchain: ${{ env.MSRV }}
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run integration tests
-        run: cargo +$MSRV nextest run --locked ${{ matrix.flags }} -E 'kind(test)'
+        run: cargo +MSRV --locked ${{ env.HACK }} nextest run -E 'kind(test)'
 
   msrv:
     name: Validate MSRV and minimal dependency versions
