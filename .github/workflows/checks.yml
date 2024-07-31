@@ -9,6 +9,8 @@ on:
     branches:
       - main
       - "0.7"
+  release:
+    types: [published]
   merge_group:
   workflow_dispatch:
     inputs:
