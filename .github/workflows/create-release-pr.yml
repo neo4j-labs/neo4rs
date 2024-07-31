@@ -30,29 +30,36 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: chainguard-dev/actions/setup-gitsign@main
+
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
+
       - name: Set up Rust nightly
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+
       - name: Set up Rust MSRV
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
+
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+
       - name: Install cargo-release
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-release
+
       - uses: cargo-bins/release-pr@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
