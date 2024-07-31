@@ -4,7 +4,6 @@ use std::cmp::PartialEq;
 use std::fmt::Debug;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
-#[non_exhaustive]
 pub enum Version {
     V4,
     V4_1,
