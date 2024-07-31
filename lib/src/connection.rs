@@ -14,9 +14,9 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufStream},
     net::TcpStream,
 };
-use tokio_rustls::client::TlsStream;
+use tokio_rustls::rustls::pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName};
 use tokio_rustls::{
-    rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName},
+    rustls::{ClientConfig, RootCertStore},
     TlsConnector,
 };
 use url::{Host, Url};
@@ -30,67 +30,40 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub(crate) async fn new(info: &ConnectionInfo) -> Result<Connection> {
-        let stream = match &info.host {
-            Host::Domain(domain) => TcpStream::connect((&**domain, info.port)).await?,
-            Host::Ipv4(ip) => TcpStream::connect((*ip, info.port)).await?,
-            Host::Ipv6(ip) => TcpStream::connect((*ip, info.port)).await?,
+    pub(crate) fn new(
+        info: &ConnectionInfo,
+    ) -> Result<impl std::future::Future<Output = Result<Connection>>> {
+        let host = info.host.clone();
+        let port = info.port;
+        let user = info.user.clone();
+        let password = info.password.clone();
+        let encryption_connector = match info.encryption {
+            Encryption::No => None,
+            Encryption::Tls => Some(Self::tls_connector(
+                &info.host,
+                info.client_certificate.as_ref(),
+            )?),
         };
 
-        match info.encryption {
-            Encryption::No => Self::new_unencrypted(stream, &info.user, &info.password).await,
-            Encryption::Tls => {
-                if let Some(certificate) = info.client_certificate.as_ref() {
-                    Self::new_tls_with_certificate(
-                        stream,
-                        &info.host,
-                        &info.user,
-                        &info.password,
-                        certificate,
-                    )
-                    .await
-                } else {
-                    Self::new_tls(stream, &info.host, &info.user, &info.password).await
-                }
-            }
-        }
+        Ok(async move {
+            let stream = match host {
+                Host::Domain(domain) => TcpStream::connect((&*domain, port)).await?,
+                Host::Ipv4(ip) => TcpStream::connect((ip, port)).await?,
+                Host::Ipv6(ip) => TcpStream::connect((ip, port)).await?,
+            };
+
+            let stream: ConnectionStream = match encryption_connector {
+                Some((connector, domain)) => connector.connect(domain, stream).await?.into(),
+                None => stream.into(),
+            };
+            Self::init(&user, &password, stream).await
+        })
     }
 
-    async fn new_unencrypted(stream: TcpStream, user: &str, password: &str) -> Result<Connection> {
-        Self::init(user, password, stream).await
-    }
-
-    async fn new_tls<T: AsRef<str>>(
-        stream: TcpStream,
+    fn tls_connector<T: AsRef<str>>(
         host: &Host<T>,
-        user: &str,
-        password: &str,
-    ) -> Result<Connection> {
-        let root_cert_store = Self::build_cert_store();
-        let stream = Self::build_stream(stream, host, root_cert_store).await?;
-
-        Self::init(user, password, stream).await
-    }
-
-    async fn new_tls_with_certificate<T: AsRef<str>>(
-        stream: TcpStream,
-        host: &Host<T>,
-        user: &str,
-        password: &str,
-        certificate: &ClientCertificate,
-    ) -> Result<Connection> {
-        let mut root_cert_store = Self::build_cert_store();
-
-        let cert_file = File::open(certificate.cert_file.as_os_str())?;
-        let mut reader = BufReader::new(cert_file);
-        let certs = rustls_pemfile::certs(&mut reader).flatten();
-        root_cert_store.add_parsable_certificates(certs);
-
-        let stream = Self::build_stream(stream, host, root_cert_store).await?;
-        Self::init(user, password, stream).await
-    }
-
-    fn build_cert_store() -> RootCertStore {
+        certificate: Option<&ClientCertificate>,
+    ) -> Result<(TlsConnector, ServerName<'static>)> {
         let mut root_cert_store = RootCertStore::empty();
         match rustls_native_certs::load_native_certs() {
             Ok(certs) => {
@@ -100,16 +73,15 @@ impl Connection {
                 warn!("Failed to load native certificates: {e}");
             }
         }
-        root_cert_store
-    }
 
-    async fn build_stream<T: AsRef<str>>(
-        stream: TcpStream,
-        host: &Host<T>,
-        root_cert_store: RootCertStore,
-    ) -> Result<TlsStream<TcpStream>, Error> {
+        if let Some(certificate) = certificate {
+            let cert_file = File::open(&certificate.cert_file)?;
+            let mut reader = BufReader::new(cert_file);
+            let certs = rustls_pemfile::certs(&mut reader).flatten();
+            root_cert_store.add_parsable_certificates(certs);
+        }
+
         let config = ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_cert_store)
             .with_no_client_auth();
 
@@ -117,22 +89,17 @@ impl Connection {
         let connector = TlsConnector::from(config);
 
         let domain = match host {
-            Host::Domain(domain) => ServerName::try_from(domain.as_ref())
-                .map_err(|_| Error::InvalidDnsName(domain.as_ref().to_owned()))?,
-            Host::Ipv4(ip) => ServerName::IpAddress((*ip).into()),
-            Host::Ipv6(ip) => ServerName::IpAddress((*ip).into()),
+            Host::Domain(domain) => ServerName::try_from(String::from(domain.as_ref()))
+                .map_err(|_| Error::InvalidDnsName(String::from(domain.as_ref())))?,
+            Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(Ipv4Addr::from(*ip))),
+            Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(Ipv6Addr::from(*ip))),
         };
 
-        let stream = connector.connect(domain, stream).await?;
-        Ok(stream)
+        Ok((connector, domain))
     }
 
-    async fn init(
-        user: &str,
-        password: &str,
-        stream: impl Into<ConnectionStream>,
-    ) -> Result<Connection> {
-        let mut stream = BufStream::new(stream.into());
+    async fn init(user: &str, password: &str, stream: ConnectionStream) -> Result<Connection> {
+        let mut stream = BufStream::new(stream);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
         stream.write_all(&Version::supported_versions()).await?;
         stream.flush().await?;
@@ -219,6 +186,7 @@ pub(crate) struct ConnectionInfo {
     client_certificate: Option<ClientCertificate>,
 }
 
+#[derive(Debug, Clone, Copy)]
 enum Encryption {
     No,
     Tls,

@@ -33,7 +33,7 @@ impl deadpool::managed::Manager for ConnectionManager {
 
     async fn create(&self) -> Result<Connection, Error> {
         info!("creating new connection...");
-        Connection::new(&self.info).await
+        Connection::new(&self.info)?.await
     }
 
     async fn recycle(&self, conn: &mut Connection) -> deadpool::managed::RecycleResult<Error> {
