@@ -22,10 +22,9 @@ async fn txn_changes_db() {
 
     let mut txn = graph.start_txn_on("system").await.unwrap();
     txn.run_queries([
+        "DROP DATABASE deebee IF EXISTS",
         "CREATE DATABASE deebee",
         "START DATABASE deebee",
-        "STOP DATABASE neo4j",
-        "DROP DATABASE neo4j",
     ])
     .await
     .unwrap();
@@ -48,7 +47,7 @@ async fn txn_changes_db() {
 
     names.sort();
 
-    assert_eq!(names, vec!["deebee", "system"]);
+    assert_eq!(names, vec!["deebee", "neo4j", "system"]);
 
     txn.commit().await.unwrap();
 }
