@@ -71,3 +71,5 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate }}
+          check-semver: true
+          base-branch: ${{ github.ref == 'refs/heads/0.7' && '0.7' || 'main' }}
