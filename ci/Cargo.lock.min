@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "neo4rs"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1053,6 +1053,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53e56521f047352df0db9a3c5aafc573eeb8909ab80f9d4cba201d8d73539009"
 dependencies = [
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
