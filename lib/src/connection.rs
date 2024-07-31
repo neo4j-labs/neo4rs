@@ -34,72 +34,27 @@ pub struct Connection {
 impl Connection {
     pub(crate) fn new(
         info: &ConnectionInfo,
-    ) -> Result<impl std::future::Future<Output = Result<Connection>>> {
-        let mut hello_builder = HelloBuilder::new(&*info.user, &*info.password);
-        if let Routing::Yes(routing) = &info.routing {
-            hello_builder.with_routing(routing.clone());
-        };
-        let encryption_connector = match info.encryption {
-            Encryption::No => None,
-            Encryption::Tls => Some(Self::tls_connector(
-                &info.host,
-                info.client_certificate.as_ref(),
-            )?),
-        };
-
+    ) -> impl std::future::Future<Output = Result<Connection>> {
+        // we do this setup outside of the async block so that the returned future
+        // does not borrow the info struct and can be Send
+        let hello_builder =
+            HelloBuilder::new(&*info.user, &*info.password).with_routing(info.routing.clone());
+        let encryption = info.encryption.clone();
         let host = info.host.clone();
         let port = info.port;
-        Ok(async move {
+        async move {
             let stream = match host {
                 Host::Domain(domain) => TcpStream::connect((&*domain, port)).await?,
                 Host::Ipv4(ip) => TcpStream::connect((ip, port)).await?,
                 Host::Ipv6(ip) => TcpStream::connect((ip, port)).await?,
             };
 
-            let stream: ConnectionStream = match encryption_connector {
+            let stream: ConnectionStream = match encryption {
                 Some((connector, domain)) => connector.connect(domain, stream).await?.into(),
                 None => stream.into(),
             };
             Self::init(hello_builder, stream).await
-        })
-    }
-
-    fn tls_connector<T: AsRef<str>>(
-        host: &Host<T>,
-        certificate: Option<&ClientCertificate>,
-    ) -> Result<(TlsConnector, ServerName<'static>)> {
-        let mut root_cert_store = RootCertStore::empty();
-        match rustls_native_certs::load_native_certs() {
-            Ok(certs) => {
-                root_cert_store.add_parsable_certificates(certs);
-            }
-            Err(e) => {
-                warn!("Failed to load native certificates: {e}");
-            }
         }
-
-        if let Some(certificate) = certificate {
-            let cert_file = File::open(&certificate.cert_file)?;
-            let mut reader = BufReader::new(cert_file);
-            let certs = rustls_pemfile::certs(&mut reader).flatten();
-            root_cert_store.add_parsable_certificates(certs);
-        }
-
-        let config = ClientConfig::builder()
-            .with_root_certificates(root_cert_store)
-            .with_no_client_auth();
-
-        let config = Arc::new(config);
-        let connector = TlsConnector::from(config);
-
-        let domain = match host {
-            Host::Domain(domain) => ServerName::try_from(String::from(domain.as_ref()))
-                .map_err(|_| Error::InvalidDnsName(String::from(domain.as_ref())))?,
-            Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(Ipv4Addr::from(*ip))),
-            Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(Ipv6Addr::from(*ip))),
-        };
-
-        Ok((connector, domain))
     }
 
     async fn init(hello_builder: HelloBuilder, stream: ConnectionStream) -> Result<Connection> {
@@ -111,7 +66,7 @@ impl Connection {
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
         let mut connection = Connection { version, stream };
-        let hello = hello_builder.version(version).build();
+        let hello = hello_builder.with_version(version).build();
         match connection.send_recv(hello).await? {
             BoltResponse::Success(_msg) => Ok(connection),
             BoltResponse::Failure(msg) => {
@@ -181,27 +136,41 @@ impl Connection {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct ConnectionInfo {
     user: Arc<str>,
     password: Arc<str>,
     host: Host<Arc<str>>,
     port: u16,
-    encryption: Encryption,
     routing: Routing,
-    client_certificate: Option<ClientCertificate>,
+    encryption: Option<(TlsConnector, ServerName<'static>)>,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Encryption {
-    No,
-    Tls,
+impl std::fmt::Debug for ConnectionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectionInfo")
+            .field("user", &self.user)
+            .field("password", &"***")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("routing", &self.routing)
+            .field("encryption", &self.encryption.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Routing {
     No,
     Yes(BoltMap),
+}
+
+impl From<Routing> for Option<BoltMap> {
+    fn from(routing: Routing) -> Self {
+        match routing {
+            Routing::No => None,
+            Routing::Yes(routing) => Some(routing),
+        }
+    }
 }
 
 impl ConnectionInfo {
@@ -213,24 +182,19 @@ impl ConnectionInfo {
     ) -> Result<Self> {
         let mut url = NeoUrl::parse(uri)?;
 
-        let host = url.host();
-        let host = match host {
-            Host::Domain(s) => Host::Domain(Arc::<str>::from(s)),
-            Host::Ipv4(d) => Host::Ipv4(d),
-            Host::Ipv6(d) => Host::Ipv6(d),
-        };
-
-        let port = url.port();
-
         let (routing, encryption) = match url.scheme() {
-            "bolt" | "" => (false, Encryption::No),
-            "bolt+s" => (false, Encryption::Tls),
-            "bolt+ssc" => (false, Encryption::Tls),
-            "neo4j" => (true, Encryption::No),
-            "neo4j+s" => (true, Encryption::Tls),
-            "neo4j+ssc" => (true, Encryption::Tls),
+            "bolt" | "" => (false, false),
+            "bolt+s" => (false, true),
+            "bolt+ssc" => (false, true),
+            "neo4j" => (true, false),
+            "neo4j+s" => (true, true),
+            "neo4j+ssc" => (true, true),
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
+
+        let encryption = encryption
+            .then(|| Self::tls_connector(url.host(), client_certificate))
+            .transpose()?;
 
         let routing = if routing {
             log::warn!(concat!(
@@ -244,15 +208,58 @@ impl ConnectionInfo {
 
         url.warn_on_unexpected_components();
 
+        let host = match url.host() {
+            Host::Domain(s) => Host::Domain(Arc::<str>::from(s)),
+            Host::Ipv4(d) => Host::Ipv4(d),
+            Host::Ipv6(d) => Host::Ipv6(d),
+        };
+
         Ok(Self {
             user: user.into(),
             password: password.into(),
             host,
-            port,
+            port: url.port(),
             encryption,
             routing,
-            client_certificate: client_certificate.cloned(),
         })
+    }
+
+    fn tls_connector(
+        host: Host<&str>,
+        certificate: Option<&ClientCertificate>,
+    ) -> Result<(TlsConnector, ServerName<'static>)> {
+        let mut root_cert_store = RootCertStore::empty();
+        match rustls_native_certs::load_native_certs() {
+            Ok(certs) => {
+                root_cert_store.add_parsable_certificates(certs);
+            }
+            Err(e) => {
+                warn!("Failed to load native certificates: {e}");
+            }
+        }
+
+        if let Some(certificate) = certificate {
+            let cert_file = File::open(&certificate.cert_file)?;
+            let mut reader = BufReader::new(cert_file);
+            let certs = rustls_pemfile::certs(&mut reader).flatten();
+            root_cert_store.add_parsable_certificates(certs);
+        }
+
+        let config = ClientConfig::builder()
+            .with_root_certificates(root_cert_store)
+            .with_no_client_auth();
+
+        let config = Arc::new(config);
+        let connector = TlsConnector::from(config);
+
+        let domain = match host {
+            Host::Domain(domain) => ServerName::try_from(domain.to_owned())
+                .map_err(|_| Error::InvalidDnsName(domain.to_owned()))?,
+            Host::Ipv4(ip) => ServerName::IpAddress(IpAddr::V4(Ipv4Addr::from(ip))),
+            Host::Ipv6(ip) => ServerName::IpAddress(IpAddr::V6(Ipv6Addr::from(ip))),
+        };
+
+        Ok((connector, domain))
     }
 }
 
