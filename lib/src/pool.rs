@@ -46,7 +46,7 @@ impl Manager for ConnectionManager {
 
     async fn create(&self) -> Result<Self::Type, Self::Error> {
         info!("creating new connection...");
-        Connection::new(&self.info).await
+        Connection::new(&self.info)?.await
     }
 
     async fn recycle(&self, obj: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
