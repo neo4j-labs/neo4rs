@@ -1,8 +1,10 @@
 use crate::{
     auth::ClientCertificate,
-    errors::{unexpected, Error, Result},
-    messages::{BoltRequest, BoltResponse},
+    errors::{Error, Result},
+    messages::{BoltRequest, BoltResponse, HelloBuilder},
+    unexpected,
     version::Version,
+    BoltMap,
 };
 use bytes::{Bytes, BytesMut};
 use log::warn;
@@ -33,10 +35,10 @@ impl Connection {
     pub(crate) fn new(
         info: &ConnectionInfo,
     ) -> Result<impl std::future::Future<Output = Result<Connection>>> {
-        let host = info.host.clone();
-        let port = info.port;
-        let user = info.user.clone();
-        let password = info.password.clone();
+        let mut hello_builder = HelloBuilder::new(&*info.user, &*info.password);
+        if let Routing::Yes(routing) = &info.routing {
+            hello_builder.with_routing(routing.clone());
+        };
         let encryption_connector = match info.encryption {
             Encryption::No => None,
             Encryption::Tls => Some(Self::tls_connector(
@@ -45,6 +47,8 @@ impl Connection {
             )?),
         };
 
+        let host = info.host.clone();
+        let port = info.port;
         Ok(async move {
             let stream = match host {
                 Host::Domain(domain) => TcpStream::connect((&*domain, port)).await?,
@@ -56,7 +60,7 @@ impl Connection {
                 Some((connector, domain)) => connector.connect(domain, stream).await?.into(),
                 None => stream.into(),
             };
-            Self::init(&user, &password, stream).await
+            Self::init(hello_builder, stream).await
         })
     }
 
@@ -98,7 +102,7 @@ impl Connection {
         Ok((connector, domain))
     }
 
-    async fn init(user: &str, password: &str, stream: ConnectionStream) -> Result<Connection> {
+    async fn init(hello_builder: HelloBuilder, stream: ConnectionStream) -> Result<Connection> {
         let mut stream = BufStream::new(stream);
         stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
         stream.write_all(&Version::supported_versions()).await?;
@@ -107,7 +111,7 @@ impl Connection {
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
         let mut connection = Connection { version, stream };
-        let hello = BoltRequest::hello("neo4rs", user, password);
+        let hello = hello_builder.version(version).build();
         match connection.send_recv(hello).await? {
             BoltResponse::Success(_msg) => Ok(connection),
             BoltResponse::Failure(msg) => {
@@ -177,12 +181,14 @@ impl Connection {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ConnectionInfo {
     user: Arc<str>,
     password: Arc<str>,
     host: Host<Arc<str>>,
     port: u16,
     encryption: Encryption,
+    routing: Routing,
     client_certificate: Option<ClientCertificate>,
 }
 
@@ -192,6 +198,12 @@ enum Encryption {
     Tls,
 }
 
+#[derive(Debug)]
+pub(crate) enum Routing {
+    No,
+    Yes(BoltMap),
+}
+
 impl ConnectionInfo {
     pub(crate) fn new(
         uri: &str,
@@ -199,48 +211,46 @@ impl ConnectionInfo {
         password: &str,
         client_certificate: Option<&ClientCertificate>,
     ) -> Result<Self> {
-        let url = NeoUrl::parse(uri)?;
-        let port = url.port();
-        let host = url.host();
+        let mut url = NeoUrl::parse(uri)?;
 
-        let encryption = match url.scheme() {
-            "bolt" | "" => Encryption::No,
-            "bolt+s" => Encryption::Tls,
-            "neo4j" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
-                Encryption::No
-            }
-            "neo4j+s" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
-                Encryption::Tls
-            }
-            "neo4j+ssc" => {
-                log::warn!(concat!(
-                    "This driver does not yet implement client-side routing. ",
-                    "It is possible that operations against a cluster (such as Aura) will fail."
-                ));
-                Encryption::Tls
-            }
-            "bolt+ssc" => Encryption::Tls,
+        let host = url.host();
+        let host = match host {
+            Host::Domain(s) => Host::Domain(Arc::<str>::from(s)),
+            Host::Ipv4(d) => Host::Ipv4(d),
+            Host::Ipv6(d) => Host::Ipv6(d),
+        };
+
+        let port = url.port();
+
+        let (routing, encryption) = match url.scheme() {
+            "bolt" | "" => (false, Encryption::No),
+            "bolt+s" => (false, Encryption::Tls),
+            "bolt+ssc" => (false, Encryption::Tls),
+            "neo4j" => (true, Encryption::No),
+            "neo4j+s" => (true, Encryption::Tls),
+            "neo4j+ssc" => (true, Encryption::Tls),
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
+
+        let routing = if routing {
+            log::warn!(concat!(
+                "This driver does not yet implement client-side routing. ",
+                "It is possible that operations against a cluster (such as Aura) will fail."
+            ));
+            Routing::Yes(url.routing_context())
+        } else {
+            Routing::No
+        };
+
+        url.warn_on_unexpected_components();
 
         Ok(Self {
             user: user.into(),
             password: password.into(),
-            host: match host {
-                Host::Domain(s) => Host::Domain(s.into()),
-                Host::Ipv4(d) => Host::Ipv4(d),
-                Host::Ipv6(d) => Host::Ipv6(d),
-            },
+            host,
             port,
             encryption,
+            routing,
             client_certificate: client_certificate.cloned(),
         })
     }
@@ -272,6 +282,33 @@ impl NeoUrl {
 
     fn port(&self) -> u16 {
         self.0.port().unwrap_or(7687)
+    }
+
+    fn routing_context(&mut self) -> BoltMap {
+        BoltMap::new()
+    }
+
+    fn warn_on_unexpected_components(&self) {
+        if !self.0.username().is_empty() || self.0.password().is_some() {
+            log::warn!(concat!(
+                "URI contained auth credentials, which are ignored.",
+                "Credentials are passed outside of the URI"
+            ));
+        }
+        if !matches!(self.0.path(), "" | "/") {
+            log::warn!("URI contained a path, which is ignored.");
+        }
+
+        if self.0.query().is_some() {
+            log::warn!(concat!(
+                "This client does not yet support client-side routing.",
+                "The routing context passed as a query to the URI is ignored."
+            ));
+        }
+
+        if self.0.fragment().is_some() {
+            log::warn!("URI contained a fragment, which is ignored.");
+        }
     }
 }
 
