@@ -68,11 +68,14 @@ impl HelloBuilder {
         }
     }
 
-    pub fn with_routing(&mut self, routing: BoltMap) {
-        self.routing = Some(routing);
+    pub fn with_routing(self, routing: impl Into<Option<BoltMap>>) -> Self {
+        Self {
+            routing: routing.into(),
+            ..self
+        }
     }
 
-    pub fn version(self, version: Version) -> Self {
+    pub fn with_version(self, version: Version) -> Self {
         Self { version, ..self }
     }
 
