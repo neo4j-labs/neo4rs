@@ -60,7 +60,7 @@ features = ["managed"]
 [dependencies.tokio-rustls]
 version = "0.26.0"
 default-features = false
-features = ["tls12"]
+features = ["tls12", "ring"]
 
 
 [dev-dependencies]
