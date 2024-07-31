@@ -152,7 +152,7 @@ jobs:
       - name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
       - name: Run integration tests
-        run: cargo +MSRV --locked ${{ env.HACK }} nextest run -E 'kind(test)'
+        run: cargo +$MSRV --locked ${{ env.HACK }} nextest run -E 'kind(test)'
 
   msrv:
     name: Validate MSRV and minimal dependency versions
