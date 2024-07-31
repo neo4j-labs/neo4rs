@@ -57,10 +57,14 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-workspaces
-        uses: taiki-e/install-action@cargo-workspaces
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-workspaces
 
       - name: Install cargo-release
-        uses: taiki-e/install-action@cargo-release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
 
       - uses: cargo-bins/release-pr@master
         with:
