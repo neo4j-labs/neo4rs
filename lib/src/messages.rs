@@ -28,7 +28,7 @@ use record::Record;
 use reset::Reset;
 use rollback::Rollback;
 use run::Run;
-use success::Success;
+pub(crate) use success::Success;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {

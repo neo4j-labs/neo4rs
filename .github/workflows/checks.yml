@@ -26,7 +26,6 @@ env:
   MSRV: 1.75.0
   HACK: hack --package neo4rs --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-streaming-summary
 
-
 jobs:
   check:
     name: Compile on MSRV
