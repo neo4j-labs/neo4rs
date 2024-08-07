@@ -1,9 +1,12 @@
-use crate::auth::ClientCertificate;
+use std::time::Duration;
+
 use crate::{
+    auth::ClientCertificate,
     config::Config,
     connection::{Connection, ConnectionInfo},
     errors::{Error, Result},
 };
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use deadpool::managed::{Manager, Metrics, Object, Pool, RecycleResult};
 use log::info;
 
@@ -12,6 +15,7 @@ pub type ManagedConnection = Object<ConnectionManager>;
 
 pub struct ConnectionManager {
     info: ConnectionInfo,
+    backoff: ExponentialBackoff,
 }
 
 impl ConnectionManager {
@@ -22,7 +26,17 @@ impl ConnectionManager {
         client_certificate: Option<&ClientCertificate>,
     ) -> Result<Self> {
         let info = ConnectionInfo::new(uri, user, password, client_certificate)?;
-        Ok(ConnectionManager { info })
+        let backoff = ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(1))
+            .with_randomization_factor(0.42)
+            .with_multiplier(2.0)
+            .with_max_elapsed_time(Some(Duration::from_secs(60)))
+            .build();
+        Ok(ConnectionManager { info, backoff })
+    }
+
+    pub fn backoff(&self) -> ExponentialBackoff {
+        self.backoff.clone()
     }
 }
 
