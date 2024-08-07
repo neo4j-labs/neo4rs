@@ -444,7 +444,9 @@ mod version;
 
 pub use crate::auth::ClientCertificate;
 pub use crate::config::{Config, ConfigBuilder, Database};
-pub use crate::errors::{Error, Result};
+pub use crate::errors::{
+    Error, Neo4jClientErrorKind, Neo4jError, Neo4jErrorKind, Neo4jSecurityErrorKind, Result,
+};
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;
 pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
@@ -461,5 +463,4 @@ pub use crate::types::{
 };
 pub use crate::version::Version;
 
-pub(crate) use errors::Neo4jErrorKind;
 pub(crate) use messages::Success;
