@@ -24,7 +24,7 @@ env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
   MSRV: ${{ (github.base_ref == '0.7' || github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '1.63.0' || '1.75.0' }}
-  HACK: hack --package neo4rs --each-feature ${{ (github.base_ref == '0.7' || github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '' || '--exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-streaming-summary' }}
+  HACK: hack --package neo4rs ${{ (github.base_ref == '0.7' || github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '--each-feature' || '--each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-streaming-summary' }}
 
 
 jobs:
