@@ -4,6 +4,7 @@ use crate::{
     pool::ManagedConnection,
     stream::{DetachedRowStream, RowStream},
     types::{BoltList, BoltMap, BoltString, BoltType},
+    Error, Neo4jErrorKind, Success,
 };
 
 /// Abstracts a cypher query that is sent to neo4j server.
@@ -43,24 +44,31 @@ impl Query {
     }
 
     pub(crate) async fn run(self, db: &str, connection: &mut ManagedConnection) -> Result<()> {
-        let run = BoltRequest::run(db, &self.query, self.params);
-        match connection.send_recv(run).await? {
-            BoltResponse::Success(_) => match connection.send_recv(BoltRequest::discard()).await? {
-                BoltResponse::Success(_) => Ok(()),
-                msg => Err(unexpected(msg, "DISCARD")),
-            },
-            msg => Err(unexpected(msg, "RUN")),
-        }
+        let request = BoltRequest::run(db, &self.query, self.params);
+        Self::try_run(request, connection)
+            .await
+            .map_err(unwrap_backoff)
     }
 
-    pub(crate) async fn execute(
-        self,
+    pub(crate) async fn run_retryable(
+        &self,
+        db: &str,
+        connection: &mut ManagedConnection,
+    ) -> Result<(), backoff::Error<Error>> {
+        let request = BoltRequest::run(db, &self.query, self.params.clone());
+        Self::try_run(request, connection).await
+    }
+
+    pub(crate) async fn execute_retryable(
+        &self,
         db: &str,
         fetch_size: usize,
         mut connection: ManagedConnection,
-    ) -> Result<DetachedRowStream> {
-        let stream = self.execute_mut(db, fetch_size, &mut connection).await?;
-        Ok(DetachedRowStream::new(stream, connection))
+    ) -> Result<DetachedRowStream, backoff::Error<Error>> {
+        let request = BoltRequest::run(db, &self.query, self.params.clone());
+        Self::try_execute(request, fetch_size, &mut connection)
+            .await
+            .map(|stream| DetachedRowStream::new(stream, connection))
     }
 
     pub(crate) async fn execute_mut<'conn>(
@@ -70,13 +78,38 @@ impl Query {
         connection: &'conn mut ManagedConnection,
     ) -> Result<RowStream> {
         let run = BoltRequest::run(db, &self.query, self.params);
-        match connection.send_recv(run).await {
-            Ok(BoltResponse::Success(success)) => {
-                let fields: BoltList = success.get("fields").unwrap_or_default();
-                let qid: i64 = success.get("qid").unwrap_or(-1);
-                Ok(RowStream::new(qid, fields, fetch_size))
-            }
-            msg => Err(unexpected(msg, "RUN")),
+        Self::try_execute(run, fetch_size, connection)
+            .await
+            .map_err(unwrap_backoff)
+    }
+
+    async fn try_run(request: BoltRequest, connection: &mut ManagedConnection) -> QueryResult<()> {
+        let _ = Self::try_request(request, connection).await?;
+        match connection.send_recv(BoltRequest::discard()).await {
+            Ok(BoltResponse::Success(_)) => Ok(()),
+            otherwise => wrap_error(otherwise, "DISCARD"),
+        }
+    }
+
+    async fn try_execute(
+        request: BoltRequest,
+        fetch_size: usize,
+        connection: &mut ManagedConnection,
+    ) -> QueryResult<RowStream> {
+        Self::try_request(request, connection).await.map(|success| {
+            let fields: BoltList = success.get("fields").unwrap_or_default();
+            let qid: i64 = success.get("qid").unwrap_or(-1);
+            RowStream::new(qid, fields, fetch_size)
+        })
+    }
+
+    async fn try_request(
+        request: BoltRequest,
+        connection: &mut ManagedConnection,
+    ) -> QueryResult<Success> {
+        match connection.send_recv(request).await {
+            Ok(BoltResponse::Success(success)) => Ok(success),
+            otherwise => wrap_error(otherwise, "RUN"),
         }
     }
 }
@@ -90,6 +123,32 @@ impl From<String> for Query {
 impl From<&str> for Query {
     fn from(query: &str) -> Self {
         Query::new(query.to_owned())
+    }
+}
+
+type QueryResult<T> = Result<T, backoff::Error<Error>>;
+
+fn wrap_error<T>(resp: Result<BoltResponse>, req: &str) -> QueryResult<T> {
+    let can_retry = if let Ok(BoltResponse::Failure(failure)) = &resp {
+        failure
+            .get::<String>("code")
+            .map_or(false, |code| Neo4jErrorKind::new(&code).can_retry())
+    } else {
+        false
+    };
+
+    let err = unexpected(resp, req);
+    if can_retry {
+        Err(backoff::Error::transient(err))
+    } else {
+        Err(backoff::Error::permanent(err))
+    }
+}
+
+fn unwrap_backoff(err: backoff::Error<Error>) -> Error {
+    match err {
+        backoff::Error::Permanent(e) => e,
+        backoff::Error::Transient { err, .. } => err,
     }
 }
 

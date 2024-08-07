@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
     config::{Config, ConfigBuilder, Database, LiveConfig},
     errors::Result,
@@ -48,6 +50,8 @@ impl Graph {
     /// Starts a new transaction on the configured database.
     /// All queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
+    ///
+    /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn(&self) -> Result<Txn> {
         self.start_txn_on(self.config.db.clone()).await
     }
@@ -55,6 +59,8 @@ impl Graph {
     /// Starts a new transaction on the provided database.
     /// All queries that needs to be run/executed within the transaction
     /// should be executed using either [`Txn::run`] or [`Txn::execute`]
+    ///
+    /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
         let connection = self.pool.get().await?;
         Txn::new(db.into(), self.config.fetch_size, connection).await
@@ -62,6 +68,11 @@ impl Graph {
 
     /// Runs a query on the configured database using a connection from the connection pool,
     /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     ///
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
@@ -73,23 +84,70 @@ impl Graph {
     /// Runs a query on the provided database using a connection from the connection pool.
     /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
     ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
+    ///
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run_on(&self, db: &str, q: Query) -> Result<()> {
-        let mut connection = self.pool.get().await?;
-        q.run(db, &mut connection).await
+        backoff::future::retry_notify(
+            self.pool.manager().backoff(),
+            || {
+                let pool = &self.pool;
+                let query = &q;
+                async move {
+                    let mut connection = pool.get().await.map_err(crate::Error::from)?;
+                    query.run_retryable(db, &mut connection).await
+                }
+            },
+            Self::log_retry,
+        )
+        .await
     }
 
     /// Executes a query on the configured database and returns a [`DetachedRowStream`]
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute(&self, q: Query) -> Result<DetachedRowStream> {
         self.execute_on(&self.config.db, q).await
     }
 
     /// Executes a query on the provided database and returns a [`DetaRowStream`]
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute_on(&self, db: &str, q: Query) -> Result<DetachedRowStream> {
-        let connection = self.pool.get().await?;
-        q.execute(db, self.config.fetch_size, connection).await
+        backoff::future::retry_notify(
+            self.pool.manager().backoff(),
+            || {
+                let pool = &self.pool;
+                let fetch_size = self.config.fetch_size;
+                let query = &q;
+                async move {
+                    let connection = pool.get().await.map_err(crate::Error::from)?;
+                    query.execute_retryable(db, fetch_size, connection).await
+                }
+            },
+            Self::log_retry,
+        )
+        .await
+    }
+
+    fn log_retry(e: crate::Error, delay: Duration) {
+        let level = match delay.as_millis() {
+            0..=499 => log::Level::Debug,
+            500..=4999 => log::Level::Info,
+            _ => log::Level::Warn,
+        };
+        log::log!(level, "Retrying query in {delay:?} due to error: {e}");
     }
 }
 
