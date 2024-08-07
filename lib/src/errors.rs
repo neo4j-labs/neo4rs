@@ -63,12 +63,8 @@ pub enum Error {
     )]
     ProtocolMismatch(u32),
 
-    #[error("FAILURE response to {msg} [{code}]: {message}")]
-    Failure {
-        code: String,
-        message: String,
-        msg: &'static str,
-    },
+    #[error("Neo4j error `{}`: {}", .0.code, .0.message)]
+    Neo4j(Neo4jError),
 
     #[error("{0}")]
     UnexpectedMessage(String),
@@ -193,11 +189,61 @@ impl Neo4jErrorKind {
             ) | Self::Transient
         )
     }
+
+    #[allow(unused)]
+    pub(crate) fn is_fatal(&self) -> bool {
+        match self {
+            Self::Client(Neo4jClientErrorKind::ProtocolViolation) => true,
+            Self::Client(_) | Self::Transient => false,
+            _ => true,
+        }
+    }
+
+    pub(crate) fn new_error(self, code: String, message: String) -> Neo4jError {
+        let code = Self::adjust_code(&code)
+            .map(|s| s.to_owned())
+            .unwrap_or(code);
+
+        Neo4jError {
+            kind: self,
+            code,
+            message,
+        }
+    }
 }
 
 impl From<&str> for Neo4jErrorKind {
     fn from(code: &str) -> Self {
         Self::new(code)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Neo4jError {
+    kind: Neo4jErrorKind,
+    code: String,
+    message: String,
+}
+
+impl Neo4jError {
+    pub(crate) fn new(code: String, message: String) -> Self {
+        Neo4jErrorKind::new(&code).new_error(code, message)
+    }
+
+    pub fn kind(&self) -> Neo4jErrorKind {
+        self.kind
+    }
+
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub(crate) fn can_retry(&self) -> bool {
+        self.kind.can_retry()
     }
 }
 

@@ -1,4 +1,8 @@
-use crate::types::{serde::DeError, BoltMap};
+use crate::{
+    errors::Neo4jError,
+    types::{serde::DeError, BoltMap},
+    BoltType,
+};
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
@@ -16,12 +20,14 @@ impl Failure {
         self.metadata.get::<T>(key)
     }
 
-    pub fn code(&self) -> &str {
-        self.get("code").unwrap()
-    }
-
-    pub fn message(&self) -> &str {
-        self.get("message").unwrap()
+    pub(crate) fn into_error(self) -> Neo4jError {
+        let mut meta = self.metadata.value;
+        let (code, message) = (meta.remove("code"), meta.remove("message"));
+        let (code, message) = match (code, message) {
+            (Some(BoltType::String(s)), Some(BoltType::String(m))) => (s.value, m.value),
+            _ => (String::new(), String::new()),
+        };
+        Neo4jError::new(code, message)
     }
 }
 
@@ -47,6 +53,7 @@ mod tests {
         ]);
 
         let failure: Failure = Failure::parse(Version::V4_1, &mut data).unwrap();
+        let failure = failure.into_error();
 
         assert_eq!(failure.code(), "Neo.ClientError.Security.Unauthorized");
         assert_eq!(

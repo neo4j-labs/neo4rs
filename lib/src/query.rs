@@ -4,7 +4,7 @@ use crate::{
     pool::ManagedConnection,
     stream::{DetachedRowStream, RowStream},
     types::{BoltList, BoltMap, BoltString, BoltType},
-    Error, Neo4jErrorKind, Success,
+    Error, Success,
 };
 
 /// Abstracts a cypher query that is sent to neo4j server.
@@ -129,23 +129,20 @@ impl From<&str> for Query {
 type QueryResult<T> = Result<T, backoff::Error<Error>>;
 
 fn wrap_error<T>(resp: Result<BoltResponse>, req: &'static str) -> QueryResult<T> {
-    let can_retry = if let Ok(BoltResponse::Failure(failure)) = &resp {
-        failure
-            .get::<String>("code")
-            .map_or(false, |code| Neo4jErrorKind::new(&code).can_retry())
-    } else {
-        false
-    };
-
-    let err = match resp {
+    let error = match resp {
+        Ok(BoltResponse::Failure(failure)) => Error::Neo4j(failure.into_error()),
         Ok(resp) => resp.into_error(req),
         Err(e) => e,
     };
+    let can_retry = match &error {
+        Error::Neo4j(e) => e.can_retry(),
+        _ => false,
+    };
 
     if can_retry {
-        Err(backoff::Error::transient(err))
+        Err(backoff::Error::transient(error))
     } else {
-        Err(backoff::Error::permanent(err))
+        Err(backoff::Error::permanent(error))
     }
 }
 

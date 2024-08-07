@@ -41,7 +41,7 @@ impl Failure {
     #[allow(unused)]
     pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
         let Self { code, message } = self;
-        crate::errors::Error::Failure { code, message, msg }
+        crate::errors::Error::Neo4j(crate::errors::Neo4jError::new(code, message))
     }
 }
 

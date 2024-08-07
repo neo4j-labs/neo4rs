@@ -154,11 +154,7 @@ impl Connection {
     pub async fn reset(&mut self) -> Result<()> {
         match self.send_recv(BoltRequest::reset()).await? {
             BoltResponse::Success(_) => Ok(()),
-            BoltResponse::Failure(f) => Err(Error::Failure {
-                code: f.code().into(),
-                message: f.message().into(),
-                msg: "RESET",
-            }),
+            BoltResponse::Failure(f) => Err(Error::Neo4j(f.into_error())),
             msg => Err(msg.into_error("RESET")),
         }
     }
