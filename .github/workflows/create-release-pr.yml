@@ -75,4 +75,4 @@ jobs:
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate || 'neo4rs' }}
           check-semver: true
-          base-branch: '0.8'
+          base-branch: 'v0.8'

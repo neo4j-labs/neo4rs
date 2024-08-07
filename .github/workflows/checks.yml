@@ -3,10 +3,10 @@ name: checks
 on:
   push:
     branches:
-      - "0.8"
+      - v0.8
   pull_request:
     branches:
-      - "0.8"
+      - v0.8
   release:
     types: [published]
   merge_group:
