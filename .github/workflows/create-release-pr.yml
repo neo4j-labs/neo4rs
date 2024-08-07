@@ -73,6 +73,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}
-          crate-name: ${{ inputs.crate }}
+          crate-name: ${{ inputs.crate || 'neo4rs' }}
           check-semver: true
           base-branch: 'v0.7'
