@@ -143,7 +143,7 @@ impl Graph {
 
     fn log_retry(e: crate::Error, delay: Duration) {
         let level = match delay.as_millis() {
-            ..=499 => log::Level::Debug,
+            0..=499 => log::Level::Debug,
             500..=4999 => log::Level::Info,
             _ => log::Level::Warn,
         };
