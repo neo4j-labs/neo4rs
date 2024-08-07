@@ -1,4 +1,8 @@
-use crate::types::{serde::DeError, BoltMap};
+use crate::{
+    errors::Neo4jError,
+    types::{serde::DeError, BoltMap},
+    BoltType, Neo4jErrorKind,
+};
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
@@ -14,6 +18,16 @@ impl Failure {
         T: Deserialize<'this>,
     {
         self.metadata.get::<T>(key)
+    }
+
+    pub(crate) fn into_error(self) -> Neo4jError {
+        let mut meta = self.metadata.value;
+        let (code, message) = (meta.remove("code"), meta.remove("message"));
+        let (code, message) = match (code, message) {
+            (Some(BoltType::String(s)), Some(BoltType::String(m))) => (s.value, m.value),
+            _ => (String::new(), String::new()),
+        };
+        Neo4jErrorKind::new(&code).new_error(code, message)
     }
 }
 
