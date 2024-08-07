@@ -20,7 +20,7 @@ on:
 
 env:
   RUSTUP_TOOLCHAIN: stable
-  MSRV: ${{ (github.base_ref == '0.7' || github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '1.63.0' || '1.75.0' }}
+  MSRV: 1.75.0
 
 jobs:
   make-release-pr:
@@ -75,4 +75,4 @@ jobs:
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate }}
           check-semver: true
-          base-branch: ${{ (github.ref == 'refs/heads/0.7' || startsWith(github.ref, 'refs/tags/v0.7.')) && '0.7' || 'main' }}
+          base-branch: main
