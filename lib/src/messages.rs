@@ -65,6 +65,7 @@ pub enum BoltRequest {
     Reset(reset::Reset),
 }
 
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 pub struct HelloBuilder {
     agent: BoltString,
     principal: BoltString,
@@ -72,6 +73,7 @@ pub struct HelloBuilder {
     routing: Option<BoltMap>,
 }
 
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 impl HelloBuilder {
     pub fn new(principal: impl Into<BoltString>, credentials: impl Into<BoltString>) -> Self {
         Self {
