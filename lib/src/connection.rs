@@ -8,18 +8,18 @@ use crate::{
     version::Version,
     BoltMap,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use log::warn;
-use std::fs::File;
-use std::io::BufReader;
-use std::{mem, sync::Arc};
+use std::{fs::File, io::BufReader, mem, sync::Arc};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, BufStream},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufStream},
     net::TcpStream,
 };
-use tokio_rustls::rustls::pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName};
 use tokio_rustls::{
-    rustls::{ClientConfig, RootCertStore},
+    rustls::{
+        pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName},
+        ClientConfig, RootCertStore,
+    },
     TlsConnector,
 };
 use url::{Host, Url};
@@ -33,43 +33,60 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub(crate) fn new(
-        info: &ConnectionInfo,
-    ) -> impl std::future::Future<Output = Result<Connection>> {
-        // we do this setup outside of the async block so that the returned future
-        // does not borrow the info struct and can be Send
-        let hello_builder =
-            HelloBuilder::new(&*info.user, &*info.password).with_routing(info.routing.clone());
-        let encryption = info.encryption.clone();
-        let host = info.host.clone();
-        let port = info.port;
-        async move {
-            let stream = match host {
-                Host::Domain(domain) => TcpStream::connect((&*domain, port)).await?,
-                Host::Ipv4(ip) => TcpStream::connect((ip, port)).await?,
-                Host::Ipv6(ip) => TcpStream::connect((ip, port)).await?,
-            };
-
-            let stream: ConnectionStream = match encryption {
-                Some((connector, domain)) => connector.connect(domain, stream).await?.into(),
-                None => stream.into(),
-            };
-            Self::init(hello_builder, stream).await
-        }
+    pub(crate) async fn new(info: &ConnectionInfo) -> Result<Self> {
+        let mut connection = Self::prepare(info).await?;
+        let hello = info.to_hello(connection.version);
+        connection.hello(hello).await?;
+        Ok(connection)
     }
 
-    async fn init(hello_builder: HelloBuilder, stream: ConnectionStream) -> Result<Connection> {
-        let mut stream = BufStream::new(stream);
-        stream.write_all(&[0x60, 0x60, 0xB0, 0x17]).await?;
-        stream.write_all(&Version::supported_versions()).await?;
+    pub(crate) async fn prepare(info: &ConnectionInfo) -> Result<Self> {
+        let mut stream = match &info.host {
+            Host::Domain(domain) => TcpStream::connect((&**domain, info.port)).await?,
+            Host::Ipv4(ip) => TcpStream::connect((*ip, info.port)).await?,
+            Host::Ipv6(ip) => TcpStream::connect((*ip, info.port)).await?,
+        };
+
+        Ok(match &info.encryption {
+            Some((connector, domain)) => {
+                let mut stream = connector.connect(domain.clone(), stream).await?;
+                let version = Self::init(&mut stream).await?;
+                Self::create(stream, version)
+            }
+            None => {
+                let version = Self::init(&mut stream).await?;
+                Self::create(stream, version)
+            }
+        })
+    }
+
+    async fn init<A: AsyncWrite + AsyncRead + Unpin>(stream: &mut A) -> Result<Version> {
+        stream.write_all_buf(&mut Self::init_msg()).await?;
         stream.flush().await?;
+
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
-        let mut connection = Connection { version, stream };
-        let hello = hello_builder.with_version(version).build();
-        match connection.send_recv(hello).await? {
-            BoltResponse::Success(_msg) => Ok(connection),
+        Ok(version)
+    }
+
+    fn create(stream: impl Into<ConnectionStream>, version: Version) -> Connection {
+        Connection {
+            version,
+            stream: BufStream::new(stream.into()),
+        }
+    }
+
+    fn init_msg() -> Bytes {
+        let mut init = BytesMut::with_capacity(20);
+        init.put_slice(&[0x60, 0x60, 0xB0, 0x17]);
+        Version::add_supported_versions(&mut init);
+        init.freeze()
+    }
+
+    async fn hello(&mut self, req: BoltRequest) -> Result<()> {
+        match self.send_recv(req).await? {
+            BoltResponse::Success(_msg) => Ok(()),
             BoltResponse::Failure(msg) => {
                 Err(Error::AuthenticationError(msg.get("message").unwrap()))
             }
@@ -305,6 +322,13 @@ impl ConnectionInfo {
         };
 
         Ok((connector, domain))
+    }
+
+    pub(crate) fn to_hello(&self, version: Version) -> BoltRequest {
+        HelloBuilder::new(&*self.user, &*self.password)
+            .with_routing(self.routing.clone())
+            .with_version(version)
+            .build()
     }
 }
 
