@@ -110,8 +110,27 @@ You can use the `NEO4J_VERSION_TAG` environment variable to set the version of t
 It is recommended to only run a single integration test and manually clean up the database after the test.
 
 ```sh
-env NEO4J_TEST_URI=neo4j+s://42421337thisisnotarealinstance.databases.neo4j.io NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=supersecret NEO4J_VERSION_TAG=5.8 cargo test --test <name of the integration test, see the file names in lib/tests/>
+env NEO4J_TEST_URI=bolt://localhost:7687 NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=supersecret NEO4J_VERSION_TAG=5.8 cargo test --test <name of the integration test, see the file names in lib/tests/>
 ```
+
+##### Using an Aura instance
+
+> ![WARNING]
+> Running the tests will create new data and might change and delete existing data or entire databases.
+> Do not use a production instance.
+
+Running a test against an Aura instance can be done by setting the values as outlined above.
+However, the environment variables used do not match the names that are given in the connection file when an Aura instance is created.
+
+By setting the environment variable `NEO4RS_TEST_ON_AURA` to `1`, the tests will look for the environment variables as they are used in the connection file.
+The tests can then also be run by using a `dotenv` like tool, e.g.
+
+```sh
+dotenvx run -f .auraenv -e NEO4RS_TEST_ON_AURA=1 -- cargo test
+```
+
+> ![NOTE]
+> Some tests might also use features not available on Aura and will fail.
 
 ### Updating `Cargo.lock` files for CI
 
