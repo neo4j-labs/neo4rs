@@ -172,7 +172,7 @@ mod tests {
 
         let expected = bolt()
             .structure(1, 0x01)
-            .tiny_map(4)
+            .tiny_map(5)
             .tiny_string("scheme")
             .tiny_string("basic")
             .tiny_string("principal")
@@ -197,7 +197,7 @@ mod tests {
 
         let expected = bolt()
             .structure(1, 0x01)
-            .tiny_map(4)
+            .tiny_map(5)
             .tiny_string("scheme")
             .tiny_string("basic")
             .tiny_string("principal")
