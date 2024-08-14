@@ -1,5 +1,5 @@
 use crate::errors::{Error, Result};
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use std::cmp::PartialEq;
 use std::fmt::Debug;
 
@@ -11,13 +11,12 @@ pub enum Version {
 }
 
 impl Version {
-    pub fn supported_versions() -> Bytes {
-        let mut bytes = BytesMut::with_capacity(16);
-        let versions: [u32; 4] = [0x0104, 0x0004, 0, 0];
-        for version in versions.iter() {
-            bytes.put_u32(*version);
-        }
-        bytes.freeze()
+    pub fn add_supported_versions(bytes: &mut BytesMut) {
+        bytes.reserve(16);
+        bytes.put_u32(0x0104); // V4_1
+        bytes.put_u32(0x0004); // V4
+        bytes.put_u32(0);
+        bytes.put_u32(0);
     }
 
     pub fn parse(version_bytes: [u8; 4]) -> Result<Version> {
