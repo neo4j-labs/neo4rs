@@ -60,15 +60,15 @@ impl Neo4jContainer {
     ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
         let _ = pretty_env_logger::try_init();
 
-        let connection = Self::create_test_endpoint();
         let server = Self::server_from_env();
+        let connection = Self::create_test_endpoint(matches!(server, TestServer::Aura(_)));
 
         let (uri, _container) = match server {
             TestServer::TestContainer => {
                 let (uri, container) = Self::create_testcontainer(&connection, enterprise_edition)?;
                 (uri, Some(container))
             }
-            TestServer::External(uri) => (uri, None),
+            TestServer::External(uri) | TestServer::Aura(uri) => (uri, None),
         };
 
         let version = connection.version;
@@ -94,12 +94,17 @@ impl Neo4jContainer {
 
     fn server_from_env() -> TestServer {
         const TEST_URI_VAR: &str = "NEO4J_TEST_URI";
+        const CHECK_AURA_VAR: &str = "NEO4RS_TEST_ON_AURA";
+        const AURA_URI_VAR: &str = "NEO4J_URI";
 
-        if let Ok(uri) = std::env::var(TEST_URI_VAR) {
-            TestServer::External(uri)
-        } else {
-            TestServer::TestContainer
-        }
+        use std::env::var;
+
+        var(CHECK_AURA_VAR)
+            .ok()
+            .filter(|use_aura| use_aura == "1")
+            .and_then(|_| var(AURA_URI_VAR).ok().map(TestServer::Aura))
+            .or_else(|| var(TEST_URI_VAR).ok().map(TestServer::External))
+            .unwrap_or(TestServer::TestContainer)
     }
 
     fn create_testcontainer(
@@ -155,9 +160,11 @@ impl Neo4jContainer {
         Ok((uri, container))
     }
 
-    fn create_test_endpoint() -> TestConnection {
+    fn create_test_endpoint(use_aura: bool) -> TestConnection {
         const USER_VAR: &str = "NEO4J_TEST_USER";
+        const AURA_USER_VAR: &str = "NEO4J_USERNAME";
         const PASS_VAR: &str = "NEO4J_TEST_PASS";
+        const AURA_PASS_VAR: &str = "NEO4J_PASSWORD";
         const VERSION_VAR: &str = "NEO4J_VERSION_TAG";
 
         const DEFAULT_USER: &str = "neo4j";
@@ -166,8 +173,10 @@ impl Neo4jContainer {
 
         use std::env::var;
 
-        let user = var(USER_VAR).unwrap_or_else(|_| DEFAULT_USER.to_owned());
-        let pass = var(PASS_VAR).unwrap_or_else(|_| DEFAULT_PASS.to_owned());
+        let user = var(if use_aura { AURA_USER_VAR } else { USER_VAR })
+            .unwrap_or_else(|_| DEFAULT_USER.to_owned());
+        let pass = var(if use_aura { AURA_PASS_VAR } else { PASS_VAR })
+            .unwrap_or_else(|_| DEFAULT_PASS.to_owned());
         let auth = TestAuth { user, pass };
         let version = var(VERSION_VAR).unwrap_or_else(|_| DEFAULT_VERSION_TAG.to_owned());
 
@@ -198,5 +207,6 @@ struct TestConnection {
 
 enum TestServer {
     TestContainer,
+    Aura(String),
     External(String),
 }
