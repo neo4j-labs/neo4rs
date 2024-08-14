@@ -16,7 +16,7 @@ impl<R: std::fmt::Debug> Summary<R> {
     #[allow(unused)]
     pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
         match self {
-            Summary::Failure(f) => f.into_error(msg),
+            Summary::Failure(f) => f.into_error(),
             otherwise => crate::Error::UnexpectedMessage(format!(
                 "unexpected response for {}: {:?}",
                 msg, otherwise
@@ -39,7 +39,7 @@ pub struct Failure {
 
 impl Failure {
     #[allow(unused)]
-    pub fn into_error(self, msg: &'static str) -> crate::errors::Error {
+    pub fn into_error(self) -> crate::errors::Error {
         let Self { code, message } = self;
         crate::errors::Error::Neo4j(crate::errors::Neo4jError::new(code, message))
     }
