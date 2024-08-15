@@ -13,7 +13,7 @@ mod request;
 mod structs;
 mod summary;
 
-pub use request::{Commit, Discard, Goodbye, Hello, Reset, Rollback, WrapExtra};
+pub use request::{Commit, Discard, Goodbye, Hello, HelloBuilder, Reset, Rollback, WrapExtra};
 pub use structs::{
     Bolt, BoltRef, Date, DateDuration, DateTime, DateTimeZoneId, DateTimeZoneIdRef, Duration,
     LegacyDateTime, LegacyDateTimeZoneId, LegacyDateTimeZoneIdRef, LocalDateTime, LocalTime, Node,

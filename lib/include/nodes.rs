@@ -1,5 +1,7 @@
-{ 
-    assert!(graph.run(query("RETURN 1")).await.is_ok());
+{
+    // run a query to ensure the connection is alive
+    let result = graph.run(query("RETURN 1")).await;
+    assert!(result.is_ok(), "Query failed: {:?}", result);
 
     let mut result = graph
         .execute(

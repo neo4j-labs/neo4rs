@@ -1,12 +1,16 @@
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{ExpectedResponse, Message, MessageResponse};
+use crate::bolt::{
+    ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
+};
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+use crate::messages::HelloBuilder;
 use crate::{
     auth::ClientCertificate,
     connection::stream::ConnectionStream,
     errors::{Error, Result},
-    messages::{BoltRequest, BoltResponse, HelloBuilder},
+    messages::{BoltRequest, BoltResponse},
     version::Version,
-    BoltMap,
+    BoltMap, BoltString, BoltType,
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use log::warn;
@@ -84,6 +88,7 @@ impl Connection {
         init.freeze()
     }
 
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     async fn hello(&mut self, req: BoltRequest) -> Result<()> {
         match self.send_recv(req).await? {
             BoltResponse::Success(_msg) => Ok(()),
@@ -94,11 +99,37 @@ impl Connection {
         }
     }
 
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    async fn hello(&mut self, hello: Hello<'_>) -> Result<()> {
+        let hello = self.send_recv_as(hello).await?;
+
+        match hello {
+            Summary::Success(_msg) => Ok(()),
+            Summary::Ignored => todo!(),
+            Summary::Failure(msg) => Err(Error::AuthenticationError(msg.message)),
+        }
+    }
+
     pub async fn reset(&mut self) -> Result<()> {
-        match self.send_recv(BoltRequest::reset()).await? {
-            BoltResponse::Success(_) => Ok(()),
-            BoltResponse::Failure(f) => Err(Error::Neo4j(f.into_error())),
-            msg => Err(msg.into_error("RESET")),
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match self.send_recv(BoltRequest::reset()).await? {
+                BoltResponse::Success(_) => Ok(()),
+                BoltResponse::Failure(f) => Err(Error::Neo4j(f.into_error())),
+                msg => Err(msg.into_error("RESET")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match self.send_recv_as(Reset).await? {
+                Summary::Success(_) => Ok(()),
+                Summary::Failure(err) => Err(Error::ConnectionClosed(err)),
+                msg => Err(Error::UnexpectedMessage(format!(
+                    "unexpected response for RESET: {:?}",
+                    msg
+                ))),
+            }
         }
     }
 
@@ -223,14 +254,19 @@ impl std::fmt::Debug for ConnectionInfo {
 #[derive(Debug, Clone)]
 pub(crate) enum Routing {
     No,
-    Yes(BoltMap),
+    Yes(Vec<(BoltString, BoltString)>),
 }
 
 impl From<Routing> for Option<BoltMap> {
     fn from(routing: Routing) -> Self {
         match routing {
             Routing::No => None,
-            Routing::Yes(routing) => Some(routing),
+            Routing::Yes(routing) => Some(
+                routing
+                    .into_iter()
+                    .map(|(k, v)| (k, BoltType::String(v)))
+                    .collect(),
+            ),
         }
     }
 }
@@ -324,11 +360,25 @@ impl ConnectionInfo {
         Ok((connector, domain))
     }
 
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub(crate) fn to_hello(&self, version: Version) -> BoltRequest {
         HelloBuilder::new(&*self.user, &*self.password)
             .with_routing(self.routing.clone())
-            .with_version(version)
-            .build()
+            .build(version)
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub(crate) fn to_hello(&self, version: Version) -> Hello {
+        let routing = match self.routing {
+            Routing::No => &[],
+            Routing::Yes(ref routing) => routing.as_slice(),
+        };
+        let routing = routing
+            .iter()
+            .map(|(k, v)| (k.value.as_str(), v.value.as_str()));
+        HelloBuilder::new(&self.user, &self.password)
+            .with_routing(routing)
+            .build(version)
     }
 }
 
@@ -360,8 +410,8 @@ impl NeoUrl {
         self.0.port().unwrap_or(7687)
     }
 
-    fn routing_context(&mut self) -> BoltMap {
-        BoltMap::new()
+    fn routing_context(&mut self) -> Vec<(BoltString, BoltString)> {
+        Vec::new()
     }
 
     fn warn_on_unexpected_components(&self) {
