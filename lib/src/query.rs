@@ -56,7 +56,7 @@ impl Query {
         &self,
         db: &str,
         connection: &mut ManagedConnection,
-    ) -> Result<(), backoff::Error<Error>> {
+    ) -> QueryResult<()> {
         let request = BoltRequest::run(db, &self.query, self.params.clone());
         Self::try_run(request, connection).await
     }
@@ -66,7 +66,7 @@ impl Query {
         db: &str,
         fetch_size: usize,
         mut connection: ManagedConnection,
-    ) -> Result<DetachedRowStream, backoff::Error<Error>> {
+    ) -> QueryResult<DetachedRowStream> {
         let request = BoltRequest::run(db, &self.query, self.params.clone());
         Self::try_execute(request, fetch_size, &mut connection)
             .await
