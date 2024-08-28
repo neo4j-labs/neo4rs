@@ -6,7 +6,7 @@ use neo4rs_macros::BoltStruct;
 #[signature(0xB0, 0x12)]
 #[cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
-    deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+    deprecated(since = "0.9.0", note = "Use `crate::bolt::Commit` instead.")
 )]
 pub struct Commit;
 

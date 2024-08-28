@@ -6,7 +6,7 @@ use neo4rs_macros::BoltStruct;
 #[signature(0xB0, 0x0F)]
 #[cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
-    deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+    deprecated(since = "0.9.0", note = "Use `crate::bolt::Reset` instead.")
 )]
 pub struct Reset;
 

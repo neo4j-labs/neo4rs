@@ -20,7 +20,6 @@ use crate::{
 use begin::Begin;
 use bytes::Bytes;
 use failure::Failure;
-use pull::Pull;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
@@ -37,30 +36,34 @@ pub enum BoltResponse {
 pub enum BoltRequest {
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Hello` instead.")
     )]
     Hello(hello::Hello),
     Run(Run),
-    Pull(Pull),
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Pull` instead.")
+    )]
+    Pull(pull::Pull),
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
     )]
     Discard(discard::Discard),
     Begin(Begin),
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Commit` instead.")
     )]
     Commit(commit::Commit),
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Rollback` instead.")
     )]
     Rollback(rollback::Rollback),
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Reset` instead.")
     )]
     Reset(reset::Reset),
 }
@@ -107,7 +110,7 @@ impl HelloBuilder {
 impl BoltRequest {
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Hello` instead.")
     )]
     pub fn hello(
         agent: BoltString,
@@ -133,13 +136,17 @@ impl BoltRequest {
         BoltRequest::Run(Run::new(db.into(), query.into(), params))
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Pull` instead.")
+    )]
     pub fn pull(n: usize, qid: i64) -> BoltRequest {
-        BoltRequest::Pull(Pull::new(n as i64, qid))
+        BoltRequest::Pull(pull::Pull::new(n as i64, qid))
     }
 
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Discard` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
     )]
     pub fn discard() -> BoltRequest {
         BoltRequest::Discard(discard::Discard::default())
@@ -152,7 +159,7 @@ impl BoltRequest {
 
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Commit` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Commit` instead.")
     )]
     pub fn commit() -> BoltRequest {
         BoltRequest::Commit(commit::Commit::new())
@@ -160,7 +167,7 @@ impl BoltRequest {
 
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Rollback` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Rollback` instead.")
     )]
     pub fn rollback() -> BoltRequest {
         BoltRequest::Rollback(rollback::Rollback::new())
@@ -168,7 +175,7 @@ impl BoltRequest {
 
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.8.0", note = "Use `crate::bolt::Reset` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Reset` instead.")
     )]
     pub fn reset() -> BoltRequest {
         BoltRequest::Reset(reset::Reset::new())

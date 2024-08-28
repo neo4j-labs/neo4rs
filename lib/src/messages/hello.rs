@@ -7,7 +7,7 @@ use neo4rs_macros::BoltStruct;
 #[signature(0xB1, 0x01)]
 #[cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
-    deprecated(since = "0.8.0", note = "Use `crate::bolt::Hello` instead.")
+    deprecated(since = "0.9.0", note = "Use `crate::bolt::Hello` instead.")
 )]
 pub struct Hello {
     extra: BoltMap,

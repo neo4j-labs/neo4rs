@@ -1,8 +1,14 @@
+#![cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
+
 use crate::types::BoltMap;
 use neo4rs_macros::BoltStruct;
 
 #[derive(Debug, PartialEq, Clone, BoltStruct)]
 #[signature(0xB1, 0x3F)]
+#[cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    deprecated(since = "0.9.0", note = "Use `crate::bolt::Pull` instead.")
+)]
 pub struct Pull {
     extra: BoltMap,
 }
@@ -14,6 +20,7 @@ impl Default for Pull {
 }
 
 impl Pull {
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(dead_code))]
     pub fn new(n: i64, qid: i64) -> Pull {
         let mut extra = BoltMap::default();
         extra.put("n".into(), n.into());
