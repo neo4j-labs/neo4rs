@@ -132,8 +132,8 @@ impl BoltRequest {
         BoltRequest::Hello(hello::Hello::new(data))
     }
 
-    pub fn run(db: &str, query: &str, params: BoltMap) -> BoltRequest {
-        BoltRequest::Run(Run::new(db.into(), query.into(), params))
+    pub fn run(db: Option<&str>, query: &str, params: BoltMap) -> BoltRequest {
+        BoltRequest::Run(Run::new(db.map(Into::into), query.into(), params))
     }
 
     #[cfg_attr(
@@ -152,8 +152,9 @@ impl BoltRequest {
         BoltRequest::Discard(discard::Discard::default())
     }
 
-    pub fn begin(db: &str) -> BoltRequest {
-        let begin = Begin::new([("db".into(), db.into())].into_iter().collect());
+    pub fn begin(db: Option<&str>) -> BoltRequest {
+        let extra = db.into_iter().map(|db| ("db".into(), db.into())).collect();
+        let begin = Begin::new(extra);
         BoltRequest::Begin(begin)
     }
 

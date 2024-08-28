@@ -45,7 +45,11 @@ impl Query {
         self.params.value.contains_key(key)
     }
 
-    pub(crate) async fn run(self, db: &str, connection: &mut ManagedConnection) -> Result<()> {
+    pub(crate) async fn run(
+        self,
+        db: Option<&str>,
+        connection: &mut ManagedConnection,
+    ) -> Result<()> {
         let request = BoltRequest::run(db, &self.query, self.params);
         Self::try_run(request, connection)
             .await
@@ -54,7 +58,7 @@ impl Query {
 
     pub(crate) async fn run_retryable(
         &self,
-        db: &str,
+        db: Option<&str>,
         connection: &mut ManagedConnection,
     ) -> QueryResult<()> {
         let request = BoltRequest::run(db, &self.query, self.params.clone());
@@ -63,7 +67,7 @@ impl Query {
 
     pub(crate) async fn execute_retryable(
         &self,
-        db: &str,
+        db: Option<&str>,
         fetch_size: usize,
         mut connection: ManagedConnection,
     ) -> QueryResult<DetachedRowStream> {
@@ -75,7 +79,7 @@ impl Query {
 
     pub(crate) async fn execute_mut<'conn>(
         self,
-        db: &str,
+        db: Option<&str>,
         fetch_size: usize,
         connection: &'conn mut ManagedConnection,
     ) -> Result<RowStream> {

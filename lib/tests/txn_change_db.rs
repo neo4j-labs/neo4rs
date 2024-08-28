@@ -7,15 +7,19 @@ mod container;
 #[tokio::test]
 async fn txn_changes_db() {
     let neo4j = match container::Neo4jContainerBuilder::new()
-        .modify_config(|c| c.db("deebee"))
+        .modify_driver_config(|c| c.db("deebee"))
         .with_enterprise_edition()
         .start()
         .await
     {
         Ok(n) => n,
         Err(e) => {
-            eprintln!("Skipping test: {}", e);
-            return;
+            if e.to_string().contains("Neo4j Enterprise Edition") {
+                eprintln!("Skipping test: {}", e);
+                return;
+            }
+
+            std::panic::panic_any(e);
         }
     };
     let graph = neo4j.graph();

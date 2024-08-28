@@ -1,6 +1,6 @@
 use lenient_semver::Version;
 use neo4rs::{ConfigBuilder, Graph};
-use testcontainers::{runners::SyncRunner, Container, ImageExt};
+use testcontainers::{runners::AsyncRunner, ContainerAsync, ContainerRequest, ImageExt};
 use testcontainers_modules::neo4j::{Neo4j, Neo4jImage};
 
 use std::{error::Error, io::BufRead as _};
@@ -10,6 +10,7 @@ use std::{error::Error, io::BufRead as _};
 pub struct Neo4jContainerBuilder {
     enterprise: bool,
     config: ConfigBuilder,
+    env: Vec<(String, String)>,
 }
 
 #[allow(dead_code)]
@@ -23,25 +24,39 @@ impl Neo4jContainerBuilder {
         self
     }
 
-    pub fn with_config(mut self, config: ConfigBuilder) -> Self {
+    pub fn with_driver_config(mut self, config: ConfigBuilder) -> Self {
         self.config = config;
         self
     }
 
-    pub fn modify_config(mut self, block: impl FnOnce(ConfigBuilder) -> ConfigBuilder) -> Self {
+    pub fn modify_driver_config(
+        mut self,
+        block: impl FnOnce(ConfigBuilder) -> ConfigBuilder,
+    ) -> Self {
         self.config = block(self.config);
         self
     }
 
+    pub fn add_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn with_server_config(self, key: &str, value: impl Into<String>) -> Self {
+        let key = format!("NEO4J_{}", key.replace('_', "__").replace('.', "_"));
+        self.add_env(key, value)
+    }
+
     pub async fn start(self) -> Result<Neo4jContainer, Box<dyn Error + Send + Sync + 'static>> {
-        Neo4jContainer::from_config_and_edition(self.config, self.enterprise).await
+        Neo4jContainer::from_config_and_edition_and_env(self.config, self.enterprise, self.env)
+            .await
     }
 }
 
 pub struct Neo4jContainer {
     graph: Graph,
     version: String,
-    _container: Option<Container<Neo4jImage>>,
+    _container: Option<ContainerAsync<Neo4jImage>>,
 }
 
 impl Neo4jContainer {
@@ -58,6 +73,20 @@ impl Neo4jContainer {
         config: ConfigBuilder,
         enterprise_edition: bool,
     ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
+        Self::from_config_and_edition_and_env::<_, String, String>(config, enterprise_edition, [])
+            .await
+    }
+
+    pub async fn from_config_and_edition_and_env<I, K, V>(
+        config: ConfigBuilder,
+        enterprise_edition: bool,
+        env_vars: I,
+    ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
         let _ = pretty_env_logger::try_init();
 
         let server = Self::server_from_env();
@@ -65,7 +94,12 @@ impl Neo4jContainer {
 
         let (uri, _container) = match server {
             TestServer::TestContainer => {
-                let (uri, container) = Self::create_testcontainer(&connection, enterprise_edition)?;
+                let (uri, container) = Self::create_testcontainer(
+                    &connection,
+                    enterprise_edition,
+                    env_vars.into_iter().map(|(k, v)| (k.into(), v.into())),
+                )
+                .await?;
                 (uri, Some(container))
             }
             TestServer::External(uri) | TestServer::Aura(uri) => (uri, None),
@@ -107,10 +141,30 @@ impl Neo4jContainer {
             .unwrap_or(TestServer::TestContainer)
     }
 
-    fn create_testcontainer(
+    async fn create_testcontainer<I>(
         connection: &TestConnection,
         enterprise: bool,
-    ) -> Result<(String, Container<Neo4jImage>), Box<dyn Error + Send + Sync + 'static>> {
+        env_vars: I,
+    ) -> Result<(String, ContainerAsync<Neo4jImage>), Box<dyn Error + Send + Sync + 'static>>
+    where
+        I: Iterator<Item = (String, String)>,
+    {
+        let container = Self::create_testcontainer_image(connection, enterprise, env_vars)?;
+        let container = container.start().await?;
+
+        let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4()?);
+
+        Ok((uri, container))
+    }
+
+    fn create_testcontainer_image<I>(
+        connection: &TestConnection,
+        enterprise: bool,
+        env_vars: I,
+    ) -> Result<ContainerRequest<Neo4jImage>, Box<dyn Error + Send + Sync + 'static>>
+    where
+        I: Iterator<Item = (String, String)>,
+    {
         let image = Neo4j::new()
             .with_user(connection.auth.user.to_owned())
             .with_password(connection.auth.pass.to_owned());
@@ -147,17 +201,17 @@ impl Neo4jContainer {
                 .into());
             }
 
-            image
-                .with_version(version)
-                .with_env_var("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
-                .start()?
+            env_vars.fold(
+                image
+                    .with_version(version)
+                    .with_env_var("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes"),
+                |i, (k, v)| i.with_env_var(k, v),
+            )
         } else {
-            image.with_version(connection.version.to_owned()).start()?
+            image.with_version(connection.version.to_owned()).into()
         };
 
-        let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4()?);
-
-        Ok((uri, container))
+        Ok(container)
     }
 
     fn create_test_endpoint(use_aura: bool) -> TestConnection {

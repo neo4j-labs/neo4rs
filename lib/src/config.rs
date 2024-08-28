@@ -3,7 +3,6 @@ use crate::errors::{Error, Result};
 use std::path::Path;
 use std::{ops::Deref, sync::Arc};
 
-const DEFAULT_DATABASE: &str = "neo4j";
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
@@ -24,12 +23,6 @@ impl From<String> for Database {
     }
 }
 
-impl Default for Database {
-    fn default() -> Self {
-        Database(DEFAULT_DATABASE.into())
-    }
-}
-
 impl AsRef<str> for Database {
     fn as_ref(&self) -> &str {
         &self.0
@@ -47,7 +40,7 @@ impl Deref for Database {
 /// The configuration that is used once a connection is alive.
 #[derive(Debug, Clone)]
 pub struct LiveConfig {
-    pub(crate) db: Database,
+    pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
 }
 
@@ -58,7 +51,7 @@ pub struct Config {
     pub(crate) user: String,
     pub(crate) password: String,
     pub(crate) max_connections: usize,
-    pub(crate) db: Database,
+    pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
     pub(crate) client_certificate: Option<ClientCertificate>,
 }
@@ -77,7 +70,7 @@ pub struct ConfigBuilder {
     uri: Option<String>,
     user: Option<String>,
     password: Option<String>,
-    db: Database,
+    db: Option<Database>,
     fetch_size: usize,
     max_connections: usize,
     client_certificate: Option<ClientCertificate>,
@@ -109,9 +102,11 @@ impl ConfigBuilder {
 
     /// The name of the database to connect to.
     ///
-    /// Defaults to "neo4j" if not set.
+    /// Defaults to the server configured default database if not set.
+    /// The database can also be specified on a per-query level, which will
+    /// override this value.
     pub fn db(mut self, db: impl Into<Database>) -> Self {
-        self.db = db.into();
+        self.db = Some(db.into());
         self
     }
 
@@ -160,7 +155,7 @@ impl Default for ConfigBuilder {
             uri: None,
             user: None,
             password: None,
-            db: DEFAULT_DATABASE.into(),
+            db: None,
             max_connections: DEFAULT_MAX_CONNECTIONS,
             fetch_size: DEFAULT_FETCH_SIZE,
             client_certificate: None,
@@ -186,7 +181,7 @@ mod tests {
         assert_eq!(config.uri, "127.0.0.1:7687");
         assert_eq!(config.user, "some_user");
         assert_eq!(config.password, "some_password");
-        assert_eq!(&*config.db, "some_db");
+        assert_eq!(config.db.as_deref(), Some("some_db"));
         assert_eq!(config.fetch_size, 10);
         assert_eq!(config.max_connections, 5);
         assert!(config.client_certificate.is_none());
@@ -203,7 +198,7 @@ mod tests {
         assert_eq!(config.uri, "127.0.0.1:7687");
         assert_eq!(config.user, "some_user");
         assert_eq!(config.password, "some_password");
-        assert_eq!(&*config.db, "neo4j");
+        assert_eq!(config.db, None);
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
         assert!(config.client_certificate.is_none());
