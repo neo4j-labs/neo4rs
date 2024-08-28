@@ -14,18 +14,18 @@ use crate::{
 /// When a transation is started, a dedicated connection is resered and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
 pub struct Txn {
-    db: Database,
+    db: Option<Database>,
     fetch_size: usize,
     connection: ManagedConnection,
 }
 
 impl Txn {
     pub(crate) async fn new(
-        db: Database,
+        db: Option<Database>,
         fetch_size: usize,
         mut connection: ManagedConnection,
     ) -> Result<Self> {
-        let begin = BoltRequest::begin(&db);
+        let begin = BoltRequest::begin(db.as_deref());
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => Ok(Txn {
                 db,
@@ -49,12 +49,12 @@ impl Txn {
 
     /// Runs a single query and discards the stream.
     pub async fn run(&mut self, q: Query) -> Result<()> {
-        q.run(&self.db, &mut self.connection).await
+        q.run(self.db.as_deref(), &mut self.connection).await
     }
 
     /// Executes a query and returns a [`RowStream`]
     pub async fn execute(&mut self, q: Query) -> Result<RowStream> {
-        q.execute_mut(&self.db, self.fetch_size, &mut self.connection)
+        q.execute_mut(self.db.as_deref(), self.fetch_size, &mut self.connection)
             .await
     }
 

@@ -53,7 +53,7 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn(&self) -> Result<Txn> {
-        self.start_txn_on(self.config.db.clone()).await
+        self.impl_start_txn_on(self.config.db.clone()).await
     }
 
     /// Starts a new transaction on the provided database.
@@ -62,8 +62,12 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
+        self.impl_start_txn_on(Some(db.into())).await
+    }
+
+    async fn impl_start_txn_on(&self, db: Option<Database>) -> Result<Txn> {
         let connection = self.pool.get().await?;
-        Txn::new(db.into(), self.config.fetch_size, connection).await
+        Txn::new(db, self.config.fetch_size, connection).await
     }
 
     /// Runs a query on the configured database using a connection from the connection pool,
@@ -78,7 +82,7 @@ impl Graph {
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run(&self, q: Query) -> Result<()> {
-        self.run_on(&self.config.db, q).await
+        self.impl_run_on(self.config.db.clone(), q).await
     }
 
     /// Runs a query on the provided database using a connection from the connection pool.
@@ -92,12 +96,17 @@ impl Graph {
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
-    pub async fn run_on(&self, db: &str, q: Query) -> Result<()> {
+    pub async fn run_on(&self, db: impl Into<Database>, q: Query) -> Result<()> {
+        self.impl_run_on(Some(db.into()), q).await
+    }
+
+    async fn impl_run_on(&self, db: Option<Database>, q: Query) -> Result<()> {
         backoff::future::retry_notify(
             self.pool.manager().backoff(),
             || {
                 let pool = &self.pool;
                 let query = &q;
+                let db = db.as_deref();
                 async move {
                     let mut connection = pool.get().await.map_err(crate::Error::from)?;
                     query.run_retryable(db, &mut connection).await
@@ -115,7 +124,7 @@ impl Graph {
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute(&self, q: Query) -> Result<DetachedRowStream> {
-        self.execute_on(&self.config.db, q).await
+        self.impl_execute_on(self.config.db.clone(), q).await
     }
 
     /// Executes a query on the provided database and returns a [`DetaRowStream`]
@@ -124,13 +133,18 @@ impl Graph {
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
-    pub async fn execute_on(&self, db: &str, q: Query) -> Result<DetachedRowStream> {
+    pub async fn execute_on(&self, db: impl Into<Database>, q: Query) -> Result<DetachedRowStream> {
+        self.impl_execute_on(Some(db.into()), q).await
+    }
+
+    async fn impl_execute_on(&self, db: Option<Database>, q: Query) -> Result<DetachedRowStream> {
         backoff::future::retry_notify(
             self.pool.manager().backoff(),
             || {
                 let pool = &self.pool;
                 let fetch_size = self.config.fetch_size;
                 let query = &q;
+                let db = db.as_deref();
                 async move {
                     let connection = pool.get().await.map_err(crate::Error::from)?;
                     query.execute_retryable(db, fetch_size, connection).await
