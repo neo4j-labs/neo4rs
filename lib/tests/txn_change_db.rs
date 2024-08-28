@@ -7,7 +7,7 @@ mod container;
 #[tokio::test]
 async fn txn_changes_db() {
     let neo4j = match container::Neo4jContainerBuilder::new()
-        .modify_config(|c| c.db("deebee"))
+        .modify_driver_config(|c| c.db("deebee"))
         .with_enterprise_edition()
         .start()
         .await
