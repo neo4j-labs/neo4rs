@@ -14,8 +14,12 @@ async fn txn_changes_db() {
     {
         Ok(n) => n,
         Err(e) => {
-            eprintln!("Skipping test: {}", e);
-            return;
+            if e.to_string().contains("Neo4j Enterprise Edition") {
+                eprintln!("Skipping test: {}", e);
+                return;
+            }
+
+            std::panic::panic_any(e);
         }
     };
     let graph = neo4j.graph();
