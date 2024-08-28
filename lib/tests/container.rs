@@ -1,6 +1,6 @@
 use lenient_semver::Version;
 use neo4rs::{ConfigBuilder, Graph};
-use testcontainers::{runners::SyncRunner, Container, ContainerRequest, ImageExt};
+use testcontainers::{runners::AsyncRunner, ContainerAsync, ContainerRequest, ImageExt};
 use testcontainers_modules::neo4j::{Neo4j, Neo4jImage};
 
 use std::{error::Error, io::BufRead as _};
@@ -56,7 +56,7 @@ impl Neo4jContainerBuilder {
 pub struct Neo4jContainer {
     graph: Graph,
     version: String,
-    _container: Option<Container<Neo4jImage>>,
+    _container: Option<ContainerAsync<Neo4jImage>>,
 }
 
 impl Neo4jContainer {
@@ -98,7 +98,8 @@ impl Neo4jContainer {
                     &connection,
                     enterprise_edition,
                     env_vars.into_iter().map(|(k, v)| (k.into(), v.into())),
-                )?;
+                )
+                .await?;
                 (uri, Some(container))
             }
             TestServer::External(uri) | TestServer::Aura(uri) => (uri, None),
@@ -140,16 +141,16 @@ impl Neo4jContainer {
             .unwrap_or(TestServer::TestContainer)
     }
 
-    fn create_testcontainer<I>(
+    async fn create_testcontainer<I>(
         connection: &TestConnection,
         enterprise: bool,
         env_vars: I,
-    ) -> Result<(String, Container<Neo4jImage>), Box<dyn Error + Send + Sync + 'static>>
+    ) -> Result<(String, ContainerAsync<Neo4jImage>), Box<dyn Error + Send + Sync + 'static>>
     where
         I: Iterator<Item = (String, String)>,
     {
         let container = Self::create_testcontainer_image(connection, enterprise, env_vars)?;
-        let container = container.start()?;
+        let container = container.start().await?;
 
         let uri = format!("bolt://127.0.0.1:{}", container.image().bolt_port_ipv4()?);
 
