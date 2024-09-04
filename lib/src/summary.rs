@@ -19,7 +19,7 @@ type MapValue = create::BoltType;
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 type Map = crate::BoltMap;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
     Read,
     Write,
@@ -28,62 +28,14 @@ pub enum Type {
     Unknown,
 }
 
-impl<'de> Deserialize<'de> for Type {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visit;
-
-        impl<'de> Visitor<'de> for Visit {
-            type Value = Type;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid type string")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                match v {
-                    "r" => Ok(Type::Read),
-                    "w" => Ok(Type::Write),
-                    "rw" => Ok(Type::ReadWrite),
-                    "s" => Ok(Type::SchemaOnly),
-                    _ => Err(E::custom(format!("invalid type string: {}", v))),
-                }
-            }
-
-            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                self.visit_str(v)
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                self.visit_str(&v)
-            }
-        }
-
-        deserializer.deserialize_str(Visit)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "UPPERCASE", tag = "severity")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum NotificationSeverity {
     Information,
     Warning,
     Off,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "UPPERCASE", tag = "category")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum NotificationClassification {
     Hint,
     Unrecognized,
@@ -103,9 +55,10 @@ pub struct InputPosition {
     pub column: i64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Deserialize)]
+#[serde(from = "NotificationWire")]
 pub struct Notification {
-    pub code: String,
+    pub code: Option<String>,
     pub title: Option<String>,
     pub description: Option<String>,
     pub severity: Option<NotificationSeverity>,
@@ -213,6 +166,222 @@ impl StreamingSummary {
 
     pub(crate) fn set_t_first(&mut self, t_first: i64) {
         self.t_first = u64::try_from(t_first).ok();
+    }
+}
+
+enum Optional<T> {
+    Some(T),
+    None,
+}
+
+impl<T> Optional<T> {
+    fn into_option(self) -> Option<T> {
+        match self {
+            Optional::Some(v) => Some(v),
+            Optional::None => None,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct NotificationWire {
+    code: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
+    severity: Option<Optional<NotificationSeverity>>,
+    category: Option<Optional<NotificationClassification>>,
+    position: Option<InputPosition>,
+}
+
+impl From<NotificationWire> for Notification {
+    fn from(value: NotificationWire) -> Self {
+        Notification {
+            code: value.code,
+            title: value.title,
+            description: value.description,
+            severity: value.severity.and_then(Optional::into_option),
+            category: value.category.and_then(Optional::into_option),
+            position: value.position,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Type {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visit;
+
+        impl<'de> Visitor<'de> for Visit {
+            type Value = Type;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid type string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "r" => Ok(Type::Read),
+                    "w" => Ok(Type::Write),
+                    "rw" => Ok(Type::ReadWrite),
+                    "s" => Ok(Type::SchemaOnly),
+                    _ => Err(E::custom(format!("invalid type string: {}", v))),
+                }
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(v)
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(&v)
+            }
+        }
+
+        deserializer.deserialize_str(Visit)
+    }
+}
+
+impl<'de> Deserialize<'de> for NotificationSeverity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct TheVisitor;
+
+        impl<'de> Visitor<'de> for TheVisitor {
+            type Value = NotificationSeverity;
+            fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                formatter.write_str("a valid NotificationSeverity")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: ::serde::de::Error,
+            {
+                if v.eq_ignore_ascii_case("information") {
+                    Ok(NotificationSeverity::Information)
+                } else if v.eq_ignore_ascii_case("warning") {
+                    Ok(NotificationSeverity::Warning)
+                } else if v.eq_ignore_ascii_case("off") {
+                    Ok(NotificationSeverity::Off)
+                } else {
+                    Err(de::Error::unknown_variant(
+                        v,
+                        &["INFORMATION", "WARNING", "OFF"],
+                    ))
+                }
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(&v)
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(v)
+            }
+        }
+
+        deserializer.deserialize_any(TheVisitor)
+    }
+}
+
+impl<'de> Deserialize<'de> for NotificationClassification {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct TheVisitor;
+
+        impl<'de> Visitor<'de> for TheVisitor {
+            type Value = NotificationClassification;
+            fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                formatter.write_str("a valid NotificationClassification")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: ::serde::de::Error,
+            {
+                if v.eq_ignore_ascii_case("hint") {
+                    Ok(NotificationClassification::Hint)
+                } else if v.eq_ignore_ascii_case("unrecognized") {
+                    Ok(NotificationClassification::Unrecognized)
+                } else if v.eq_ignore_ascii_case("unsupported") {
+                    Ok(NotificationClassification::Unsupported)
+                } else if v.eq_ignore_ascii_case("performance") {
+                    Ok(NotificationClassification::Performance)
+                } else if v.eq_ignore_ascii_case("deprecation") {
+                    Ok(NotificationClassification::Deprecation)
+                } else if v.eq_ignore_ascii_case("security") {
+                    Ok(NotificationClassification::Security)
+                } else if v.eq_ignore_ascii_case("topology") {
+                    Ok(NotificationClassification::Topology)
+                } else if v.eq_ignore_ascii_case("generic") {
+                    Ok(NotificationClassification::Generic)
+                } else if v.eq_ignore_ascii_case("schema") {
+                    Ok(NotificationClassification::Schema)
+                } else {
+                    Err(de::Error::unknown_variant(
+                        v,
+                        &[
+                            "HINT",
+                            "UNRECOGNIZED",
+                            "UNSUPPORTED",
+                            "PERFORMANCE",
+                            "DEPRECATION",
+                            "SECURITY",
+                            "TOPOLOGY",
+                            "GENERIC",
+                            "SCHEMA",
+                        ],
+                    ))
+                }
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(&v)
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_str(v)
+            }
+        }
+
+        deserializer.deserialize_any(TheVisitor)
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Optional<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        T::deserialize(deserializer)
+            .map(Optional::Some)
+            .or_else(|_| Ok(Optional::None))
     }
 }
 
@@ -599,5 +768,100 @@ mod tests {
         };
 
         assert_eq!(*actual, expected);
+    }
+
+    #[test]
+    fn parse_severity() {
+        let data = bolt().tiny_string("WARNING").build();
+        let actual = from_bytes::<NotificationSeverity>(data).unwrap();
+
+        assert_eq!(actual, NotificationSeverity::Warning);
+    }
+
+    #[test]
+    fn parse_classification() {
+        let data = bolt().tiny_string("UNRECOGNIZED").build();
+        let actual = from_bytes::<NotificationClassification>(data).unwrap();
+
+        assert_eq!(actual, NotificationClassification::Unrecognized);
+    }
+
+    #[test]
+    fn parse_notification() {
+        let data = bolt()
+            .tiny_map(6)
+            .tiny_string("code")
+            .string8("Neo.ClientError.Security.Unauthorized")
+            .tiny_string("title")
+            .string8("Unauthorized")
+            .tiny_string("description")
+            .string8("The client is unauthorized due to authentication failure.")
+            .tiny_string("severity")
+            .tiny_string("WARNING")
+            .tiny_string("category")
+            .tiny_string("UNRECOGNIZED")
+            .tiny_string("position")
+            .tiny_map(3)
+            .tiny_string("offset")
+            .tiny_int(42)
+            .tiny_string("line")
+            .int16(1337)
+            .tiny_string("column")
+            .tiny_int(84)
+            .build();
+
+        let expected = Notification {
+            code: Some("Neo.ClientError.Security.Unauthorized".to_owned()),
+            title: Some("Unauthorized".to_owned()),
+            description: Some(
+                "The client is unauthorized due to authentication failure.".to_owned(),
+            ),
+            severity: Some(NotificationSeverity::Warning),
+            category: Some(NotificationClassification::Unrecognized),
+            position: Some(InputPosition {
+                offset: 42,
+                line: 1337,
+                column: 84,
+            }),
+        };
+
+        let actual = from_bytes::<Notification>(data).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn parse_notification_missing_data() {
+        let data = bolt().tiny_map(0).build();
+
+        let expected = Notification {
+            code: None,
+            title: None,
+            description: None,
+            severity: None,
+            category: None,
+            position: None,
+        };
+
+        let actual = from_bytes::<Notification>(data).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn parse_notification_invalid_data() {
+        let data = bolt()
+            .tiny_map(2)
+            .tiny_string("severity")
+            .tiny_string("FROBNICATE")
+            .tiny_string("category")
+            .tiny_string("FOOBAR")
+            .build();
+
+        let expected = Notification::default();
+
+        let actual = from_bytes::<Notification>(data).unwrap();
+
+        assert_eq!(actual, expected);
     }
 }
