@@ -71,7 +71,7 @@ impl Graph {
     }
 
     /// Runs a query on the configured database using a connection from the connection pool,
-    /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
+    /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
     ///
     /// This operation retires the query on certain failures.
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
@@ -86,7 +86,7 @@ impl Graph {
     }
 
     /// Runs a query on the provided database using a connection from the connection pool.
-    /// It doesn't return any [`RowStream`] as the `run` abstraction discards any stream.
+    /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
     ///
     /// This operation retires the query on certain failures.
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
@@ -127,7 +127,7 @@ impl Graph {
         self.impl_execute_on(self.config.db.clone(), q).await
     }
 
-    /// Executes a query on the provided database and returns a [`DetaRowStream`]
+    /// Executes a query on the provided database and returns a [`DetachedRowStream`]
     ///
     /// This operation retires the query on certain failures.
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
