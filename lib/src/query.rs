@@ -94,7 +94,7 @@ impl Query {
 
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
-            match connection.send_recv(BoltRequest::discard()).await {
+            match connection.send_recv(BoltRequest::discard_all()).await {
                 Ok(BoltResponse::Success(_)) => Ok(()),
                 otherwise => wrap_error(otherwise, "DISCARD"),
             }
@@ -117,7 +117,17 @@ impl Query {
         Self::try_request(request, connection).await.map(|success| {
             let fields: BoltList = success.get("fields").unwrap_or_default();
             let qid: i64 = success.get("qid").unwrap_or(-1);
-            RowStream::new(qid, fields, fetch_size)
+
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            {
+                let available: i64 = success.get("t_first").unwrap_or(-1);
+                RowStream::new(qid, available, fields, fetch_size)
+            }
+
+            #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+            {
+                RowStream::new(qid, fields, fetch_size)
+            }
         })
     }
 

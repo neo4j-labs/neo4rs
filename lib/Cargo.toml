@@ -17,12 +17,12 @@ rust-version = "1.75.0"
 
 [features]
 json = ["serde_json"]
-unstable-v1 = ["unstable-bolt-protocol-impl-v2", "unstable-streaming-summary"]
+unstable-v1 = ["unstable-bolt-protocol-impl-v2", "unstable-result-summary"]
 unstable-serde-packstream-format = []
-unstable-streaming-summary = ["unstable-serde-packstream-format"]
+unstable-result-summary = ["unstable-serde-packstream-format"]
 unstable-bolt-protocol-impl-v2 = [
     "unstable-serde-packstream-format",
-    "unstable-streaming-summary",
+    "unstable-result-summary",
     "dep:nav-types",
     "dep:time",
 ]

@@ -45,7 +45,7 @@ async fn txn_changes_db() {
     };
 
     let mut txn = graph.start_txn().await.unwrap();
-    let databases = txn
+    let mut databases = txn
         .execute(
             query(&format!(
                 concat!(

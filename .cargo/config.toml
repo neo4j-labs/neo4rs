@@ -1,2 +1,3 @@
 [alias]
 xtask = "run --package xtask --"
+ff = "hack --package neo4rs --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-result-summary"

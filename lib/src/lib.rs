@@ -148,6 +148,37 @@
 //!
 //! ```
 //!
+#![cfg_attr(
+    feature = "unstable-result-summary",
+    doc = r##"### Streaming summary
+
+To get access to the result summary after streaming a [`RowStream`], you can use the [`RowStream::next_or_summary`] method.
+Alternatively, you can use one of the [`RowStream::as_row_items`], [`RowStream::as_items`], or [`RowStream::column_to_items`]
+methods to get the result as a stream of [`RowItem`], whis an enum of either the row or the summary.
+The last option is to use one of the [`RowStream::into_stream`], [`RowStream::into_stream_as`], or [`RowStream::column_into_stream`] methods
+and after the stream is consumed, call [`RowStream::finish`] to get the summary.
+
+```no_run
+use neo4rs::*;
+
+#[tokio::main]
+async fn main() {
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Graph::new(uri, user, pass).await.unwrap();
+
+"##
+)]
+#![cfg_attr(feature="unstable-result-summary", doc = include_str!("../include/result_summary.rs"))]
+#![cfg_attr(
+    feature = "unstable-result-summary",
+    doc = r"
+}
+```
+
+"
+)]
 //! ### Rollback a transaction
 //! ```no_run
 //! use neo4rs::*;
@@ -436,7 +467,7 @@ mod pool;
 mod query;
 mod row;
 mod stream;
-#[cfg(feature = "unstable-streaming-summary")]
+#[cfg(feature = "unstable-result-summary")]
 pub mod summary;
 mod txn;
 mod types;
@@ -450,7 +481,7 @@ pub use crate::errors::{
 pub use crate::graph::{query, Graph};
 pub use crate::query::Query;
 pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
-pub use crate::stream::RowStream;
+pub use crate::stream::{DetachedRowStream, RowItem, RowStream};
 pub use crate::txn::Txn;
 pub use crate::types::serde::{
     DeError, EndNodeId, Id, Indices, Keys, Labels, Nodes, Offset, Relationships, StartNodeId,
