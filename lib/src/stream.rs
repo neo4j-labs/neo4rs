@@ -38,15 +38,17 @@ type FinishResult = ();
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
+    available_after: i64,
     state: State,
     fetch_size: usize,
     buffer: VecDeque<Row>,
 }
 
 impl RowStream {
-    pub(crate) fn new(qid: i64, fields: BoltList, fetch_size: usize) -> Self {
+    pub(crate) fn new(qid: i64, available_after: i64, fields: BoltList, fetch_size: usize) -> Self {
         RowStream {
             qid,
+            available_after,
             fields,
             fetch_size,
             state: State::Ready,
@@ -154,8 +156,9 @@ impl RowStream {
                                 self.buffer.push_back(row);
                             }
                             Response::Success(Streaming::HasMore) => break State::Ready,
-                            Response::Success(Streaming::Done(s)) => {
-                                break State::Complete(Some(s))
+                            Response::Success(Streaming::Done(mut s)) => {
+                                s.set_t_first(self.available_after);
+                                break State::Complete(Some(s));
                             }
                             otherwise => return Err(otherwise.into_error("PULL")),
                         }

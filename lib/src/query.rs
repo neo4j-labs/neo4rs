@@ -117,7 +117,8 @@ impl Query {
         Self::try_request(request, connection).await.map(|success| {
             let fields: BoltList = success.get("fields").unwrap_or_default();
             let qid: i64 = success.get("qid").unwrap_or(-1);
-            RowStream::new(qid, fields, fetch_size)
+            let available: i64 = success.get("t_first").unwrap_or(-1);
+            RowStream::new(qid, available, fields, fetch_size)
         })
     }
 

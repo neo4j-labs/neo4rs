@@ -1,4 +1,4 @@
-use std::{fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData, time::Duration};
 
 use serde::{
     de::{self, Visitor},
@@ -25,6 +25,7 @@ pub enum Type {
     Write,
     ReadWrite,
     SchemaOnly,
+    Unknown,
 }
 
 impl<'de> Deserialize<'de> for Type {
@@ -73,6 +74,62 @@ impl<'de> Deserialize<'de> for Type {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum NotificationSeverity {
+    Information,
+    Warning,
+    Off,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum NotificationClassification {
+    Hint,
+    Unrecognized,
+    Unsupported,
+    Performance,
+    Deprecation,
+    Security,
+    Topology,
+    Generic,
+    Schema,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct InputPosition {
+    pub offset: i64,
+    pub line: i64,
+    pub column: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Notification {
+    pub code: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub severity: Option<NotificationSeverity>,
+    pub category: Option<NotificationClassification>,
+    pub position: Option<InputPosition>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct Counters {
+    pub nodes_created: u64,
+    pub nodes_deleted: u64,
+    pub relationships_created: u64,
+    pub relationships_deleted: u64,
+    pub properties_set: u64,
+    pub labels_added: u64,
+    pub labels_removed: u64,
+    pub indexes_added: u64,
+    pub indexes_removed: u64,
+    pub constraints_added: u64,
+    pub constraints_removed: u64,
+    pub system_updates: u64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Streaming {
     HasMore,
@@ -81,14 +138,82 @@ pub enum Streaming {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamingSummary {
-    pub(crate) bookmark: Option<String>,
-    pub(crate) t_last: Option<i64>,
-    pub(crate) r#type: Option<Type>,
-    pub(crate) db: Option<String>,
-    pub(crate) stats: Option<Map>,
+    pub bookmark: Option<String>,
+    t_first: Option<u64>,
+    t_last: Option<u64>,
+    pub r#type: Option<Type>,
+    pub db: Option<String>,
+    pub stats: Counters,
     pub(crate) plan: Option<Map>,
     pub(crate) profile: Option<Map>,
-    pub(crate) notifications: Option<Vec<Map>>,
+    pub notifications: Vec<Notification>,
+}
+
+impl StreamingSummary {
+    pub fn available_after(&self) -> Option<Duration> {
+        self.t_first.map(Duration::from_millis)
+    }
+
+    pub fn consumed_after(&self) -> Option<Duration> {
+        self.t_last.map(Duration::from_millis)
+    }
+
+    pub fn query_type(&self) -> Type {
+        self.r#type.unwrap_or(Type::Unknown)
+    }
+
+    pub fn db(&self) -> Option<&str> {
+        self.db.as_deref()
+    }
+
+    pub fn stats(&self) -> &Counters {
+        &self.stats
+    }
+
+    pub fn notifications(&self) -> &[Notification] {
+        &self.notifications
+    }
+
+    pub fn nodes_created(&self) -> u64 {
+        self.stats.nodes_created
+    }
+    pub fn nodes_deleted(&self) -> u64 {
+        self.stats.nodes_deleted
+    }
+    pub fn relationships_created(&self) -> u64 {
+        self.stats.relationships_created
+    }
+    pub fn relationships_deleted(&self) -> u64 {
+        self.stats.relationships_deleted
+    }
+    pub fn properties_set(&self) -> u64 {
+        self.stats.properties_set
+    }
+    pub fn labels_added(&self) -> u64 {
+        self.stats.labels_added
+    }
+    pub fn labels_removed(&self) -> u64 {
+        self.stats.labels_removed
+    }
+    pub fn indexes_added(&self) -> u64 {
+        self.stats.indexes_added
+    }
+    pub fn indexes_removed(&self) -> u64 {
+        self.stats.indexes_removed
+    }
+    pub fn constraints_added(&self) -> u64 {
+        self.stats.constraints_added
+    }
+    pub fn constraints_removed(&self) -> u64 {
+        self.stats.constraints_removed
+    }
+    pub fn system_updates(&self) -> u64 {
+        self.stats.system_updates
+    }
+
+    pub(crate) fn set_t_first(&mut self, t_first: i64) {
+        self.t_first = u64::try_from(t_first).ok();
+    }
 }
 
 impl<'de> Deserialize<'de> for Streaming {
@@ -106,7 +231,7 @@ impl<'de> Deserialize<'de> for Streaming {
             plan,
             profile,
             notifications,
-        } = SummaryBuilder::<String, Map>::deserialize(deserializer)?;
+        } = SummaryBuilder::<String, Map, Counters, Notification>::deserialize(deserializer)?;
 
         if has_more {
             return Ok(Streaming::HasMore);
@@ -114,13 +239,14 @@ impl<'de> Deserialize<'de> for Streaming {
 
         let full = StreamingSummary {
             bookmark,
-            t_last,
+            t_first: None,
+            t_last: t_last.map(u64::try_from).and_then(Result::ok),
             r#type,
             db,
-            stats,
+            stats: stats.unwrap_or_default(),
             plan,
             profile,
-            notifications,
+            notifications: notifications.unwrap_or_default(),
         };
 
         Ok(Streaming::Done(Box::new(full)))
@@ -165,6 +291,8 @@ impl<'de> Deserialize<'de> for StreamingRef<'de> {
         } = SummaryBuilder::<
             &'de str,
             std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
+            std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
+            std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
         >::deserialize(deserializer)?;
 
         if has_more {
@@ -188,20 +316,25 @@ impl<'de> Deserialize<'de> for StreamingRef<'de> {
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 #[derive(Debug, Clone, PartialEq)]
-struct SummaryBuilder<Str, Map> {
+struct SummaryBuilder<Str, Map, Stats, Note> {
     has_more: bool,
     bookmark: Option<Str>,
     t_last: Option<i64>,
     r#type: Option<Type>,
     db: Option<Str>,
-    stats: Option<Map>,
+    stats: Option<Stats>,
     plan: Option<Map>,
     profile: Option<Map>,
-    notifications: Option<Vec<Map>>,
+    notifications: Option<Vec<Note>>,
 }
 
-impl<'de, Key: Deserialize<'de>, Map: Deserialize<'de>> Deserialize<'de>
-    for SummaryBuilder<Key, Map>
+impl<
+        'de,
+        Key: Deserialize<'de>,
+        Map: Deserialize<'de>,
+        Stats: Deserialize<'de>,
+        Note: Deserialize<'de>,
+    > Deserialize<'de> for SummaryBuilder<Key, Map, Stats, Note>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -220,10 +353,17 @@ impl<'de, Key: Deserialize<'de>, Map: Deserialize<'de>> Deserialize<'de>
             "notifications",
         ];
 
-        struct Visit<Str, Map>(PhantomData<(Str, Map)>);
+        struct Visit<Str, Map, Stats, Note>(PhantomData<(Str, Map, Stats, Note)>);
 
-        impl<'de, Str: Deserialize<'de>, Map: Deserialize<'de>> Visitor<'de> for Visit<Str, Map> {
-            type Value = SummaryBuilder<Str, Map>;
+        impl<
+                'de,
+                Str: Deserialize<'de>,
+                Map: Deserialize<'de>,
+                Stats: Deserialize<'de>,
+                Note: Deserialize<'de>,
+            > Visitor<'de> for Visit<Str, Map, Stats, Note>
+        {
+            type Value = SummaryBuilder<Str, Map, Stats, Note>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a valid streaming response")
@@ -374,17 +514,19 @@ mod tests {
 
         let expected = StreamingSummary {
             bookmark: Some("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ".to_owned()),
+            t_first: None,
             t_last: Some(42),
             r#type: Some(Type::ReadWrite),
             db: Some("neo4j".to_owned()),
-            stats: Some(Map::from_iter([
-                (MapKey::from("labels-added"), MapValue::from(1)),
-                (MapKey::from("nodes-created"), MapValue::from(2)),
-                (MapKey::from("properties-set"), MapValue::from(3)),
-            ])),
+            stats: Counters {
+                labels_added: 1,
+                nodes_created: 2,
+                properties_set: 3,
+                ..Default::default()
+            },
             plan: None,
             profile: None,
-            notifications: None,
+            notifications: Vec::new(),
         };
 
         let actual = from_bytes::<Streaming>(data).unwrap();
