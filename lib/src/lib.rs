@@ -152,7 +152,11 @@
     feature = "unstable-streaming-summary",
     doc = r##"### Streaming summary
 
-To get access to the result summary after streaming a [`RowStream`], use the [`RowStream::next_or_summary`] method.
+To get access to the result summary after streaming a [`RowStream`], you can use the [`RowStream::next_or_summary`] method.
+Alternatively, you can use one of the [`RowStream::as_row_items`], [`RowStream::as_items`], or [`RowStream::column_to_items`]
+methods to get the result as a stream of [`RowItem`], whis an enum of either the row or the summary.
+The last option is to use one of the [`RowStream::into_stream`], [`RowStream::into_stream_as`], or [`RowStream::column_into_stream`] methods
+and after the stream is consumed, call [`RowStream::finish`] to get the summary.
 
 ```no_run
 use neo4rs::*;

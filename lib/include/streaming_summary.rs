@@ -1,7 +1,7 @@
 {
     use ::futures::TryStreamExt as _;
 
-    use neo4rs::{RowItem, summary::{Type, Counters, StreamingSummary}};
+    use neo4rs::summary::{Type, Counters, StreamingSummary};
 
     #[allow(dead_code)]
     #[derive(Debug, PartialEq, serde::Deserialize)]
