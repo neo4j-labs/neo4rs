@@ -1,4 +1,4 @@
-use std::{fmt, marker::PhantomData, time::Duration};
+use std::{fmt, time::Duration};
 
 use serde::{
     de::{self, Visitor},
@@ -83,14 +83,15 @@ pub struct Counters {
     pub system_updates: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(from = "SummaryBuilder")]
 pub enum Streaming {
     HasMore,
-    Done(Box<StreamingSummary>),
+    Done(Box<ResultSummary>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct StreamingSummary {
+pub struct ResultSummary {
     pub bookmark: Option<String>,
     t_first: Option<u64>,
     t_last: Option<u64>,
@@ -102,7 +103,7 @@ pub struct StreamingSummary {
     pub notifications: Vec<Notification>,
 }
 
-impl StreamingSummary {
+impl ResultSummary {
     pub fn available_after(&self) -> Option<Duration> {
         self.t_first.map(Duration::from_millis)
     }
@@ -202,6 +203,51 @@ impl From<NotificationWire> for Notification {
             severity: value.severity.and_then(Optional::into_option),
             category: value.category.and_then(Optional::into_option),
             position: value.position,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct SummaryBuilder {
+    has_more: Option<bool>,
+    bookmark: Option<String>,
+    t_last: Option<i64>,
+    r#type: Option<Type>,
+    db: Option<String>,
+    stats: Option<Counters>,
+    plan: Option<Map>,
+    profile: Option<Map>,
+    notifications: Option<Vec<Notification>>,
+}
+
+impl From<SummaryBuilder> for Streaming {
+    fn from(value: SummaryBuilder) -> Self {
+        let SummaryBuilder {
+            has_more,
+            bookmark,
+            t_last,
+            r#type,
+            db,
+            stats,
+            plan,
+            profile,
+            notifications,
+        } = value;
+
+        if has_more.unwrap_or(false) {
+            Streaming::HasMore
+        } else {
+            Streaming::Done(Box::new(ResultSummary {
+                bookmark,
+                t_first: None,
+                t_last: t_last.map(u64::try_from).and_then(Result::ok),
+                r#type,
+                db,
+                stats: stats.unwrap_or_default(),
+                plan,
+                profile,
+                notifications: notifications.unwrap_or_default(),
+            }))
         }
     }
 }
@@ -385,157 +431,18 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Optional<T> {
     }
 }
 
-impl<'de> Deserialize<'de> for Streaming {
+impl<'de> Deserialize<'de> for SummaryBuilder {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        let SummaryBuilder {
-            has_more,
-            bookmark,
-            t_last,
-            r#type,
-            db,
-            stats,
-            plan,
-            profile,
-            notifications,
-        } = SummaryBuilder::<String, Map, Counters, Notification>::deserialize(deserializer)?;
+        struct Visit;
 
-        if has_more {
-            return Ok(Streaming::HasMore);
-        }
-
-        let full = StreamingSummary {
-            bookmark,
-            t_first: None,
-            t_last: t_last.map(u64::try_from).and_then(Result::ok),
-            r#type,
-            db,
-            stats: stats.unwrap_or_default(),
-            plan,
-            profile,
-            notifications: notifications.unwrap_or_default(),
-        };
-
-        Ok(Streaming::Done(Box::new(full)))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum StreamingRef<'de> {
-    HasMore,
-    Done(Box<StreamingSummaryRef<'de>>),
-}
-
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-#[derive(Debug, Clone, PartialEq)]
-pub struct StreamingSummaryRef<'de> {
-    pub(crate) bookmark: Option<&'de str>,
-    pub(crate) t_last: Option<i64>,
-    pub(crate) r#type: Option<Type>,
-    pub(crate) db: Option<&'de str>,
-    pub(crate) stats: Option<std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>>,
-    pub(crate) plan: Option<std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>>,
-    pub(crate) profile: Option<std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>>,
-    pub(crate) notifications:
-        Option<Vec<std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>>>,
-}
-
-impl<'de> Deserialize<'de> for StreamingRef<'de> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let SummaryBuilder {
-            has_more,
-            bookmark,
-            t_last,
-            r#type,
-            db,
-            stats,
-            plan,
-            profile,
-            notifications,
-        } = SummaryBuilder::<
-            &'de str,
-            std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
-            std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
-            std::collections::HashMap<&'de str, crate::bolt::BoltRef<'de>>,
-        >::deserialize(deserializer)?;
-
-        if has_more {
-            return Ok(StreamingRef::HasMore);
-        }
-
-        let full = StreamingSummaryRef {
-            bookmark,
-            t_last,
-            r#type,
-            db,
-            stats,
-            plan,
-            profile,
-            notifications,
-        };
-
-        Ok(StreamingRef::Done(Box::new(full)))
-    }
-}
-
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-#[derive(Debug, Clone, PartialEq)]
-struct SummaryBuilder<Str, Map, Stats, Note> {
-    has_more: bool,
-    bookmark: Option<Str>,
-    t_last: Option<i64>,
-    r#type: Option<Type>,
-    db: Option<Str>,
-    stats: Option<Stats>,
-    plan: Option<Map>,
-    profile: Option<Map>,
-    notifications: Option<Vec<Note>>,
-}
-
-impl<
-        'de,
-        Key: Deserialize<'de>,
-        Map: Deserialize<'de>,
-        Stats: Deserialize<'de>,
-        Note: Deserialize<'de>,
-    > Deserialize<'de> for SummaryBuilder<Key, Map, Stats, Note>
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        // TODO: replace with cenum?
-        const FIELDS: &[&str] = &[
-            "has_more",
-            "bookmark",
-            "t_last",
-            "type",
-            "db",
-            "stats",
-            "plan",
-            "profile",
-            "notifications",
-        ];
-
-        struct Visit<Str, Map, Stats, Note>(PhantomData<(Str, Map, Stats, Note)>);
-
-        impl<
-                'de,
-                Str: Deserialize<'de>,
-                Map: Deserialize<'de>,
-                Stats: Deserialize<'de>,
-                Note: Deserialize<'de>,
-            > Visitor<'de> for Visit<Str, Map, Stats, Note>
-        {
-            type Value = SummaryBuilder<Str, Map, Stats, Note>;
+        impl<'de> Visitor<'de> for Visit {
+            type Value = SummaryBuilder;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid streaming response")
+                formatter.write_str("a valid result summary")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -619,9 +526,7 @@ impl<
                     notifications,
                 );
 
-                let has_more = has_more.unwrap_or(false);
-
-                let full = SummaryBuilder {
+                Ok(SummaryBuilder {
                     has_more,
                     bookmark,
                     t_last,
@@ -631,20 +536,32 @@ impl<
                     plan,
                     profile,
                     notifications,
-                };
-
-                Ok(full)
+                })
             }
         }
 
-        deserializer.deserialize_struct("Response", FIELDS, Visit(PhantomData))
+        deserializer.deserialize_struct(
+            "Response",
+            &[
+                "has_more",
+                "bookmark",
+                "t_last",
+                "type",
+                "db",
+                "stats",
+                "plan",
+                "profile",
+                "notifications",
+            ],
+            Visit,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::packstream::{bolt, from_bytes, from_bytes_ref, Data};
+    use crate::packstream::{bolt, from_bytes};
 
     #[test]
     fn parse_stream_summary() {
@@ -681,7 +598,7 @@ mod tests {
             .tiny_string("neo4j")
             .build();
 
-        let expected = StreamingSummary {
+        let expected = ResultSummary {
             bookmark: Some("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ".to_owned()),
             t_first: None,
             t_last: Some(42),
@@ -701,69 +618,6 @@ mod tests {
         let actual = from_bytes::<Streaming>(data).unwrap();
         let actual = match actual {
             Streaming::Done(actual) => actual,
-            _ => panic!("Expected done"),
-        };
-
-        assert_eq!(*actual, expected);
-    }
-
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    #[test]
-    fn parse_stream_summary_ref() {
-        let data = bolt()
-            .tiny_map(1)
-            .tiny_string("has_more")
-            .bool(true)
-            .build();
-
-        let mut data = Data::new(data);
-        let success = from_bytes_ref::<StreamingRef>(&mut data).unwrap();
-
-        assert!(matches!(success, StreamingRef::HasMore));
-    }
-
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    #[test]
-    fn parse_full_summary_ref() {
-        let data = bolt()
-            .tiny_map(5)
-            .tiny_string("bookmark")
-            .string16("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ")
-            .tiny_string("stats")
-            .tiny_map(3)
-            .tiny_string("labels-added")
-            .tiny_int(1)
-            .tiny_string("nodes-created")
-            .tiny_int(2)
-            .tiny_string("properties-set")
-            .tiny_int(3)
-            .tiny_string("type")
-            .tiny_string("rw")
-            .tiny_string("t_last")
-            .tiny_int(42)
-            .tiny_string("db")
-            .tiny_string("neo4j")
-            .build();
-
-        let expected = StreamingSummaryRef {
-            bookmark: Some("FB:kcwQ9vYF5wN+TCaprZQJITJbQnaQ"),
-            t_last: Some(42),
-            r#type: Some(Type::ReadWrite),
-            db: Some("neo4j"),
-            stats: Some(std::collections::HashMap::from_iter([
-                ("labels-added", crate::bolt::BoltRef::from(1)),
-                ("nodes-created", crate::bolt::BoltRef::from(2)),
-                ("properties-set", crate::bolt::BoltRef::from(3)),
-            ])),
-            plan: None,
-            profile: None,
-            notifications: None,
-        };
-
-        let mut data = Data::new(data);
-        let actual = from_bytes_ref::<StreamingRef>(&mut data).unwrap();
-        let actual = match actual {
-            StreamingRef::Done(actual) => actual,
             _ => panic!("Expected done"),
         };
 

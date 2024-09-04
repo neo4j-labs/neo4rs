@@ -1,7 +1,7 @@
 {
     use ::futures::TryStreamExt as _;
 
-    use neo4rs::summary::{Type, Counters, StreamingSummary};
+    use neo4rs::summary::{Type, Counters, ResultSummary};
 
     #[allow(dead_code)]
     #[derive(Debug, PartialEq, serde::Deserialize)]
@@ -13,7 +13,7 @@
         assert_eq!(n.prop, "frobnicate");
     }
 
-    fn assert_summary(summary: &StreamingSummary) {
+    fn assert_summary(summary: &ResultSummary) {
         assert!(summary.available_after().is_some());
         assert!(summary.consumed_after().is_some());
         assert!(summary.db().is_some());

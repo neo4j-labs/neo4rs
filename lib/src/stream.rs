@@ -1,7 +1,7 @@
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 use crate::messages::{BoltRequest, BoltResponse};
-#[cfg(feature = "unstable-streaming-summary")]
-use crate::summary::{Streaming, StreamingSummary};
+#[cfg(feature = "unstable-result-summary")]
+use crate::summary::{ResultSummary, Streaming};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
     bolt::{Bolt, Discard, Pull, Response, Summary, WrapExtra as _},
@@ -21,13 +21,13 @@ use serde::de::DeserializeOwned;
 
 use std::collections::VecDeque;
 
-#[cfg(feature = "unstable-streaming-summary")]
-type BoxedSummary = Box<StreamingSummary>;
-#[cfg(not(feature = "unstable-streaming-summary"))]
+#[cfg(feature = "unstable-result-summary")]
+type BoxedSummary = Box<ResultSummary>;
+#[cfg(not(feature = "unstable-result-summary"))]
 type BoxedSummary = ();
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-type FinishResult = Option<StreamingSummary>;
+type FinishResult = Option<ResultSummary>;
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 type FinishResult = ();
 
@@ -83,21 +83,21 @@ impl DetachedRowStream {
 #[derive(Clone, Debug)]
 pub enum RowItem<T = Row> {
     Row(T),
-    #[cfg(feature = "unstable-streaming-summary")]
-    Summary(Box<StreamingSummary>),
+    #[cfg(feature = "unstable-result-summary")]
+    Summary(Box<ResultSummary>),
 }
 
 impl<T> RowItem<T> {
     pub fn row(&self) -> Option<&T> {
         match self {
             RowItem::Row(row) => Some(row),
-            #[cfg(feature = "unstable-streaming-summary")]
+            #[cfg(feature = "unstable-result-summary")]
             _ => None,
         }
     }
 
-    #[cfg(feature = "unstable-streaming-summary")]
-    pub fn summary(&self) -> Option<&StreamingSummary> {
+    #[cfg(feature = "unstable-result-summary")]
+    pub fn summary(&self) -> Option<&ResultSummary> {
         match self {
             RowItem::Summary(summary) => Some(summary),
             _ => None,
@@ -107,13 +107,13 @@ impl<T> RowItem<T> {
     pub fn into_row(self) -> Option<T> {
         match self {
             RowItem::Row(row) => Some(row),
-            #[cfg(feature = "unstable-streaming-summary")]
+            #[cfg(feature = "unstable-result-summary")]
             _ => None,
         }
     }
 
-    #[cfg(feature = "unstable-streaming-summary")]
-    pub fn into_summary(self) -> Option<Box<StreamingSummary>> {
+    #[cfg(feature = "unstable-result-summary")]
+    pub fn into_summary(self) -> Option<Box<ResultSummary>> {
         match self {
             RowItem::Summary(summary) => Some(summary),
             _ => None,
@@ -352,7 +352,7 @@ impl RowStream {
                     Ok(res) => Ok(Some((res, (stream, hd, de)))),
                     Err(e) => Err(Error::DeserializationError(e)),
                 },
-                #[cfg(feature = "unstable-streaming-summary")]
+                #[cfg(feature = "unstable-result-summary")]
                 Ok(Some(RowItem::Summary(summary))) => {
                     stream.state = State::Complete(Some(summary));
                     Ok(None)
@@ -374,7 +374,7 @@ impl RowStream {
                     Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
                     Err(e) => Err(Error::DeserializationError(e)),
                 },
-                #[cfg(feature = "unstable-streaming-summary")]
+                #[cfg(feature = "unstable-result-summary")]
                 Ok(Some(RowItem::Summary(summary))) => {
                     Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
                 }

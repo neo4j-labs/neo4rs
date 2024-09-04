@@ -149,7 +149,7 @@
 //! ```
 //!
 #![cfg_attr(
-    feature = "unstable-streaming-summary",
+    feature = "unstable-result-summary",
     doc = r##"### Streaming summary
 
 To get access to the result summary after streaming a [`RowStream`], you can use the [`RowStream::next_or_summary`] method.
@@ -170,9 +170,9 @@ async fn main() {
 
 "##
 )]
-#![cfg_attr(feature="unstable-streaming-summary", doc = include_str!("../include/streaming_summary.rs"))]
+#![cfg_attr(feature="unstable-result-summary", doc = include_str!("../include/result_summary.rs"))]
 #![cfg_attr(
-    feature = "unstable-streaming-summary",
+    feature = "unstable-result-summary",
     doc = r"
 }
 ```
@@ -467,7 +467,7 @@ mod pool;
 mod query;
 mod row;
 mod stream;
-#[cfg(feature = "unstable-streaming-summary")]
+#[cfg(feature = "unstable-result-summary")]
 pub mod summary;
 mod txn;
 mod types;
