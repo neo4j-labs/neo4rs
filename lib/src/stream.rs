@@ -38,6 +38,7 @@ type FinishResult = ();
 pub struct RowStream {
     qid: i64,
     fields: BoltList,
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     available_after: i64,
     state: State,
     fetch_size: usize,
@@ -45,9 +46,15 @@ pub struct RowStream {
 }
 
 impl RowStream {
-    pub(crate) fn new(qid: i64, available_after: i64, fields: BoltList, fetch_size: usize) -> Self {
+    pub(crate) fn new(
+        qid: i64,
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")] available_after: i64,
+        fields: BoltList,
+        fetch_size: usize,
+    ) -> Self {
         RowStream {
             qid,
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             available_after,
             fields,
             fetch_size,
@@ -84,6 +91,7 @@ impl<T> RowItem<T> {
     pub fn row(&self) -> Option<&T> {
         match self {
             RowItem::Row(row) => Some(row),
+            #[cfg(feature = "unstable-streaming-summary")]
             _ => None,
         }
     }
@@ -99,6 +107,7 @@ impl<T> RowItem<T> {
     pub fn into_row(self) -> Option<T> {
         match self {
             RowItem::Row(row) => Some(row),
+            #[cfg(feature = "unstable-streaming-summary")]
             _ => None,
         }
     }
