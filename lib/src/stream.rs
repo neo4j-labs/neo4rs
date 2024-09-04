@@ -16,10 +16,10 @@ use crate::{
     DeError,
 };
 
-use futures::{stream::try_unfold, stream::TryStreamExt as _, TryStream};
+use futures::{stream::try_unfold, TryStream};
 use serde::de::DeserializeOwned;
 
-use std::{collections::VecDeque, future::ready};
+use std::collections::VecDeque;
 
 #[cfg(feature = "unstable-streaming-summary")]
 type BoxedSummary = Box<StreamingSummary>;
@@ -76,7 +76,6 @@ pub enum RowItem<T = Row> {
     Row(T),
     #[cfg(feature = "unstable-streaming-summary")]
     Summary(Box<StreamingSummary>),
-    Done,
 }
 
 impl<T> RowItem<T> {
@@ -118,16 +117,19 @@ impl RowStream {
     pub async fn next(&mut self, handle: impl TransactionHandle) -> Result<Option<Row>> {
         self.next_or_summary(handle)
             .await
-            .map(|item| item.into_row())
+            .map(|item| item.and_then(RowItem::into_row))
     }
 
     /// A call to next_or_summary() will return a row from an internal buffer if the buffer has any entries,
     /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
     /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
-    pub async fn next_or_summary(&mut self, mut handle: impl TransactionHandle) -> Result<RowItem> {
+    pub async fn next_or_summary(
+        &mut self,
+        mut handle: impl TransactionHandle,
+    ) -> Result<Option<RowItem>> {
         loop {
             if let Some(row) = self.buffer.pop_front() {
-                return Ok(RowItem::Row(row));
+                return Ok(Some(RowItem::Row(row)));
             }
 
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -160,8 +162,8 @@ impl RowStream {
                     };
                 } else if let State::Complete(ref mut summary) = self.state {
                     break match summary.take() {
-                        Some(summary) => Ok(RowItem::Summary(summary)),
-                        None => Ok(RowItem::Done),
+                        Some(summary) => Ok(Some(RowItem::Summary(summary))),
+                        None => Ok(None),
                     };
                 }
             }
@@ -191,7 +193,7 @@ impl RowStream {
                         }
                     };
                 } else if let State::Complete(_) = self.state {
-                    break Ok(RowItem::Done);
+                    break Ok(None);
                 };
             }
         }
@@ -266,6 +268,17 @@ impl RowStream {
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every element is a [`RowItem`].
+    ///
+    /// The stream can only be converted once.
+    pub fn as_row_items<'this, 'db: 'this>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+    ) -> impl TryStream<Ok = RowItem, Error = Error> + 'this {
+        self.convert_with_summary(handle, Ok)
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every row is converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// The stream can only be converted once.
@@ -276,6 +289,17 @@ impl RowStream {
         handle: impl TransactionHandle + 'db,
     ) -> impl TryStream<Ok = T, Error = Error> + 'this {
         self.convert_rows(handle, |row| row.to::<T>())
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every row is converted into a [`RowItem<T>`] by calling [`crate::row::Row::to`].
+    ///
+    /// The stream can only be converted once.
+    pub fn as_items<'this, 'db: 'this, T: DeserializeOwned + 'this>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
+        self.convert_with_summary(handle, |row| row.to::<T>())
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -292,13 +316,39 @@ impl RowStream {
         self.convert_rows(handle, move |row| row.get::<T>(column))
     }
 
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// the value at the given column is converted into a [`RowItem<T>`]
+    /// by calling [`crate::row::Row::get`].
+    ///
+    /// The stream can only be converted once.
+    pub fn column_to_items<'this, 'db: 'this, T: DeserializeOwned + 'db>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+        column: &'db str,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
+        self.convert_with_summary(handle, move |row| row.get::<T>(column))
+    }
+
     fn convert_rows<'this, 'db: 'this, T: 'this>(
         &'this mut self,
         handle: impl TransactionHandle + 'db,
         convert: impl Fn(Row) -> Result<T, DeError> + 'this,
     ) -> impl TryStream<Ok = T, Error = Error> + 'this {
-        self.convert_with_summary(handle, convert)
-            .try_filter_map(|row| ready(Ok(row.into_row())))
+        try_unfold((self, handle, convert), |(stream, mut hd, de)| async move {
+            match stream.next_or_summary(&mut hd).await {
+                Ok(Some(RowItem::Row(row))) => match de(row) {
+                    Ok(res) => Ok(Some((res, (stream, hd, de)))),
+                    Err(e) => Err(Error::DeserializationError(e)),
+                },
+                #[cfg(feature = "unstable-streaming-summary")]
+                Ok(Some(RowItem::Summary(summary))) => {
+                    stream.state = State::Complete(Some(summary));
+                    Ok(None)
+                }
+                Ok(None) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
     }
 
     fn convert_with_summary<'this, 'db: 'this, T>(
@@ -308,15 +358,15 @@ impl RowStream {
     ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
         try_unfold((self, handle, convert), |(stream, mut hd, de)| async move {
             match stream.next_or_summary(&mut hd).await {
-                Ok(RowItem::Row(row)) => match de(row) {
+                Ok(Some(RowItem::Row(row))) => match de(row) {
                     Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
                     Err(e) => Err(Error::DeserializationError(e)),
                 },
                 #[cfg(feature = "unstable-streaming-summary")]
-                Ok(RowItem::Summary(summary)) => {
+                Ok(Some(RowItem::Summary(summary))) => {
                     Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
                 }
-                Ok(RowItem::Done) => Ok(None),
+                Ok(None) => Ok(None),
                 Err(e) => Err(e),
             }
         })
@@ -334,7 +384,7 @@ impl DetachedRowStream {
     /// A call to next_or_summary() will return a row from an internal buffer if the buffer has any entries,
     /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
     /// are fetched from the server (using the fetch_size value configured see [`crate::ConfigBuilder::fetch_size`])
-    pub async fn next_or_summary(&mut self) -> Result<RowItem> {
+    pub async fn next_or_summary(&mut self) -> Result<Option<RowItem>> {
         self.stream.next_or_summary(&mut self.connection).await
     }
 
@@ -355,6 +405,14 @@ impl DetachedRowStream {
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every element is a [`RowItem`].
+    ///
+    /// The stream can only be converted once.
+    pub fn as_row_items(&mut self) -> impl TryStream<Ok = RowItem, Error = Error> + '_ {
+        self.stream.as_row_items(&mut self.connection)
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every row is converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// The stream can only be converted once.
@@ -364,6 +422,16 @@ impl DetachedRowStream {
         &'this mut self,
     ) -> impl TryStream<Ok = T, Error = Error> + 'this {
         self.stream.into_stream_as(&mut self.connection)
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// every row is converted into a [`RowItem<T>`] by calling [`crate::row::Row::to`].
+    ///
+    /// The stream can only be converted once.
+    pub fn as_items<'this, T: DeserializeOwned + 'this>(
+        &'this mut self,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
+        self.stream.as_items(&mut self.connection)
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -377,6 +445,18 @@ impl DetachedRowStream {
         column: &'db str,
     ) -> impl TryStream<Ok = T, Error = Error> + 'this {
         self.stream.column_into_stream(&mut self.connection, column)
+    }
+
+    /// Turns this RowStream into a [`futures::stream::TryStream`] where
+    /// the value at the given column is converted into a [`RowItem<T>`]
+    /// by calling [`crate::row::Row::get`].
+    ///
+    /// The stream can only be converted once.
+    pub fn column_to_items<'this, 'db: 'this, T: DeserializeOwned + 'db>(
+        &'this mut self,
+        column: &'db str,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
+        self.stream.column_to_items(&mut self.connection, column)
     }
 }
 
