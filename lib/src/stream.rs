@@ -1,14 +1,12 @@
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 use crate::messages::{BoltRequest, BoltResponse};
 #[cfg(feature = "unstable-streaming-summary")]
-use crate::summary::StreamingSummary;
+use crate::summary::{Streaming, StreamingSummary};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
     bolt::{Bolt, Discard, Pull, Response, Summary, WrapExtra as _},
-    summary::Streaming,
     BoltType,
 };
-
 use crate::{
     errors::{Error, Result},
     pool::ManagedConnection,
@@ -17,12 +15,11 @@ use crate::{
     types::BoltList,
     DeError,
 };
-use futures::{
-    stream::{try_unfold, TryStreamExt as _},
-    TryStream,
-};
+
+use futures::{stream::try_unfold, stream::TryStreamExt as _, TryStream};
 use serde::de::DeserializeOwned;
-use std::collections::VecDeque;
+
+use std::{collections::VecDeque, future::ready};
 
 #[cfg(feature = "unstable-streaming-summary")]
 type BoxedSummary = Box<StreamingSummary>;
@@ -257,64 +254,72 @@ impl RowStream {
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every element is a [`crate::row::Row`].
-    pub fn into_stream(
-        self,
-        handle: impl TransactionHandle,
-    ) -> impl TryStream<Ok = Row, Error = Error> {
-        self.into_stream_convert(handle, Ok)
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_stream<'this, 'db: 'this>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+    ) -> impl TryStream<Ok = Row, Error = Error> + 'this {
+        self.convert_rows(handle, Ok)
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every row is converted into a `T` by calling [`crate::row::Row::to`].
-    pub fn into_stream_as<T: DeserializeOwned>(
-        self,
-        handle: impl TransactionHandle,
-    ) -> impl TryStream<Ok = T, Error = Error> {
-        self.into_stream_convert(handle, |row| row.to::<T>())
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_stream_as<'this, 'db: 'this, T: DeserializeOwned + 'this>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+    ) -> impl TryStream<Ok = T, Error = Error> + 'this {
+        self.convert_rows(handle, |row| row.to::<T>())
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// the value at the given column is converted into a `T`
     /// by calling [`crate::row::Row::get`].
-    pub fn column_into_stream<'db, T: DeserializeOwned + 'db>(
-        self,
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    pub fn column_into_stream<'this, 'db: 'this, T: DeserializeOwned + 'db>(
+        &'this mut self,
         handle: impl TransactionHandle + 'db,
         column: &'db str,
-    ) -> impl TryStream<Ok = T, Error = Error> + 'db {
-        self.into_stream_convert(handle, move |row| row.get::<T>(column))
+    ) -> impl TryStream<Ok = T, Error = Error> + 'this {
+        self.convert_rows(handle, move |row| row.get::<T>(column))
     }
 
-    fn into_stream_convert<T>(
-        self,
-        handle: impl TransactionHandle,
-        convert: impl Fn(Row) -> Result<T, DeError>,
-    ) -> impl TryStream<Ok = T, Error = Error> {
-        self.into_stream_convert_and_summary(handle, convert)
-            .try_filter_map(|row| async { Ok(row.into_row()) })
+    fn convert_rows<'this, 'db: 'this, T: 'this>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+        convert: impl Fn(Row) -> Result<T, DeError> + 'this,
+    ) -> impl TryStream<Ok = T, Error = Error> + 'this {
+        self.convert_with_summary(handle, convert)
+            .try_filter_map(|row| ready(Ok(row.into_row())))
     }
 
-    fn into_stream_convert_and_summary<T>(
-        self,
-        handle: impl TransactionHandle,
-        convert: impl Fn(Row) -> Result<T, DeError>,
-    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> {
-        try_unfold(
-            (self, handle, convert),
-            |(mut stream, mut hd, de)| async move {
-                match stream.next_or_summary(&mut hd).await {
-                    Ok(RowItem::Row(row)) => match de(row) {
-                        Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
-                        Err(e) => Err(Error::DeserializationError(e)),
-                    },
-                    #[cfg(feature = "unstable-streaming-summary")]
-                    Ok(RowItem::Summary(summary)) => {
-                        Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
-                    }
-                    Ok(RowItem::Done) => Ok(None),
-                    Err(e) => Err(e),
+    fn convert_with_summary<'this, 'db: 'this, T>(
+        &'this mut self,
+        handle: impl TransactionHandle + 'db,
+        convert: impl Fn(Row) -> Result<T, DeError> + 'this,
+    ) -> impl TryStream<Ok = RowItem<T>, Error = Error> + 'this {
+        try_unfold((self, handle, convert), |(stream, mut hd, de)| async move {
+            match stream.next_or_summary(&mut hd).await {
+                Ok(RowItem::Row(row)) => match de(row) {
+                    Ok(res) => Ok(Some((RowItem::Row(res), (stream, hd, de)))),
+                    Err(e) => Err(Error::DeserializationError(e)),
+                },
+                #[cfg(feature = "unstable-streaming-summary")]
+                Ok(RowItem::Summary(summary)) => {
+                    Ok(Some((RowItem::Summary(summary), (stream, hd, de))))
                 }
-            },
-        )
+                Ok(RowItem::Done) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
     }
 }
 
@@ -341,24 +346,37 @@ impl DetachedRowStream {
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every element is a [`crate::row::Row`].
-    pub fn into_stream(self) -> impl TryStream<Ok = Row, Error = Error> {
-        self.stream.into_stream(self.connection)
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_stream(&mut self) -> impl TryStream<Ok = Row, Error = Error> + '_ {
+        self.stream.into_stream(&mut self.connection)
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// every row is converted into a `T` by calling [`crate::row::Row::to`].
-    pub fn into_stream_as<T: DeserializeOwned>(self) -> impl TryStream<Ok = T, Error = Error> {
-        self.stream.into_stream_as(self.connection)
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_stream_as<'this, T: DeserializeOwned + 'this>(
+        &'this mut self,
+    ) -> impl TryStream<Ok = T, Error = Error> + 'this {
+        self.stream.into_stream_as(&mut self.connection)
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
     /// the value at the given column is converted into a `T`
     /// by calling [`crate::row::Row::get`].
-    pub fn column_into_stream<'db, T: DeserializeOwned + 'db>(
-        self,
+    ///
+    /// The stream can only be converted once.
+    /// After the returned stream is consumed, this stream can be [`Self::finish`]ed to get the summary.
+    pub fn column_into_stream<'this, 'db: 'this, T: DeserializeOwned + 'db>(
+        &'this mut self,
         column: &'db str,
-    ) -> impl TryStream<Ok = T, Error = Error> + 'db {
-        self.stream.column_into_stream(self.connection, column)
+    ) -> impl TryStream<Ok = T, Error = Error> + 'this {
+        self.stream.column_into_stream(&mut self.connection, column)
     }
 }
 
