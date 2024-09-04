@@ -75,7 +75,7 @@ impl<'de> Deserialize<'de> for Type {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE", tag = "severity")]
 pub enum NotificationSeverity {
     Information,
     Warning,
@@ -83,7 +83,7 @@ pub enum NotificationSeverity {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE", tag = "category")]
 pub enum NotificationClassification {
     Hint,
     Unrecognized,
