@@ -17,6 +17,8 @@ rust-version = "1.75.0"
 
 [features]
 json = ["serde_json"]
+polars = ["polars_v0_43"]
+polars_v0_43 = ["dep:polars"]
 unstable-v1 = ["unstable-bolt-protocol-impl-v2", "unstable-result-summary"]
 unstable-serde-packstream-format = []
 unstable-result-summary = ["unstable-serde-packstream-format"]
@@ -38,6 +40,7 @@ nav-types = { version = "0.5.2", optional = true }
 neo4rs-macros = { version = "0.3.0", path = "../macros" }
 paste = "1.0.0"
 pin-project-lite = "0.2.9"
+polars-utils = { version = "0.43.1", default-features = false }
 rustls-native-certs = "0.7.1"
 rustls-pemfile = "2.1.2"
 serde = { version = "1.0.185", features = ["derive"] }    # TODO: eliminate derive
@@ -62,6 +65,11 @@ version = "0.26.0"
 default-features = false
 features = ["tls12", "ring"]
 
+[dependencies.polars]
+version = "0.43.0"
+default-features = false
+optional = true
+features = ["rows"]
 
 [dev-dependencies]
 pretty_env_logger = "0.5.0"
