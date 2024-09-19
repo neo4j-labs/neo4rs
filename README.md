@@ -116,7 +116,7 @@ env NEO4J_TEST_URI=bolt://localhost:7687 NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=s
 
 ##### Using an Aura instance
 
-> ![WARNING]
+> [!WARNING]
 > Running the tests will create new data and might change and delete existing data or entire databases.
 > Do not use a production instance.
 
@@ -130,7 +130,7 @@ The tests can then also be run by using a `dotenv` like tool, e.g.
 dotenvx run -f .auraenv -e NEO4RS_TEST_ON_AURA=1 -- cargo test
 ```
 
-> ![NOTE]
+> [!NOTE]
 > Some tests might also use features not available on Aura and will fail.
 
 ### Updating `Cargo.lock` files for CI
