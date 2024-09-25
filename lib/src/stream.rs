@@ -197,8 +197,7 @@ impl RowStream {
                                 };
                             }
                             Ok(BoltResponse::Record(record)) => {
-                                let row = Row::new(self.fields.clone(), record.data);
-                                self.buffer.push_back(row);
+                                self.buffer.push_back(record.data);
                             }
                             Ok(msg) => return Err(msg.into_error("PULL")),
                             Err(e) => return Err(e),
@@ -384,7 +383,11 @@ impl RowStream {
         })
     }
 
-    #[cfg(all(feature = "polars_v0_43", not(feature = "unstable-result-summary")))]
+    #[cfg(all(
+        feature = "polars_v0_43",
+        not(feature = "unstable-result-summary"),
+        feature = "unstable-bolt-protocol-impl-v2"
+    ))]
     pub async fn into_dataframe(
         self,
         mut handle: impl TransactionHandle,
@@ -392,7 +395,11 @@ impl RowStream {
         self.into_df(handle).await
     }
 
-    #[cfg(all(feature = "polars_v0_43", feature = "unstable-result-summary"))]
+    #[cfg(all(
+        feature = "polars_v0_43",
+        feature = "unstable-result-summary",
+        feature = "unstable-bolt-protocol-impl-v2"
+    ))]
     pub async fn into_dataframe(
         self,
         handle: impl TransactionHandle,
@@ -403,7 +410,7 @@ impl RowStream {
         Ok((df, summary))
     }
 
-    #[cfg(feature = "polars_v0_43")]
+    #[cfg(all(feature = "polars_v0_43", feature = "unstable-bolt-protocol-impl-v2"))]
     fn into_df(
         mut self,
         mut handle: impl TransactionHandle,
