@@ -40,7 +40,6 @@ nav-types = { version = "0.5.2", optional = true }
 neo4rs-macros = { version = "0.3.0", path = "../macros" }
 paste = "1.0.0"
 pin-project-lite = "0.2.9"
-polars-utils = { version = "0.43.1", default-features = false }
 rustls-native-certs = "0.7.1"
 rustls-pemfile = "2.1.2"
 serde = { version = "1.0.185", features = ["derive"] }    # TODO: eliminate derive
