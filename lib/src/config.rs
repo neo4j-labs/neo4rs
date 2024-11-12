@@ -1,4 +1,4 @@
-use crate::auth::ClientCertificate;
+use crate::auth::{ClientCertificate, ConnectionTLSConfig};
 use crate::errors::{Error, Result};
 use std::path::Path;
 use std::{ops::Deref, sync::Arc};
@@ -53,7 +53,7 @@ pub struct Config {
     pub(crate) max_connections: usize,
     pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
-    pub(crate) client_certificate: Option<ClientCertificate>,
+    pub(crate) tls_config: ConnectionTLSConfig,
 }
 
 impl Config {
@@ -73,7 +73,7 @@ pub struct ConfigBuilder {
     db: Option<Database>,
     fetch_size: usize,
     max_connections: usize,
-    client_certificate: Option<ClientCertificate>,
+    tls_config: ConnectionTLSConfig,
 }
 
 impl ConfigBuilder {
@@ -128,7 +128,12 @@ impl ConfigBuilder {
     }
 
     pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
-        self.client_certificate = Some(ClientCertificate::new(client_cert));
+        self.tls_config = ConnectionTLSConfig::ClientCACertificate(ClientCertificate::new(client_cert));
+        self
+    }
+
+    pub fn skip_ssl_validation(mut self) -> Self {
+        self.tls_config = ConnectionTLSConfig::NoSSLValidation;
         self
     }
 
@@ -141,7 +146,7 @@ impl ConfigBuilder {
                 fetch_size: self.fetch_size,
                 max_connections: self.max_connections,
                 db: self.db,
-                client_certificate: self.client_certificate,
+                tls_config: self.tls_config,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -158,7 +163,7 @@ impl Default for ConfigBuilder {
             db: None,
             max_connections: DEFAULT_MAX_CONNECTIONS,
             fetch_size: DEFAULT_FETCH_SIZE,
-            client_certificate: None,
+            tls_config: ConnectionTLSConfig::None,
         }
     }
 }
@@ -184,7 +189,7 @@ mod tests {
         assert_eq!(config.db.as_deref(), Some("some_db"));
         assert_eq!(config.fetch_size, 10);
         assert_eq!(config.max_connections, 5);
-        assert!(config.client_certificate.is_none());
+        assert_eq!(config.tls_config, ConnectionTLSConfig::None);
     }
 
     #[test]
@@ -201,7 +206,25 @@ mod tests {
         assert_eq!(config.db, None);
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
-        assert!(config.client_certificate.is_none());
+        assert_eq!(config.tls_config, ConnectionTLSConfig::None);
+    }
+
+    #[test]
+    fn should_build_with_tls_config() {
+        let config = ConfigBuilder::default()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .skip_ssl_validation()
+            .build()
+            .unwrap();
+        assert_eq!(config.uri, "127.0.0.1:7687");
+        assert_eq!(config.user, "some_user");
+        assert_eq!(config.password, "some_password");
+        assert_eq!(config.db, None);
+        assert_eq!(config.fetch_size, 200);
+        assert_eq!(config.max_connections, 16);
+        assert_eq!(config.tls_config, ConnectionTLSConfig::NoSSLValidation);
     }
 
     #[test]

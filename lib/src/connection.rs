@@ -5,7 +5,6 @@ use crate::bolt::{
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 use crate::messages::HelloBuilder;
 use crate::{
-    auth::ClientCertificate,
     connection::stream::ConnectionStream,
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
@@ -15,6 +14,11 @@ use crate::{
 use bytes::{BufMut, Bytes, BytesMut};
 use log::warn;
 use std::{fs::File, io::BufReader, mem, sync::Arc};
+use std::fmt::{Debug, Formatter};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::{DigitallySignedStruct, SignatureScheme};
+use rustls::crypto::CryptoProvider;
+use rustls::pki_types::{CertificateDer, UnixTime};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufStream},
     net::TcpStream,
@@ -27,6 +31,7 @@ use tokio_rustls::{
     TlsConnector,
 };
 use url::{Host, Url};
+use crate::auth::ConnectionTLSConfig;
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 
@@ -276,7 +281,7 @@ impl ConnectionInfo {
         uri: &str,
         user: &str,
         password: &str,
-        client_certificate: Option<&ClientCertificate>,
+        tls_config: &ConnectionTLSConfig,
     ) -> Result<Self> {
         let mut url = NeoUrl::parse(uri)?;
 
@@ -291,7 +296,7 @@ impl ConnectionInfo {
         };
 
         let encryption = encryption
-            .then(|| Self::tls_connector(url.host(), client_certificate))
+            .then(|| Self::tls_connector(url.host(), tls_config))
             .transpose()?;
 
         let routing = if routing {
@@ -324,7 +329,7 @@ impl ConnectionInfo {
 
     fn tls_connector(
         host: Host<&str>,
-        certificate: Option<&ClientCertificate>,
+        tls_config: &ConnectionTLSConfig,
     ) -> Result<(TlsConnector, ServerName<'static>)> {
         let mut root_cert_store = RootCertStore::empty();
         match rustls_native_certs::load_native_certs() {
@@ -336,16 +341,27 @@ impl ConnectionInfo {
             }
         }
 
-        if let Some(certificate) = certificate {
-            let cert_file = File::open(&certificate.cert_file)?;
-            let mut reader = BufReader::new(cert_file);
-            let certs = rustls_pemfile::certs(&mut reader).flatten();
-            root_cert_store.add_parsable_certificates(certs);
-        }
-
-        let config = ClientConfig::builder()
-            .with_root_certificates(root_cert_store)
-            .with_no_client_auth();
+        let builder = ClientConfig::builder();
+        let config = match tls_config {
+            ConnectionTLSConfig::None => {
+                warn!("TLS config set to None but required from the URI. Using default config.");
+                builder.with_root_certificates(root_cert_store)
+                    .with_no_client_auth()
+            },
+            ConnectionTLSConfig::ClientCACertificate(certificate) => {
+                let cert_file = File::open(&certificate.cert_file)?;
+                let mut reader = BufReader::new(cert_file);
+                let certs = rustls_pemfile::certs(&mut reader).flatten();
+                root_cert_store.add_parsable_certificates(certs);
+                builder.with_root_certificates(root_cert_store)
+                    .with_no_client_auth()
+            }
+            ConnectionTLSConfig::NoSSLValidation => {
+                builder.dangerous()
+                    .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
+                    .with_no_client_auth()
+            }
+        };
 
         let config = Arc::new(config);
         let connector = TlsConnector::from(config);
@@ -531,6 +547,41 @@ mod stream {
                 ConnectionStream::Encrypted { stream } => stream.is_write_vectored(),
             }
         }
+    }
+}
+
+// Custom verifier that disables certificate validation
+struct NoCertificateVerification;
+
+impl Debug for NoCertificateVerification {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("NoCertificateVerification")
+    }
+}
+
+impl ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> std::result::Result<ServerCertVerified, rustls::Error> {
+        // Bypass certificate verification
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(&self, _message: &[u8], _cert: &CertificateDer<'_>, _dss: &DigitallySignedStruct) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(&self, _message: &[u8], _cert: &CertificateDer<'_>, _dss: &DigitallySignedStruct) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        CryptoProvider::get_default().expect("Default Crypto Provider unset").signature_verification_algorithms.supported_schemes()
     }
 }
 
