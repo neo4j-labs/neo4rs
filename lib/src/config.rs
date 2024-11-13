@@ -128,7 +128,8 @@ impl ConfigBuilder {
     }
 
     pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
-        self.tls_config = ConnectionTLSConfig::ClientCACertificate(ClientCertificate::new(client_cert));
+        self.tls_config =
+            ConnectionTLSConfig::ClientCACertificate(ClientCertificate::new(client_cert));
         self
     }
 
