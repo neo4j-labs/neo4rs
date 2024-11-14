@@ -1,6 +1,13 @@
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionTLSConfig {
+    None,
+    ClientCACertificate(ClientCertificate),
+    NoSSLValidation,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ClientCertificate {
     pub(crate) cert_file: PathBuf,
 }

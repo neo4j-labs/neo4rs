@@ -1,7 +1,7 @@
 use std::time::Duration;
 
+use crate::auth::ConnectionTLSConfig;
 use crate::{
-    auth::ClientCertificate,
     config::Config,
     connection::{Connection, ConnectionInfo},
     errors::{Error, Result},
@@ -23,9 +23,9 @@ impl ConnectionManager {
         uri: &str,
         user: &str,
         password: &str,
-        client_certificate: Option<&ClientCertificate>,
+        tls_config: &ConnectionTLSConfig,
     ) -> Result<Self> {
-        let info = ConnectionInfo::new(uri, user, password, client_certificate)?;
+        let info = ConnectionInfo::new(uri, user, password, tls_config)?;
         let backoff = ExponentialBackoffBuilder::new()
             .with_initial_interval(Duration::from_millis(1))
             .with_randomization_factor(0.42)
@@ -59,7 +59,7 @@ pub async fn create_pool(config: &Config) -> Result<ConnectionPool> {
         &config.uri,
         &config.user,
         &config.password,
-        config.client_certificate.as_ref(),
+        &config.tls_config,
     )?;
     info!(
         "creating connection pool with max size {}",
