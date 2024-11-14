@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use crate::auth::ConnectionTLSConfig;
 use crate::{
-    auth::ClientCertificate,
     config::Config,
     connection::{Connection, ConnectionInfo},
     errors::{Error, Result},
