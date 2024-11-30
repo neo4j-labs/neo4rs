@@ -93,6 +93,18 @@ pub enum Error {
 
     #[error("{0}")]
     DeserializationError(DeError),
+
+    #[error("Failed to fetch the routing table [{}]: {}", _0.0, _0.1)]
+    RoutingTableError((String, String)),
+
+    #[error("The request has been ignored by the server. This can happen if the server is under pressure or there was an issue with the memory.")]
+    RequestIgnoredError,
+
+    #[error("{0}")]
+    RoutingTableRefreshFailed(String),
+
+    #[error("{0}")]
+    ServerUnavailableError(String),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

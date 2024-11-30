@@ -4,21 +4,25 @@ use crate::bolt::{
     ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
 };
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-use crate::messages::HelloBuilder;
+use {crate::messages::HelloBuilder, crate::types::BoltMap};
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::routing::Route;
+use crate::routing::{Routing, RoutingTable};
 use crate::{
     connection::stream::ConnectionStream,
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
-    BoltMap, BoltString, BoltType,
+    BoltString,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use log::warn;
+use log::{info, warn};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::{fs::File, io::BufReader, mem, sync::Arc};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufStream},
@@ -49,6 +53,10 @@ impl Connection {
         Ok(connection)
     }
 
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
     pub(crate) async fn prepare(info: &ConnectionInfo) -> Result<Self> {
         let mut stream = match &info.host {
             Host::Domain(domain) => TcpStream::connect((&**domain, info.port)).await?,
@@ -76,6 +84,7 @@ impl Connection {
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
+        info!("Connected to Neo4j with version {}", version);
         Ok(version)
     }
 
@@ -110,8 +119,33 @@ impl Connection {
 
         match hello {
             Summary::Success(_msg) => Ok(()),
-            Summary::Ignored => todo!(),
+            Summary::Ignored => Err(Error::RequestIgnoredError),
             Summary::Failure(msg) => Err(Error::AuthenticationError(msg.message)),
+        }
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn route(&mut self, route: Route<'_>) -> Result<RoutingTable> {
+        let route = self.send_recv_as(route).await?;
+
+        match route {
+            Summary::Success(msg) => Ok(msg.metadata.rt),
+            Summary::Ignored => Err(Error::RequestIgnoredError),
+            Summary::Failure(msg) => Err(Error::RoutingTableError((msg.code, msg.message))),
+        }
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    pub async fn route(&mut self, route: BoltRequest) -> Result<RoutingTable> {
+        match self.send_recv(route).await? {
+            BoltResponse::Success(msg) => {
+                let rt: BoltMap = msg.get("rt").unwrap();
+                Ok(RoutingTable::from(rt))
+            }
+            BoltResponse::Failure(msg) => {
+                Err(Error::RoutingTableError(msg.get("message").unwrap()))
+            }
+            msg => Err(msg.into_error("HELLO")),
         }
     }
 
@@ -235,16 +269,16 @@ impl Connection {
 }
 
 pub(crate) struct ConnectionInfo {
-    user: Arc<str>,
-    password: Arc<str>,
-    host: Host<Arc<str>>,
-    port: u16,
-    routing: Routing,
-    encryption: Option<(TlsConnector, ServerName<'static>)>,
+    pub user: Arc<str>,
+    pub password: Arc<str>,
+    pub host: Host<Arc<str>>,
+    pub port: u16,
+    pub routing: Routing,
+    pub encryption: Option<(TlsConnector, ServerName<'static>)>,
 }
 
-impl std::fmt::Debug for ConnectionInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for ConnectionInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConnectionInfo")
             .field("user", &self.user)
             .field("password", &"***")
@@ -253,26 +287,6 @@ impl std::fmt::Debug for ConnectionInfo {
             .field("routing", &self.routing)
             .field("encryption", &self.encryption.is_some())
             .finish_non_exhaustive()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum Routing {
-    No,
-    Yes(Vec<(BoltString, BoltString)>),
-}
-
-impl From<Routing> for Option<BoltMap> {
-    fn from(routing: Routing) -> Self {
-        match routing {
-            Routing::No => None,
-            Routing::Yes(routing) => Some(
-                routing
-                    .into_iter()
-                    .map(|(k, v)| (k, BoltType::String(v)))
-                    .collect(),
-            ),
-        }
     }
 }
 
@@ -300,8 +314,8 @@ impl ConnectionInfo {
             .transpose()?;
 
         let routing = if routing {
-            log::warn!(concat!(
-                "This driver does not yet implement client-side routing. ",
+            warn!(concat!(
+                "Client-side routing is in experimental mode.",
                 "It is possible that operations against a cluster (such as Aura) will fail."
             ));
             Routing::Yes(url.routing_context())
@@ -399,10 +413,11 @@ impl ConnectionInfo {
     }
 }
 
-struct NeoUrl(Url);
+#[derive(Clone, Debug)]
+pub struct NeoUrl(Url);
 
 impl NeoUrl {
-    fn parse(uri: &str) -> Result<Self> {
+    pub(crate) fn parse(uri: &str) -> Result<Self> {
         let url = match Url::parse(uri) {
             Ok(url) if url.has_host() => url,
             // missing scheme
@@ -419,11 +434,11 @@ impl NeoUrl {
         self.0.scheme()
     }
 
-    fn host(&self) -> Host<&str> {
+    pub(crate) fn host(&self) -> Host<&str> {
         self.0.host().unwrap()
     }
 
-    fn port(&self) -> u16 {
+    pub(crate) fn port(&self) -> u16 {
         self.0.port().unwrap_or(7687)
     }
 
@@ -433,25 +448,31 @@ impl NeoUrl {
 
     fn warn_on_unexpected_components(&self) {
         if !self.0.username().is_empty() || self.0.password().is_some() {
-            log::warn!(concat!(
+            warn!(concat!(
                 "URI contained auth credentials, which are ignored.",
                 "Credentials are passed outside of the URI"
             ));
         }
         if !matches!(self.0.path(), "" | "/") {
-            log::warn!("URI contained a path, which is ignored.");
+            warn!("URI contained a path, which is ignored.");
         }
 
         if self.0.query().is_some() {
-            log::warn!(concat!(
+            warn!(concat!(
                 "This client does not yet support client-side routing.",
                 "The routing context passed as a query to the URI is ignored."
             ));
         }
 
         if self.0.fragment().is_some() {
-            log::warn!("URI contained a fragment, which is ignored.");
+            warn!("URI contained a fragment, which is ignored.");
         }
+    }
+}
+
+impl Display for NeoUrl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
