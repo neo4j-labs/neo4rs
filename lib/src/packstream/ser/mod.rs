@@ -539,6 +539,12 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
         value.serialize(&mut **self)
     }
 
+    fn skip_field(&mut self, _key: &'static str) -> Result<(), Self::Error> {
+        self.bytes.reserve(1);
+        self.bytes.put_u8(0xC0);
+        Ok(())
+    }
+
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
     }

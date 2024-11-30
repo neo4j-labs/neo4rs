@@ -6,6 +6,7 @@ mod hello;
 mod pull;
 mod reset;
 mod rollback;
+mod route;
 
 pub use commit::Commit;
 pub use discard::Discard;

@@ -7,6 +7,7 @@ use crate::{
     pool::ManagedConnection,
     query::Query,
     stream::RowStream,
+    Operation,
 };
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
@@ -17,6 +18,7 @@ pub struct Txn {
     db: Option<Database>,
     fetch_size: usize,
     connection: ManagedConnection,
+    operation: Operation,
 }
 
 impl Txn {
@@ -31,6 +33,7 @@ impl Txn {
                 db,
                 fetch_size,
                 connection,
+                operation: Operation::Write, // TODO: pass the operation from the outside
             }),
             msg => Err(msg.into_error("BEGIN")),
         }
@@ -49,12 +52,35 @@ impl Txn {
 
     /// Runs a single query and discards the stream.
     pub async fn run(&mut self, q: Query) -> Result<()> {
-        q.run(self.db.as_deref(), &mut self.connection).await
+        let mut query = q.clone();
+        if let Some(db) = self.db.as_ref() {
+            query = query.extra("db", db.to_string());
+        }
+        query = query.extra(
+            "mode",
+            match self.operation {
+                Operation::Read => "r",
+                Operation::Write => "w",
+            },
+        );
+        query.run(&mut self.connection).await
     }
 
     /// Executes a query and returns a [`RowStream`]
     pub async fn execute(&mut self, q: Query) -> Result<RowStream> {
-        q.execute_mut(self.db.as_deref(), self.fetch_size, &mut self.connection)
+        let mut query = q.clone();
+        if let Some(db) = self.db.as_ref() {
+            query = query.extra("db", db.to_string());
+        }
+        query = query.extra(
+            "mode",
+            match self.operation {
+                Operation::Read => "r",
+                Operation::Write => "w",
+            },
+        );
+        query
+            .execute_mut(self.fetch_size, &mut self.connection)
             .await
     }
 
