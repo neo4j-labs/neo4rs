@@ -10,6 +10,7 @@ mod reset;
 mod rollback;
 mod run;
 mod success;
+mod ignore;
 
 use crate::{
     errors::{Error, Result},
@@ -23,11 +24,13 @@ use failure::Failure;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
+use crate::messages::ignore::Ignore;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
     Success(Success),
     Failure(Failure),
+    Ignore(Ignore),
     Record(Record),
 }
 
@@ -222,15 +225,20 @@ impl BoltResponse {
             let record = Record::parse(version, &mut response)?;
             return Ok(BoltResponse::Record(record));
         }
+        if Ignore::can_parse(version, &response) {
+            let ignore = Ignore::parse(version, &mut response)?;
+            return Ok(BoltResponse::Ignore(ignore));
+        }
         Err(Error::UnknownMessage(format!(
-            "unknown message {:?}",
-            response
+            "unknown message {}",
+            response.iter().map(|byte| format!("{:02X}", byte)).collect::<String>()
         )))
     }
 
     pub fn into_error(self, msg: &'static str) -> Error {
         match self {
             BoltResponse::Failure(failure) => Error::Neo4j(failure.into_error()),
+            BoltResponse::Ignore(ignore) => Error::Neo4j(ignore.into_error()),
             _ => Error::UnexpectedMessage(format!("unexpected response for {}: {:?}", msg, self)),
         }
     }
