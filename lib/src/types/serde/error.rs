@@ -56,13 +56,14 @@ pub enum DeError {
     NoSuchProperty,
 
     #[error(
-        "The property is missing but the deserializer still expects a value. \
+        "{} is missing but the deserializer still expects a value. \
         If you have an optional property with a default value, you need to \
         use an Option<T> instead (the default attribute does not work in \
         this particular instance). If you meant to extract additional data \
-        other than properties, you need to use the appropriate struct wrapper."
+        other than properties, you need to use the appropriate struct wrapper.",
+        property_missing_msg(.0)
     )]
-    PropertyMissingButRequired,
+    PropertyMissingButRequired(Option<&'static str>),
 
     #[error("{0}")]
     Other(String),
@@ -72,6 +73,13 @@ pub enum DeError {
 
     #[error("Could not convert the DateTime to the target type {0}")]
     DateTimeOutOfBounds(&'static str),
+}
+
+fn property_missing_msg(field_name: &Option<&'static str>) -> String {
+    match field_name {
+        Some(field_name) => format!("The property `{}`", field_name),
+        None => "A property".to_owned(),
+    }
 }
 
 /// `Unexpected` represents an unexpected invocation of any one of the `Visitor`
@@ -252,5 +260,25 @@ impl Error for DeError {
         T: fmt::Display,
     {
         Self::Other(msg.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_message_for_missing_property() {
+        let message = "The property `frobnicate` is missing";
+
+        assert!(DeError::PropertyMissingButRequired(Some("frobnicate"))
+            .to_string()
+            .starts_with(message),);
+
+        let message = "A property is missing";
+
+        assert!(DeError::PropertyMissingButRequired(None)
+            .to_string()
+            .starts_with(message));
     }
 }
