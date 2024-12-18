@@ -377,6 +377,9 @@ impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
         self.len -= 1;
 
         let bytes = self.bytes.get();
+        if bytes.is_empty() {
+            return Ok(None);
+        }
         seed.deserialize(Deserializer { bytes }).map(Some)
     }
 
@@ -398,6 +401,9 @@ impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
         self.len -= 1;
 
         let bytes = self.bytes.get();
+        if bytes.is_empty() {
+            return Ok(None);
+        }
         seed.deserialize(Deserializer { bytes }).map(Some)
     }
 
