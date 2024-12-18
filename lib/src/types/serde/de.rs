@@ -168,7 +168,7 @@ impl<'de> Deserialize<'de> for Offset<FixedOffset> {
         }
         struct OffsetVisitor;
 
-        impl<'de> Visitor<'de> for OffsetVisitor {
+        impl Visitor<'_> for OffsetVisitor {
             type Value = FixedOffset;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

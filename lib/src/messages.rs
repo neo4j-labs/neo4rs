@@ -229,12 +229,13 @@ impl BoltResponse {
             let ignore = Ignore::parse(version, &mut response)?;
             return Ok(BoltResponse::Ignore(ignore));
         }
-        Err(Error::UnknownMessage(format!(
-            "unknown message {}",
-            response
-                .iter()
-                .map(|byte| format!("{:02X}", byte))
-                .collect::<String>()
+        Err(Error::UnknownMessage(response.iter().fold(
+            "unknown message ".to_owned(),
+            |mut output, byte| {
+                use std::fmt::Write;
+                let _ = write!(output, "{:02X}", byte);
+                output
+            },
         )))
     }
 
