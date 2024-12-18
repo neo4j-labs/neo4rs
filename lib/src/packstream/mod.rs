@@ -611,4 +611,24 @@ mod tests {
         let expected = Bytes::copy_from_slice(input);
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn dont_fail_on_wrong_lengths() {
+        let wrong_list = bolt()
+            .tiny_list(3) // says it's three elements
+            .tiny_int(42) // but it's not
+            .build();
+
+        assert_eq!(from_bytes::<Vec<u32>>(wrong_list).unwrap(), vec![42]);
+
+        let wrong_map = bolt()
+            .tiny_map(3) // says it's three elements
+            .tiny_string("key") // but it's not
+            .tiny_int(42)
+            .build();
+
+        let data = from_bytes::<std::collections::HashMap<String, u32>>(wrong_map).unwrap();
+        assert_eq!(data.len(), 1);
+        assert_eq!(data.get("key").copied(), Some(42));
+    }
 }
