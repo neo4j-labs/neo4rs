@@ -46,6 +46,7 @@ pub enum ElementDataValue<'de> {
 
 pub struct ElementDataDeserializer<'de, T> {
     data: T,
+    field_name: Option<&'static str>,
     _lifetime: PhantomData<&'de ()>,
 }
 
@@ -53,6 +54,15 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
     pub fn new(data: T) -> Self {
         Self {
             data,
+            field_name: None,
+            _lifetime: PhantomData,
+        }
+    }
+
+    pub fn with_field_name(data: T, field_name: &'static str) -> Self {
+        Self {
+            data,
+            field_name: Some(field_name),
             _lifetime: PhantomData,
         }
     }
@@ -77,7 +87,7 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
             (
                 BorrowedStr(f),
                 properties.and_then(|p| p.get(f)).map_or_else(
-                    || AdditionalData::Element(self.data),
+                    || AdditionalData::Element(self.data, f),
                     |v| AdditionalData::Property(v),
                 ),
             )
@@ -270,7 +280,7 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
     where
         V: Visitor<'de>,
     {
-        Err(DeError::PropertyMissingButRequired)
+        Err(DeError::PropertyMissingButRequired(self.field_name))
     }
 }
 
@@ -490,7 +500,7 @@ impl<'de> IntoDeserializer<'de, DeError> for BorrowedStr<'de> {
 #[derive(Copy, Clone, Debug)]
 enum AdditionalData<'de, T> {
     Property(&'de BoltType),
-    Element(T),
+    Element(T, &'static str),
 }
 
 enum AdditionalDataDeserializer<'de, T> {
@@ -544,9 +554,9 @@ impl<'de, T: ElementData<'de>> IntoDeserializer<'de, DeError> for AdditionalData
             AdditionalData::Property(v) => {
                 AdditionalDataDeserializer::Property(v.into_deserializer())
             }
-            AdditionalData::Element(v) => {
-                AdditionalDataDeserializer::Element(ElementDataDeserializer::new(v))
-            }
+            AdditionalData::Element(v, field_name) => AdditionalDataDeserializer::Element(
+                ElementDataDeserializer::with_field_name(v, field_name),
+            ),
         }
     }
 }

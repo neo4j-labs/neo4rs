@@ -308,7 +308,10 @@ mod tests {
 
         let node = test_node();
         let actual = node.to::<Person>().unwrap_err();
-        assert!(matches!(actual, DeError::PropertyMissingButRequired));
+        assert!(matches!(
+            actual,
+            DeError::PropertyMissingButRequired(Some("favorite_rust_crate"))
+        ));
     }
 
     #[test]
