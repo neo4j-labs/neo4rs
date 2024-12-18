@@ -4,14 +4,15 @@ mod commit;
 mod discard;
 mod failure;
 mod hello;
+mod ignore;
 mod pull;
 mod record;
 mod reset;
 mod rollback;
 mod run;
 mod success;
-mod ignore;
 
+use crate::messages::ignore::Ignore;
 use crate::{
     errors::{Error, Result},
     types::{BoltMap, BoltWireFormat},
@@ -24,7 +25,6 @@ use failure::Failure;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
-use crate::messages::ignore::Ignore;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
@@ -231,7 +231,10 @@ impl BoltResponse {
         }
         Err(Error::UnknownMessage(format!(
             "unknown message {}",
-            response.iter().map(|byte| format!("{:02X}", byte)).collect::<String>()
+            response
+                .iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<String>()
         )))
     }
 
