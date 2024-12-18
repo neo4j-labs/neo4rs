@@ -4,6 +4,7 @@ mod commit;
 mod discard;
 mod failure;
 mod hello;
+mod ignore;
 mod pull;
 mod record;
 mod reset;
@@ -11,6 +12,7 @@ mod rollback;
 mod run;
 mod success;
 
+use crate::messages::ignore::Ignore;
 use crate::{
     errors::{Error, Result},
     types::{BoltMap, BoltWireFormat},
@@ -28,6 +30,7 @@ pub(crate) use success::Success;
 pub enum BoltResponse {
     Success(Success),
     Failure(Failure),
+    Ignore(Ignore),
     Record(Record),
 }
 
@@ -222,15 +225,24 @@ impl BoltResponse {
             let record = Record::parse(version, &mut response)?;
             return Ok(BoltResponse::Record(record));
         }
-        Err(Error::UnknownMessage(format!(
-            "unknown message {:?}",
-            response
+        if Ignore::can_parse(version, &response) {
+            let ignore = Ignore::parse(version, &mut response)?;
+            return Ok(BoltResponse::Ignore(ignore));
+        }
+        Err(Error::UnknownMessage(response.iter().fold(
+            "unknown message ".to_owned(),
+            |mut output, byte| {
+                use std::fmt::Write;
+                let _ = write!(output, "{:02X}", byte);
+                output
+            },
         )))
     }
 
     pub fn into_error(self, msg: &'static str) -> Error {
         match self {
             BoltResponse::Failure(failure) => Error::Neo4j(failure.into_error()),
+            BoltResponse::Ignore(ignore) => Error::Neo4j(ignore.into_error()),
             _ => Error::UnexpectedMessage(format!("unexpected response for {}: {:?}", msg, self)),
         }
     }
