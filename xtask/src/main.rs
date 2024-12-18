@@ -89,7 +89,10 @@ fn update_min_lock() -> Result {
 
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    let pin_versions: &[(String, &str)] = &[("home".to_owned(), "0.5.9")];
+    let pin_versions: &[(String, &str)] = &[
+        ("home".to_owned(), "0.5.9"),
+        ("serde_repr".to_owned(), "0.1.5"),
+    ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, &sh, &cargo, krate, version)?;
     }

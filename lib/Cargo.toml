@@ -74,8 +74,8 @@ serde_test = "1.0.176"
 serde_with = "3.0.0"
 tap = "1.0.1"
 test-case = "3.3.1"
-testcontainers = { version = "0.20.0", features = ["blocking"] }
-testcontainers-modules = { version = "0.8.0", features = ["neo4j"] }
+testcontainers = { version = "0.23.0", features = ["blocking"] }
+testcontainers-modules = { version = "0.11.0", features = ["neo4j"] }
 time = { version = "0.3.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4"] }
 
