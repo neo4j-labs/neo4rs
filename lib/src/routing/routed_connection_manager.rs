@@ -117,6 +117,7 @@ impl RoutedConnectionManager {
                 .load_balancing_strategy
                 .select_reader(available_servers.as_slice()),
         } {
+            debug!("requesting connection for server: {:?}", server);
             if let Some(pool) = self.registry.get_pool(&server) {
                 match pool.get().await {
                     Ok(connection) => return Ok(connection),
