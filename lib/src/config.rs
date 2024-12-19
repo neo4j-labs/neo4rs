@@ -1,5 +1,7 @@
 use crate::auth::{ClientCertificate, ConnectionTLSConfig};
 use crate::errors::{Error, Result};
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use serde::{Deserialize, Deserializer};
 use std::path::Path;
 use std::{ops::Deref, sync::Arc};
 
@@ -10,6 +12,17 @@ const DEFAULT_MAX_CONNECTIONS: usize = 16;
 /// Stores the name as an `Arc<str>` to avoid cloning the name around.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Database(Arc<str>);
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+impl<'de> Deserialize<'de> for Database {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Database::from(s))
+    }
+}
 
 impl From<&str> for Database {
     fn from(s: &str) -> Self {
@@ -34,6 +47,12 @@ impl Deref for Database {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Database("neo4j".into())
     }
 }
 

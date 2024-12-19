@@ -1,5 +1,14 @@
-use std::time::Duration;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use {
+    crate::connection::{Connection, ConnectionInfo, Routing},
+    crate::graph::ConnectionPoolManager::Routed,
+    crate::routing::{RoundRobinStrategy, RouteBuilder, RoutedConnectionManager},
+    log::info,
+    std::sync::Arc,
+};
 
+use crate::graph::ConnectionPoolManager::Normal;
+use crate::pool::ManagedConnection;
 use crate::{
     config::{Config, ConfigBuilder, Database, LiveConfig},
     errors::Result,
@@ -7,7 +16,45 @@ use crate::{
     query::Query,
     stream::DetachedRowStream,
     txn::Txn,
+    Operation,
 };
+use backoff::ExponentialBackoff;
+use std::time::Duration;
+
+#[derive(Clone)]
+enum ConnectionPoolManager {
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    Routed(RoutedConnectionManager),
+    Normal(ConnectionPool),
+}
+
+impl ConnectionPoolManager {
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    async fn get(&self, operation: Option<Operation>) -> Result<ManagedConnection> {
+        match self {
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            Routed(manager) => manager.get(operation).await,
+            Normal(pool) => pool.get().await.map_err(crate::Error::from),
+        }
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    async fn get(&self) -> Result<ManagedConnection> {
+        match self {
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            Routed(manager) => manager.get(operation).await,
+            Normal(pool) => pool.get().await.map_err(crate::Error::from),
+        }
+    }
+
+    fn backoff(&self) -> ExponentialBackoff {
+        match self {
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            Routed(manager) => manager.backoff(),
+            Normal(pool) => pool.manager().backoff(),
+        }
+    }
+}
 
 /// A neo4j database abstraction.
 /// This type can be cloned and shared across threads, internal resources
@@ -15,7 +62,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Graph {
     config: LiveConfig,
-    pool: ConnectionPool,
+    pool: ConnectionPoolManager,
 }
 
 /// Returns a [`Query`] which provides methods like [`Query::param`] to add parameters to the query
@@ -28,9 +75,53 @@ impl Graph {
     ///
     /// You can build a config using [`ConfigBuilder::default()`].
     pub async fn connect(config: Config) -> Result<Self> {
-        let pool = create_pool(&config).await?;
-        let config = config.into_live_config();
-        Ok(Graph { config, pool })
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            let info = ConnectionInfo::new(
+                &config.uri,
+                &config.user,
+                &config.password,
+                &config.tls_config,
+            )?;
+            if matches!(info.routing, Routing::Yes(_)) {
+                let mut connection = Connection::new(&info).await?;
+                let mut builder = RouteBuilder::new(info.routing, vec![]);
+                if let Some(db) = config.db.clone() {
+                    builder = builder.with_db(db);
+                }
+                let rt = connection
+                    .route(builder.build(connection.version()))
+                    .await?;
+                connection.reset().await?;
+                info!("Connected to routing server, routing table: {:?}", rt);
+                let pool = Routed(
+                    RoutedConnectionManager::new(
+                        &config,
+                        Arc::new(rt.clone()),
+                        Arc::new(RoundRobinStrategy::new(rt)),
+                    )
+                    .await?,
+                );
+                Ok(Graph {
+                    config: config.into_live_config(),
+                    pool,
+                })
+            } else {
+                let pool = Normal(create_pool(&config).await?);
+                Ok(Graph {
+                    config: config.into_live_config(),
+                    pool,
+                })
+            }
+        }
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            let pool = Normal(create_pool(&config).await?);
+            Ok(Graph {
+                config: config.into_live_config(),
+                pool,
+            })
+        }
     }
 
     /// Connects to the database with default configurations
@@ -53,7 +144,19 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn(&self) -> Result<Txn> {
-        self.impl_start_txn_on(self.config.db.clone()).await
+        self.impl_start_txn_on(self.config.db.clone(), Operation::Write)
+            .await
+    }
+
+    /// Starts a new transaction on the configured database specifying the desired operation.
+    /// All queries that needs to be run/executed within the transaction
+    /// should be executed using either [`Txn::run`] or [`Txn::execute`]
+    ///
+    /// Transactions will not be automatically retried on any failure.
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn start_txn_as(&self, operation: Operation) -> Result<Txn> {
+        self.impl_start_txn_on(self.config.db.clone(), operation)
+            .await
     }
 
     /// Starts a new transaction on the provided database.
@@ -62,10 +165,15 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
-        self.impl_start_txn_on(Some(db.into())).await
+        self.impl_start_txn_on(Some(db.into()), Operation::Write)
+            .await
     }
 
-    async fn impl_start_txn_on(&self, db: Option<Database>) -> Result<Txn> {
+    #[allow(unused_variables)]
+    async fn impl_start_txn_on(&self, db: Option<Database>, operation: Operation) -> Result<Txn> {
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        let connection = self.pool.get(Some(operation)).await?;
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         let connection = self.pool.get().await?;
         Txn::new(db, self.config.fetch_size, connection).await
     }
@@ -82,7 +190,24 @@ impl Graph {
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run(&self, q: Query) -> Result<()> {
-        self.impl_run_on(self.config.db.clone(), q).await
+        self.impl_run_on(self.config.db.clone(), q, Operation::Write)
+            .await
+    }
+
+    /// Runs a READ ONLY query on the configured database using a connection from the connection pool,
+    /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
+    ///
+    /// Use [`Graph::run`] for cases where you just want a write operation
+    ///
+    /// use [`Graph::execute`] when you are interested in the result stream
+    pub async fn run_read(&self, q: Query) -> Result<()> {
+        self.impl_run_on(self.config.db.clone(), q, Operation::Read)
+            .await
     }
 
     /// Runs a query on the provided database using a connection from the connection pool.
@@ -96,19 +221,40 @@ impl Graph {
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
-    pub async fn run_on(&self, db: impl Into<Database>, q: Query) -> Result<()> {
-        self.impl_run_on(Some(db.into()), q).await
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn run_on(
+        &self,
+        db: impl Into<Database>,
+        q: Query,
+        operation: Operation,
+    ) -> Result<()> {
+        self.impl_run_on(Some(db.into()), q, operation).await
     }
 
-    async fn impl_run_on(&self, db: Option<Database>, q: Query) -> Result<()> {
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    pub async fn run_on(&self, db: impl Into<Database>, q: Query) -> Result<()> {
+        self.impl_run_on(Some(db.into()), q, Operation::Write).await
+    }
+
+    #[allow(unused_variables)]
+    async fn impl_run_on(
+        &self,
+        db: Option<Database>,
+        q: Query,
+        operation: Operation,
+    ) -> Result<()> {
         backoff::future::retry_notify(
-            self.pool.manager().backoff(),
+            self.pool.backoff(),
             || {
                 let pool = &self.pool;
                 let query = &q;
                 let db = db.as_deref();
+                let operation = operation.clone();
                 async move {
-                    let mut connection = pool.get().await.map_err(crate::Error::from)?;
+                    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                    let mut connection = pool.get(Some(operation)).await?;
+                    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+                    let mut connection = pool.get().await?;
                     query.run_retryable(db, &mut connection).await
                 }
             },
@@ -117,14 +263,26 @@ impl Graph {
         .await
     }
 
-    /// Executes a query on the configured database and returns a [`DetachedRowStream`]
+    /// Executes a READ/WRITE query on the configured database and returns a [`DetachedRowStream`]
     ///
     /// This operation retires the query on certain failures.
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute(&self, q: Query) -> Result<DetachedRowStream> {
-        self.impl_execute_on(self.config.db.clone(), q).await
+        self.impl_execute_on(self.config.db.clone(), q, Operation::Write)
+            .await
+    }
+
+    /// Executes a query READ on the configured database and returns a [`DetachedRowStream`]
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
+    pub async fn execute_read(&self, q: Query) -> Result<DetachedRowStream> {
+        self.impl_execute_on(self.config.db.clone(), q, Operation::Read)
+            .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -133,20 +291,48 @@ impl Graph {
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
-    pub async fn execute_on(&self, db: impl Into<Database>, q: Query) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), q).await
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn execute_on(
+        &self,
+        db: impl Into<Database>,
+        q: Query,
+        operation: Operation,
+    ) -> Result<DetachedRowStream> {
+        self.impl_execute_on(Some(db.into()), q, operation).await
     }
 
-    async fn impl_execute_on(&self, db: Option<Database>, q: Query) -> Result<DetachedRowStream> {
+    /// Executes a query on the provided database and returns a [`DetachedRowStream`]
+    ///
+    /// This operation retires the query on certain failures.
+    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
+    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    pub async fn execute_on(&self, db: impl Into<Database>, q: Query) -> Result<DetachedRowStream> {
+        self.impl_execute_on(Some(db.into()), q, Operation::Write)
+            .await
+    }
+
+    #[allow(unused_variables)]
+    async fn impl_execute_on(
+        &self,
+        db: Option<Database>,
+        q: Query,
+        operation: Operation,
+    ) -> Result<DetachedRowStream> {
         backoff::future::retry_notify(
-            self.pool.manager().backoff(),
+            self.pool.backoff(),
             || {
                 let pool = &self.pool;
                 let fetch_size = self.config.fetch_size;
                 let query = &q;
                 let db = db.as_deref();
+                #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                let operation = operation.clone();
                 async move {
-                    let connection = pool.get().await.map_err(crate::Error::from)?;
+                    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                    let connection = pool.get(Some(operation)).await?;
+                    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+                    let connection = pool.get().await?;
                     query.execute_retryable(db, fetch_size, connection).await
                 }
             },
