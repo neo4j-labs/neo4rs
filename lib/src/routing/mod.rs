@@ -1,14 +1,19 @@
 mod connection_registry;
 mod load_balancing;
 mod routed_connection_manager;
-use crate::types::{BoltMap, BoltString, BoltType};
 use std::fmt::{Display, Formatter};
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-use {crate::messages::BoltRequest, crate::types::BoltList, neo4rs_macros::BoltStruct};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
+    crate::connection::Routing,
     serde::ser::SerializeMap,
     serde::{ser::SerializeStructVariant, Deserialize, Serialize},
+};
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+use {
+    crate::messages::BoltRequest,
+    crate::types::BoltList,
+    crate::types::{BoltMap, BoltString, BoltType},
+    neo4rs_macros::BoltStruct,
 };
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -17,26 +22,6 @@ pub struct Route<'a> {
     pub(crate) routing: Routing,
     pub(crate) bookmarks: Vec<&'a str>,
     pub(crate) db: Option<Database>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Routing {
-    No,
-    Yes(Vec<(BoltString, BoltString)>),
-}
-
-impl From<Routing> for Option<BoltMap> {
-    fn from(routing: Routing) -> Self {
-        match routing {
-            Routing::No => None,
-            Routing::Yes(routing) => Some(
-                routing
-                    .into_iter()
-                    .map(|(k, v)| (k, BoltType::String(v)))
-                    .collect(),
-            ),
-        }
-    }
 }
 
 #[derive(Debug, Clone, BoltStruct, PartialEq)]
@@ -86,51 +71,6 @@ pub struct RoutingTable {
 pub struct Server {
     pub(crate) addresses: Vec<String>,
     pub(crate) role: String, // TODO: use an enum here
-}
-
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-pub struct RouteBuilder {
-    routing: BoltMap,
-    bookmarks: BoltList,
-    db: BoltString,
-}
-
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-impl RouteBuilder {
-    pub fn new(routing: Routing, bookmarks: Vec<&str>) -> Self {
-        let map = match routing {
-            Routing::No => BoltMap::default(),
-            Routing::Yes(routing) => routing
-                .into_iter()
-                .map(|(k, v)| (k, BoltType::String(v)))
-                .collect(),
-        };
-        RouteBuilder {
-            routing: map,
-            bookmarks: BoltList::from(
-                bookmarks
-                    .into_iter()
-                    .map(|b| BoltType::String(BoltString::new(b)))
-                    .collect::<Vec<BoltType>>(),
-            ),
-            db: BoltString::from("".to_string()),
-        }
-    }
-
-    pub fn with_db(self, db: Database) -> Self {
-        Self {
-            db: BoltString::from(db.to_string()),
-            ..self
-        }
-    }
-
-    pub fn build(self, _version: Version) -> BoltRequest {
-        BoltRequest::Route(Route {
-            routing: self.routing,
-            bookmarks: self.bookmarks,
-            db: self.db,
-        })
-    }
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -202,7 +142,7 @@ impl Serialize for Routing {
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-impl<'a> Serialize for Route<'a> {
+impl Serialize for Route<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

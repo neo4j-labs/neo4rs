@@ -4,17 +4,16 @@ use crate::bolt::{
     ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
 };
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-use {crate::messages::HelloBuilder, crate::types::BoltMap};
+use crate::messages::HelloBuilder;
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::routing::Route;
-use crate::routing::{Routing, RoutingTable};
+use crate::routing::{Route, RoutingTable};
 use crate::{
     connection::stream::ConnectionStream,
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
-    BoltString,
+    BoltMap, BoltString, BoltType,
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use log::{info, warn};
@@ -135,20 +134,6 @@ impl Connection {
         }
     }
 
-    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    pub async fn route(&mut self, route: BoltRequest) -> Result<RoutingTable> {
-        match self.send_recv(route).await? {
-            BoltResponse::Success(msg) => {
-                let rt: BoltMap = msg.get("rt").unwrap();
-                Ok(RoutingTable::from(rt))
-            }
-            BoltResponse::Failure(msg) => {
-                Err(Error::RoutingTableError(msg.get("message").unwrap()))
-            }
-            msg => Err(msg.into_error("HELLO")),
-        }
-    }
-
     pub async fn reset(&mut self) -> Result<()> {
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
@@ -265,6 +250,26 @@ impl Connection {
     #[cfg(all(feature = "unstable-serde-packstream-format", test, debug_assertions))]
     fn dbg(tag: &str, bytes: &Bytes) {
         eprintln!("[{}] {:?}", tag, crate::packstream::Dbg(bytes));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Routing {
+    No,
+    Yes(Vec<(BoltString, BoltString)>),
+}
+
+impl From<Routing> for Option<BoltMap> {
+    fn from(routing: Routing) -> Self {
+        match routing {
+            Routing::No => None,
+            Routing::Yes(routing) => Some(
+                routing
+                    .into_iter()
+                    .map(|(k, v)| (k, BoltType::String(v)))
+                    .collect(),
+            ),
+        }
     }
 }
 

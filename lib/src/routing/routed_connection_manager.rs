@@ -1,13 +1,17 @@
 use crate::pool::ManagedConnection;
 use crate::routing::connection_registry::ConnectionRegistry;
 use crate::routing::load_balancing::LoadBalancingStrategy;
-use crate::routing::{RouteBuilder, Routing, RoutingTable};
 use crate::{Config, Error, Operation};
 use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use futures::lock::Mutex;
 use log::{debug, error, info};
 use std::sync::Arc;
 use std::time::Duration;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use {
+    crate::connection::Routing,
+    crate::routing::{RouteBuilder, RoutingTable},
+};
 
 #[derive(Clone)]
 pub struct RoutedConnectionManager {

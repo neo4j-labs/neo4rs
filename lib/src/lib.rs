@@ -465,6 +465,7 @@ mod messages;
 mod packstream;
 mod pool;
 mod query;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 mod routing;
 mod row;
 mod stream;

@@ -24,9 +24,12 @@ mod tests {
 
     #[test]
     fn serialize() {
-        let route = RouteBuilder::new(Routing::Yes(vec![("address".into(), "localhost:7687".into())]), vec!["bookmark"])
-            .with_db(Database::from("neo4j"))
-            .build(Version::V4_3);
+        let route = RouteBuilder::new(
+            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            vec!["bookmark"],
+        )
+        .with_db(Database::from("neo4j"))
+        .build(Version::V4_3);
         let bytes = route.to_bytes().unwrap();
 
         let expected = bolt()

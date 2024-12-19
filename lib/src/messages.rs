@@ -9,12 +9,8 @@ mod pull;
 mod record;
 mod reset;
 mod rollback;
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-mod route;
 mod run;
 mod success;
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-use crate::routing;
 
 use crate::{
     errors::{Error, Result},
@@ -25,10 +21,10 @@ use crate::{
 use begin::Begin;
 use bytes::Bytes;
 use failure::Failure;
+use ignore::Ignore;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
-use ignore::Ignore;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
@@ -73,8 +69,6 @@ pub enum BoltRequest {
         deprecated(since = "0.9.0", note = "Use `crate::bolt::Reset` instead.")
     )]
     Reset(reset::Reset),
-    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    Route(routing::Route),
 }
 
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
@@ -212,8 +206,6 @@ impl BoltRequest {
             BoltRequest::Commit(commit) => commit.into_bytes(version)?,
             BoltRequest::Rollback(rollback) => rollback.into_bytes(version)?,
             BoltRequest::Reset(reset) => reset.into_bytes(version)?,
-            #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-            BoltRequest::Route(route) => route.into_bytes(version)?,
         };
         Ok(bytes)
     }
