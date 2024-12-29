@@ -8,13 +8,6 @@ use {
     serde::ser::SerializeMap,
     serde::{ser::SerializeStructVariant, Deserialize, Serialize},
 };
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-use {
-    crate::messages::BoltRequest,
-    crate::types::BoltList,
-    crate::types::{BoltMap, BoltString, BoltType},
-    neo4rs_macros::BoltStruct,
-};
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,31 +15,6 @@ pub struct Route<'a> {
     pub(crate) routing: Routing,
     pub(crate) bookmarks: Vec<&'a str>,
     pub(crate) db: Option<Database>,
-}
-
-#[derive(Debug, Clone, BoltStruct, PartialEq)]
-#[signature(0xB3, 0x66)]
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-pub struct Route {
-    routing: BoltMap,
-    bookmarks: BoltList,
-    db: BoltString, // TODO: this can also be null. How do we represent a null string?
-}
-
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-impl Route {
-    pub fn new(routing: BoltMap, bookmarks: Vec<&str>, db: Option<Database>) -> Self {
-        Route {
-            routing,
-            bookmarks: BoltList::from(
-                bookmarks
-                    .into_iter()
-                    .map(|b| BoltType::String(BoltString::new(b)))
-                    .collect::<Vec<BoltType>>(),
-            ),
-            db: BoltString::from(db.map(|d| d.to_string()).unwrap_or("".to_string())),
-        }
-    }
 }
 
 // NOTE: this structure will be needed in the future when we implement the Bolt protocol v4.4
