@@ -29,9 +29,9 @@ pub struct Extra<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", derive(Deserialize))]
 pub struct RoutingTable {
-    pub(crate) ttl: u64,
-    pub(crate) db: Option<Database>,
-    pub(crate) servers: Vec<Server>,
+    ttl: u64,
+    db: Option<Database>,
+    servers: Vec<Server>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

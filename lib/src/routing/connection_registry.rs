@@ -13,7 +13,11 @@ pub(crate) struct ConnectionRegistry {
     config: Config,
     creation_time: Arc<Mutex<u64>>,
     ttl: u64,
-    pub(crate) connections: Registry, // Arc is needed for Clone
+    pub(crate) connections: Registry,
+    servers: Vec<Server>,
+    readers: Vec<Server>,
+    writers: Vec<Server>,
+    routers: Vec<Server>,
 }
 
 impl ConnectionRegistry {
@@ -22,7 +26,25 @@ impl ConnectionRegistry {
         routing_table: Arc<RoutingTable>,
     ) -> Result<Self, Error> {
         let ttl = routing_table.ttl;
-        let connections = Self::build_registry(config, routing_table).await?;
+        let readers = routing_table
+            .servers
+            .iter()
+            .filter(|s| s.role == "READ")
+            .cloned()
+            .collect();
+        let writers = routing_table
+            .servers
+            .iter()
+            .filter(|s| s.role == "WRITE")
+            .cloned()
+            .collect();
+        let routers = routing_table
+            .servers
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect();
+        let connections = Self::build_registry(config, &routing_table.servers).await?;
         Ok(ConnectionRegistry {
             config: config.clone(),
             creation_time: Arc::new(Mutex::new(
@@ -33,15 +55,18 @@ impl ConnectionRegistry {
             )),
             ttl,
             connections,
+            servers: routing_table.servers.clone(),
+            readers,
+            writers,
+            routers,
         })
     }
 
     async fn build_registry(
         config: &Config,
-        routing_table: Arc<RoutingTable>,
+        servers: &Vec<Server>,
     ) -> Result<Registry, Error> {
         let registry = DashMap::new();
-        let servers = routing_table.servers.clone();
         for server in servers.iter() {
             registry.insert(server.clone(), create_pool(config).await?);
         }
@@ -87,11 +112,21 @@ impl ConnectionRegistry {
         self.connections.remove(server);
     }
 
-    pub fn servers(&self) -> Vec<Server> {
-        self.connections
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect()
+    #[allow(dead_code)]
+    pub fn servers(&self) -> &[Server] {
+        self.servers.as_slice()
+    }
+
+    pub fn readers(&self) -> &[Server] {
+        self.readers.as_slice()
+    }
+    
+    pub fn writers(&self) -> &[Server] {
+        self.writers.as_slice()
+    }
+    
+    pub fn routers(&self) -> &[Server] {
+        self.routers.as_slice()
     }
 }
 
@@ -154,13 +189,13 @@ mod tests {
         assert_eq!(registry.connections.len(), 5);
         let strategy = RoundRobinStrategy::new(cluster_routing_table.clone());
         let router = strategy
-            .select_router(registry.servers().as_slice())
+            .select_router(registry.routers())
             .unwrap();
         assert_eq!(router, routers[0]);
         registry.mark_unavailable(&writers[0]);
         assert_eq!(registry.connections.len(), 4);
         let writer = strategy
-            .select_writer(registry.servers().as_slice())
+            .select_writer(registry.writers())
             .unwrap();
         assert_eq!(writer, writers[1]);
     }

@@ -50,7 +50,7 @@ impl RoutedConnectionManager {
     pub async fn refresh_routing_table(&self) -> Result<RoutingTable, Error> {
         while let Some(router) = self
             .load_balancing_strategy
-            .select_router(self.registry.servers().as_slice())
+            .select_router(self.registry.routers())
         {
             if let Some(pool) = self.registry.get_pool(&router) {
                 if let Ok(mut connection) = pool.get().await {
@@ -108,14 +108,13 @@ impl RoutedConnectionManager {
             .await?;
 
         let op = operation.unwrap_or(Operation::Write);
-        let available_servers = self.registry.servers();
         while let Some(server) = match op {
             Operation::Write => self
                 .load_balancing_strategy
-                .select_writer(available_servers.as_slice()),
+                .select_writer(self.registry.writers()),
             _ => self
                 .load_balancing_strategy
-                .select_reader(available_servers.as_slice()),
+                .select_reader(self.registry.readers()),
         } {
             debug!("requesting connection for server: {:?}", server);
             if let Some(pool) = self.registry.get_pool(&server) {
