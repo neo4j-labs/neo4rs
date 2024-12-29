@@ -5,8 +5,7 @@ use std::fmt::{Display, Formatter};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
     crate::connection::Routing,
-    serde::ser::SerializeMap,
-    serde::{ser::SerializeStructVariant, Deserialize, Serialize},
+    serde::{Deserialize, Serialize},
 };
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -29,9 +28,9 @@ pub struct Extra<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", derive(Deserialize))]
 pub struct RoutingTable {
-    ttl: u64,
-    db: Option<Database>,
-    servers: Vec<Server>,
+    pub(crate) ttl: u64,
+    pub(crate) db: Option<Database>,
+    pub(crate) servers: Vec<Server>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -74,56 +73,29 @@ impl<'a> RouteBuilder<'a> {
     }
 }
 
+impl Display for Route<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ROUTE {{ {} }} [{}] {}",
+            self.routing, self.bookmarks.iter().map(|b| b.to_string()).collect::<Vec<String>>().join(", "), self.db.clone().map(|d| d.to_string()).unwrap_or("null".to_string())
+        )
+    }
+}
+
 impl Display for RoutingTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "RoutingTable {{ ttl: {}, db: {:?}, servers: {} }}",
             self.ttl,
-            self.db.clone().unwrap_or_default(),
+            self.db.clone(),
             self.servers
                 .iter()
                 .map(|s| s.addresses.join(", "))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
-    }
-}
-
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-impl Serialize for Routing {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Routing::No => serializer.serialize_none(),
-            Routing::Yes(routing) => {
-                let mut map = serializer.serialize_map(Some(routing.len()))?;
-                for (k, v) in routing {
-                    map.serialize_entry(k.to_string().as_str(), v.to_string().as_str())?;
-                }
-                map.end()
-            }
-        }
-    }
-}
-
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-impl Serialize for Route<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut structure = serializer.serialize_struct_variant("Request", 0x66, "ROUTE", 3)?;
-        structure.serialize_field("routing", &self.routing)?;
-        structure.serialize_field("bookmarks", &self.bookmarks)?;
-        if let Some(db) = &self.db {
-            structure.serialize_field("db", db.as_ref())?;
-        } else {
-            structure.serialize_field("db", &"")?;
-        }
-        structure.end()
     }
 }
 

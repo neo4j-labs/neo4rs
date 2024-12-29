@@ -1,7 +1,8 @@
 use crate::auth::ConnectionTLSConfig;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{
-    ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
+use {
+    crate::bolt::{ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary},
+    log::debug,
 };
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 use crate::messages::HelloBuilder;
@@ -125,6 +126,7 @@ impl Connection {
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     pub async fn route(&mut self, route: Route<'_>) -> Result<RoutingTable> {
+        debug!("Routing request: {}", route);
         let route = self.send_recv_as(route).await?;
 
         match route {
@@ -269,6 +271,22 @@ impl From<Routing> for Option<BoltMap> {
                     .map(|(k, v)| (k, BoltType::String(v)))
                     .collect(),
             ),
+        }
+    }
+}
+
+impl Display for Routing {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Routing::No => f.write_str(""),
+            Routing::Yes(routing) => {
+                let routing = routing
+                    .iter()
+                    .map(|(k, v)| format!("{}: \"{}\"", k, v))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{}", routing)
+            }
         }
     }
 }
@@ -448,7 +466,7 @@ impl NeoUrl {
     }
 
     fn routing_context(&mut self) -> Vec<(BoltString, BoltString)> {
-        Vec::new()
+        vec![("address".into(), format!("{}:{}", self.0.host().unwrap(), self.port()).into())]
     }
 
     fn warn_on_unexpected_components(&self) {
