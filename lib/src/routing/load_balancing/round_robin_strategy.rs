@@ -1,6 +1,6 @@
+use crate::routing::connection_registry::BoltServer;
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use std::sync::atomic::AtomicUsize;
-use crate::routing::connection_registry::BoltServer;
 
 pub struct RoundRobinStrategy {
     readers: Vec<BoltServer>,
@@ -81,42 +81,60 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::routing::{RoutingTable, Server};
     use super::*;
+    use crate::routing::{RoutingTable, Server};
 
     #[test]
     fn should_get_next_server() {
-        let readers = vec![
-            Server {
-                addresses: vec!["localhost:7687".to_string()],
-                role: "READ".to_string(),
-            },
-            Server {
-                addresses: vec!["localhost:7688".to_string()],
-                role: "READ".to_string(),
-            },
-        ];
-        let writers = vec![];
+        let routers = vec![Server {
+            addresses: vec!["192.168.0.1:7688".to_string()],
+            role: "WRITE".to_string(),
+        }];
+        let readers = vec![Server {
+            addresses: vec![
+                "192.168.0.2:7687".to_string(),
+                "192.168.0.3:7687".to_string(),
+            ],
+            role: "READ".to_string(),
+        }];
+        let writers = vec![Server {
+            addresses: vec!["192.168.0.4:7688".to_string()],
+            role: "WRITE".to_string(),
+        }];
+
         let cluster_routing_table = RoutingTable {
-            ttl: 0,
-            db: None,
-            servers: readers.clone().into_iter().chain(writers.clone()).collect(),
+            ttl: 300,
+            db: Some("neo4j".into()),
+            servers: routers
+                .clone()
+                .into_iter()
+                .chain(readers.clone())
+                .chain(writers.clone())
+                .collect(),
         };
+        let all_servers = cluster_routing_table.resolve();
+        assert_eq!(all_servers.len(), 4);
         let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
 
-        let reader = strategy
-            .select_reader()
-            .unwrap();
-        assert_eq!(reader.address, readers[1].addresses[0]);
-        let reader = strategy
-            .select_reader()
-            .unwrap();
-        assert_eq!(reader.address, readers[0].addresses[0]);
-        let reader = strategy
-            .select_reader()
-            .unwrap();
-        assert_eq!(reader.address, readers[1].addresses[0]);
-        let writer = strategy.select_writer();
-        assert_eq!(writer, None);
+        let reader = strategy.select_reader().unwrap();
+        assert_eq!(
+            format!("{}:{}", reader.address, reader.port),
+            readers[0].addresses[1]
+        );
+        let reader = strategy.select_reader().unwrap();
+        assert_eq!(
+            format!("{}:{}", reader.address, reader.port),
+            readers[0].addresses[0]
+        );
+        let reader = strategy.select_reader().unwrap();
+        assert_eq!(
+            format!("{}:{}", reader.address, reader.port),
+            readers[0].addresses[1]
+        );
+        let writer = strategy.select_writer().unwrap();
+        assert_eq!(
+            format!("{}:{}", writer.address, writer.port),
+            writers[0].addresses[0]
+        );
     }
 }

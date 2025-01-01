@@ -1,3 +1,4 @@
+use crate::connection::NeoUrl;
 use crate::pool::{create_pool, ConnectionPool};
 use crate::routing::{RoutingTable, Server};
 use crate::{Config, Error};
@@ -5,7 +6,6 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::{debug, info};
 use std::sync::Arc;
-use crate::connection::NeoUrl;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct BoltServer {
@@ -16,16 +16,21 @@ pub(crate) struct BoltServer {
 
 impl BoltServer {
     pub(crate) fn resolve(server: &Server) -> Vec<Self> {
-        server.addresses.iter().map(|address| {
-            let bs = NeoUrl::parse(address)
-                .map(|addr| BoltServer {
-                    address: addr.host().to_string(),
-                    port: addr.port(),
-                    role: server.role.to_string(),
-                }).unwrap_or_else(|_| panic!("Failed to parse address {}", address));
-            debug!("Resolved server: {:?}", bs);
-            bs
-        }).collect()
+        server
+            .addresses
+            .iter()
+            .map(|address| {
+                let bs = NeoUrl::parse(address)
+                    .map(|addr| BoltServer {
+                        address: addr.host().to_string(),
+                        port: addr.port(),
+                        role: server.role.to_string(),
+                    })
+                    .unwrap_or_else(|_| panic!("Failed to parse address {}", address));
+                debug!("Resolved server: {:?}", bs);
+                bs
+            })
+            .collect()
     }
 }
 
@@ -61,10 +66,7 @@ impl ConnectionRegistry {
         })
     }
 
-    async fn build_registry(
-        config: &Config,
-        servers: &[BoltServer],
-    ) -> Result<Registry, Error> {
+    async fn build_registry(config: &Config, servers: &[BoltServer]) -> Result<Registry, Error> {
         let registry = DashMap::new();
         for server in servers.iter() {
             let server_config = Config {
@@ -174,15 +176,17 @@ mod tests {
             .unwrap();
         assert_eq!(registry.connections.len(), 5);
         let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
-        let router = strategy
-            .select_router()
-            .unwrap();
-        assert_eq!(router.address, routers[0].addresses[0]);
+        let router = strategy.select_router().unwrap();
+        assert_eq!(
+            format!("{}:{}", router.address, router.port),
+            routers[0].addresses[0]
+        );
         registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap());
         assert_eq!(registry.connections.len(), 4);
-        let writer = strategy
-            .select_writer()
-            .unwrap();
-        assert_eq!(writer.address, writers[1].addresses[0]);
+        let writer = strategy.select_writer().unwrap();
+        assert_eq!(
+            format!("{}:{}", writer.address, writer.port),
+            writers[1].addresses[0]
+        );
     }
 }

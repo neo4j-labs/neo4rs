@@ -26,7 +26,7 @@ async fn use_default_db() {
     let graph = neo4j.graph();
 
     let default_db = graph
-        .execute_on("system", query("SHOW DEFAULT DATABASE"))
+        .execute_on("system", query("SHOW DEFAULT DATABASE"), Operation::Read)
         .await
         .unwrap()
         .column_into_stream::<String>("name")
@@ -57,6 +57,7 @@ async fn use_default_db() {
             dbname.as_str(),
             query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
                 .param("uuid", id.to_string()),
+            Operation::Read,
         )
         .await
         .unwrap()

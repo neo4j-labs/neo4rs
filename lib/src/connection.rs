@@ -1,11 +1,13 @@
 use crate::auth::ConnectionTLSConfig;
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use {
-    crate::bolt::{ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary},
-    log::debug,
-};
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 use crate::messages::HelloBuilder;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use {
+    crate::bolt::{
+        ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
+    },
+    log::debug,
+};
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::routing::{Route, RoutingTable};
@@ -466,7 +468,10 @@ impl NeoUrl {
     }
 
     fn routing_context(&mut self) -> Vec<(BoltString, BoltString)> {
-        vec![("address".into(), format!("{}:{}", self.0.host().unwrap(), self.port()).into())]
+        vec![(
+            "address".into(),
+            format!("{}:{}", self.0.host().unwrap(), self.port()).into(),
+        )]
     }
 
     fn warn_on_unexpected_components(&self) {
