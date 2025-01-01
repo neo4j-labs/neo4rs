@@ -50,13 +50,13 @@ impl RoutedConnectionManager {
     pub async fn refresh_routing_table(&self) -> Result<RoutingTable, Error> {
         while let Some(router) = self
             .load_balancing_strategy
-            .select_router(self.registry.routers())
+            .select_router()
         {
             if let Some(pool) = self.registry.get_pool(&router) {
                 if let Ok(mut connection) = pool.get().await {
                     info!(
                         "Refreshing routing table from router {}",
-                        router.addresses.first().unwrap()
+                        router.address
                     );
                     let bookmarks = self.bookmarks.lock().await;
                     let bookmarks = bookmarks.iter().map(|b| b.as_str()).collect();
@@ -72,7 +72,7 @@ impl RoutedConnectionManager {
                             self.registry.mark_unavailable(&router);
                             error!(
                                 "Failed to refresh routing table from router {}: {}",
-                                router.addresses.first().unwrap(),
+                                router.address,
                                 e
                             );
                         }
@@ -81,13 +81,13 @@ impl RoutedConnectionManager {
                     self.registry.mark_unavailable(&router);
                     error!(
                         "Failed to create connection to router `{}`",
-                        router.addresses.first().unwrap()
+                        router.address
                     );
                 }
             } else {
                 error!(
                     "No connection manager available for router `{}` in the registry. Maybe it was marked as unavailable",
-                    router.addresses.first().unwrap()
+                    router.address
                 );
             }
         }
@@ -111,10 +111,10 @@ impl RoutedConnectionManager {
         while let Some(server) = match op {
             Operation::Write => self
                 .load_balancing_strategy
-                .select_writer(self.registry.writers()),
+                .select_writer(),
             _ => self
                 .load_balancing_strategy
-                .select_reader(self.registry.readers()),
+                .select_reader(),
         } {
             debug!("requesting connection for server: {:?}", server);
             if let Some(pool) = self.registry.get_pool(&server) {
@@ -123,7 +123,7 @@ impl RoutedConnectionManager {
                     Err(e) => {
                         error!(
                             "Failed to get connection from pool for server `{}`: {}",
-                            server.addresses.first().unwrap(),
+                            server.address,
                             e
                         );
                         self.registry.mark_unavailable(&server);
@@ -134,7 +134,7 @@ impl RoutedConnectionManager {
                 // We couldn't find a connection manager for the server, it was probably marked unavailable
                 error!(
                     "No connection manager available for router `{}` in the registry",
-                    server.addresses.first().unwrap()
+                    server.address
                 );
             }
         }

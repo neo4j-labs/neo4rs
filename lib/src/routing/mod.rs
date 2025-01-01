@@ -33,6 +33,16 @@ pub struct RoutingTable {
     pub(crate) servers: Vec<Server>,
 }
 
+impl RoutingTable {
+    pub(crate) fn resolve(&self) -> Vec<BoltServer> {
+        self
+            .servers
+            .iter()
+            .flat_map(BoltServer::resolve)
+            .collect::<Vec<BoltServer>>()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", derive(Deserialize))]
 pub struct Server {
@@ -102,3 +112,4 @@ impl Display for RoutingTable {
 use crate::{Database, Version};
 pub use load_balancing::round_robin_strategy::RoundRobinStrategy;
 pub use routed_connection_manager::RoutedConnectionManager;
+use crate::routing::connection_registry::BoltServer;

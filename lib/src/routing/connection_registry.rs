@@ -3,10 +3,33 @@ use crate::routing::{RoutingTable, Server};
 use crate::{Config, Error};
 use dashmap::DashMap;
 use futures::lock::Mutex;
-use log::info;
+use log::{debug, info};
 use std::sync::Arc;
+use crate::connection::NeoUrl;
 
-pub type Registry = DashMap<Server, ConnectionPool>;
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct BoltServer {
+    pub(crate) address: String,
+    pub(crate) port: u16,
+    pub(crate) role: String,
+}
+
+impl BoltServer {
+    pub(crate) fn resolve(server: &Server) -> Vec<Self> {
+        server.addresses.iter().map(|address| {
+            let bs = NeoUrl::parse(address)
+                .map(|addr| BoltServer {
+                    address: addr.host().to_string(),
+                    port: addr.port(),
+                    role: server.role.to_string(),
+                }).unwrap_or_else(|_| panic!("Failed to parse address {}", address));
+            debug!("Resolved server: {:?}", bs);
+            bs
+        }).collect()
+    }
+}
+
+pub type Registry = DashMap<BoltServer, ConnectionPool>;
 
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
@@ -14,10 +37,6 @@ pub(crate) struct ConnectionRegistry {
     creation_time: Arc<Mutex<u64>>,
     ttl: u64,
     pub(crate) connections: Registry,
-    servers: Vec<Server>,
-    readers: Vec<Server>,
-    writers: Vec<Server>,
-    routers: Vec<Server>,
 }
 
 impl ConnectionRegistry {
@@ -26,25 +45,9 @@ impl ConnectionRegistry {
         routing_table: Arc<RoutingTable>,
     ) -> Result<Self, Error> {
         let ttl = routing_table.ttl;
-        let readers = routing_table
-            .servers
-            .iter()
-            .filter(|s| s.role == "READ")
-            .cloned()
-            .collect();
-        let writers = routing_table
-            .servers
-            .iter()
-            .filter(|s| s.role == "WRITE")
-            .cloned()
-            .collect();
-        let routers = routing_table
-            .servers
-            .iter()
-            .filter(|s| s.role == "ROUTE")
-            .cloned()
-            .collect();
-        let connections = Self::build_registry(config, &routing_table.servers).await?;
+        let servers = routing_table.resolve();
+
+        let connections = Self::build_registry(config, &servers).await?;
         Ok(ConnectionRegistry {
             config: config.clone(),
             creation_time: Arc::new(Mutex::new(
@@ -55,20 +58,20 @@ impl ConnectionRegistry {
             )),
             ttl,
             connections,
-            servers: routing_table.servers.clone(),
-            readers,
-            writers,
-            routers,
         })
     }
 
     async fn build_registry(
         config: &Config,
-        servers: &Vec<Server>,
+        servers: &[BoltServer],
     ) -> Result<Registry, Error> {
         let registry = DashMap::new();
         for server in servers.iter() {
-            registry.insert(server.clone(), create_pool(config).await?);
+            let server_config = Config {
+                uri: format!("{}:{}", server.address, server.port), // build a config for each server in the routing table
+                ..config.clone() // but keep the information about tls and other settings
+            };
+            registry.insert(server.clone(), create_pool(&server_config).await?);
         }
         Ok(registry)
     }
@@ -89,7 +92,7 @@ impl ConnectionRegistry {
                 let routing_table = f().await?;
                 info!("Routing table refreshed: {:?}", routing_table);
                 let registry = &self.connections;
-                let servers = routing_table.servers.clone();
+                let servers = routing_table.resolve();
                 for server in servers.iter() {
                     if registry.contains_key(server) {
                         continue;
@@ -104,29 +107,12 @@ impl ConnectionRegistry {
         Ok(())
     }
     /// Retrieve the pool for a specific server.
-    pub fn get_pool(&self, server: &Server) -> Option<ConnectionPool> {
+    pub fn get_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
         self.connections.get(server).map(|entry| entry.clone())
     }
 
-    pub fn mark_unavailable(&self, server: &Server) {
+    pub fn mark_unavailable(&self, server: &BoltServer) {
         self.connections.remove(server);
-    }
-
-    #[allow(dead_code)]
-    pub fn servers(&self) -> &[Server] {
-        self.servers.as_slice()
-    }
-
-    pub fn readers(&self) -> &[Server] {
-        self.readers.as_slice()
-    }
-    
-    pub fn writers(&self) -> &[Server] {
-        self.writers.as_slice()
-    }
-    
-    pub fn routers(&self) -> &[Server] {
-        self.routers.as_slice()
     }
 }
 
@@ -187,16 +173,16 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(registry.connections.len(), 5);
-        let strategy = RoundRobinStrategy::new(cluster_routing_table.clone());
+        let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
         let router = strategy
-            .select_router(registry.routers())
+            .select_router()
             .unwrap();
-        assert_eq!(router, routers[0]);
-        registry.mark_unavailable(&writers[0]);
+        assert_eq!(router.address, routers[0].addresses[0]);
+        registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap());
         assert_eq!(registry.connections.len(), 4);
         let writer = strategy
-            .select_writer(registry.writers())
+            .select_writer()
             .unwrap();
-        assert_eq!(writer, writers[1]);
+        assert_eq!(writer.address, writers[1].addresses[0]);
     }
 }

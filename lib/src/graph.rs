@@ -98,7 +98,7 @@ impl Graph {
                     RoutedConnectionManager::new(
                         &config,
                         Arc::new(rt.clone()),
-                        Arc::new(RoundRobinStrategy::new(rt)),
+                        Arc::new(RoundRobinStrategy::new(&rt.resolve())),
                     )
                     .await?,
                 );
