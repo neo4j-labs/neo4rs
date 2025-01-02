@@ -29,17 +29,8 @@ enum ConnectionPoolManager {
 }
 
 impl ConnectionPoolManager {
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    #[allow(unused_variables)]
     async fn get(&self, operation: Option<Operation>) -> Result<ManagedConnection> {
-        match self {
-            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            Routed(manager) => manager.get(operation).await,
-            Normal(pool) => pool.get().await.map_err(crate::Error::from),
-        }
-    }
-
-    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    async fn get(&self) -> Result<ManagedConnection> {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.get(operation).await,
@@ -171,10 +162,7 @@ impl Graph {
 
     #[allow(unused_variables)]
     async fn impl_start_txn_on(&self, db: Option<Database>, operation: Operation) -> Result<Txn> {
-        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         let connection = self.pool.get(Some(operation)).await?;
-        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        let connection = self.pool.get().await?;
         Txn::new(db, self.config.fetch_size, connection).await
     }
 
@@ -251,10 +239,7 @@ impl Graph {
                 let db = db.as_deref();
                 let operation = operation.clone();
                 async move {
-                    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
                     let mut connection = pool.get(Some(operation)).await?;
-                    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-                    let mut connection = pool.get().await?;
                     query.run_retryable(db, &mut connection).await
                 }
             },
@@ -326,13 +311,9 @@ impl Graph {
                 let fetch_size = self.config.fetch_size;
                 let query = &q;
                 let db = db.as_deref();
-                #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
                 let operation = operation.clone();
                 async move {
-                    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
                     let connection = pool.get(Some(operation)).await?;
-                    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-                    let connection = pool.get().await?;
                     query.execute_retryable(db, fetch_size, connection).await
                 }
             },

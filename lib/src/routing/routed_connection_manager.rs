@@ -118,9 +118,10 @@ impl RoutedConnectionManager {
             } else {
                 // We couldn't find a connection manager for the server, it was probably marked unavailable
                 error!(
-                    "No connection manager available for router `{}` in the registry",
+                    "No connection manager available for router `{}` in the registry, marking as unavailable",
                     server.address
                 );
+                self.registry.mark_unavailable(&server);
             }
         }
         Err(Error::RoutingTableRefreshFailed(format!(
