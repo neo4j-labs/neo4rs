@@ -18,7 +18,7 @@ use crate::{
     txn::Txn,
     Operation,
 };
-use backoff::ExponentialBackoff;
+use backoff::{Error, ExponentialBackoff};
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -239,7 +239,7 @@ impl Graph {
                 let db = db.as_deref();
                 let operation = operation.clone();
                 async move {
-                    let mut connection = pool.get(Some(operation)).await?;
+                    let mut connection = pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
                     query.run_retryable(db, &mut connection).await
                 }
             },
@@ -313,7 +313,7 @@ impl Graph {
                 let db = db.as_deref();
                 let operation = operation.clone();
                 async move {
-                    let connection = pool.get(Some(operation)).await?;
+                    let connection = pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
                     query.execute_retryable(db, fetch_size, connection).await
                 }
             },
