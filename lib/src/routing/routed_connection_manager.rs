@@ -1,5 +1,5 @@
 use crate::pool::ManagedConnection;
-use crate::routing::connection_registry::ConnectionRegistry;
+use crate::routing::connection_registry::{BoltServer, ConnectionRegistry};
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::{Config, Error, Operation};
 use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
@@ -48,7 +48,7 @@ impl RoutedConnectionManager {
     }
 
     pub async fn refresh_routing_table(&self) -> Result<RoutingTable, Error> {
-        while let Some(router) = self.load_balancing_strategy.select_router() {
+        while let Some(router) = self.select_router() {
             if let Some(pool) = self.registry.get_pool(&router) {
                 if let Ok(mut connection) = pool.get().await {
                     info!("Refreshing routing table from router {}", router.address);
@@ -99,8 +99,8 @@ impl RoutedConnectionManager {
 
         let op = operation.unwrap_or(Operation::Write);
         while let Some(server) = match op {
-            Operation::Write => self.load_balancing_strategy.select_writer(),
-            _ => self.load_balancing_strategy.select_reader(),
+            Operation::Write => self.select_writer(),
+            _ => self.select_reader(),
         } {
             debug!("requesting connection for server: {:?}", server);
             if let Some(pool) = self.registry.get_pool(&server) {
@@ -131,5 +131,17 @@ impl RoutedConnectionManager {
 
     pub(crate) fn backoff(&self) -> ExponentialBackoff {
         self.backoff.as_ref().clone()
+    }
+    
+    fn select_reader(&self) -> Option<BoltServer> {
+        self.load_balancing_strategy.select_reader(&self.registry.servers())
+    }
+    
+    fn select_writer(&self) -> Option<BoltServer> {
+        self.load_balancing_strategy.select_writer(&self.registry.servers())
+    }
+    
+    fn select_router(&self) -> Option<BoltServer> {
+        self.load_balancing_strategy.select_router(&self.registry.servers())
     }
 }

@@ -116,6 +116,10 @@ impl ConnectionRegistry {
     pub fn mark_unavailable(&self, server: &BoltServer) {
         self.connections.remove(server);
     }
+
+    pub fn servers(&self) -> Vec<BoltServer> {
+        self.connections.iter().map(|entry| entry.key().clone()).collect()
+    }
 }
 
 #[cfg(test)]
@@ -176,17 +180,22 @@ mod tests {
             .unwrap();
         assert_eq!(registry.connections.len(), 5);
         let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
-        let router = strategy.select_router().unwrap();
+        let router = strategy.select_router(&registry.servers()).unwrap();
         assert_eq!(
             format!("{}:{}", router.address, router.port),
             routers[0].addresses[0]
         );
         registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap());
         assert_eq!(registry.connections.len(), 4);
-        let writer = strategy.select_writer().unwrap();
+        let writer = strategy.select_writer(&registry.servers()).unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),
             writers[1].addresses[0]
         );
+
+        registry.mark_unavailable(BoltServer::resolve(&writers[1]).first().unwrap());
+        assert_eq!(registry.connections.len(), 3);
+        let writer = strategy.select_writer(&registry.servers());
+        assert!(writer.is_none());
     }
 }

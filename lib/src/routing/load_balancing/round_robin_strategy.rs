@@ -3,9 +3,6 @@ use crate::routing::load_balancing::LoadBalancingStrategy;
 use std::sync::atomic::AtomicUsize;
 
 pub struct RoundRobinStrategy {
-    readers: Vec<BoltServer>,
-    writers: Vec<BoltServer>,
-    routers: Vec<BoltServer>,
     reader_index: AtomicUsize,
     writer_index: AtomicUsize,
     router_index: AtomicUsize,
@@ -32,9 +29,6 @@ impl RoundRobinStrategy {
         let writer_index = AtomicUsize::new(writers.len());
         let router_index = AtomicUsize::new(routers.len());
         RoundRobinStrategy {
-            readers,
-            writers,
-            routers,
             reader_index,
             writer_index,
             router_index,
@@ -66,16 +60,31 @@ impl RoundRobinStrategy {
 }
 
 impl LoadBalancingStrategy for RoundRobinStrategy {
-    fn select_reader(&self) -> Option<BoltServer> {
-        Self::select(&self.readers, &self.reader_index)
+    fn select_reader(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        let readers = servers
+            .iter()
+            .filter(|s| s.role == "READ")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+        Self::select(&readers, &self.reader_index)
     }
 
-    fn select_writer(&self) -> Option<BoltServer> {
-        Self::select(&self.writers, &self.writer_index)
+    fn select_writer(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        let writers = servers
+            .iter()
+            .filter(|s| s.role == "WRITE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+        Self::select(&writers, &self.writer_index)
     }
 
-    fn select_router(&self) -> Option<BoltServer> {
-        Self::select(&self.routers, &self.router_index)
+    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        let routers = servers
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+        Self::select(&routers, &self.router_index)
     }
 }
 
@@ -116,22 +125,22 @@ mod tests {
         assert_eq!(all_servers.len(), 4);
         let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
 
-        let reader = strategy.select_reader().unwrap();
+        let reader = strategy.select_reader(&all_servers).unwrap();
         assert_eq!(
             format!("{}:{}", reader.address, reader.port),
             readers[0].addresses[1]
         );
-        let reader = strategy.select_reader().unwrap();
+        let reader = strategy.select_reader(&all_servers).unwrap();
         assert_eq!(
             format!("{}:{}", reader.address, reader.port),
             readers[0].addresses[0]
         );
-        let reader = strategy.select_reader().unwrap();
+        let reader = strategy.select_reader(&all_servers).unwrap();
         assert_eq!(
             format!("{}:{}", reader.address, reader.port),
             readers[0].addresses[1]
         );
-        let writer = strategy.select_writer().unwrap();
+        let writer = strategy.select_writer(&all_servers).unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),
             writers[0].addresses[0]
