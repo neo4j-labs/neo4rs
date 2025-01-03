@@ -2,39 +2,13 @@ use crate::routing::connection_registry::BoltServer;
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use std::sync::atomic::AtomicUsize;
 
+#[derive(Default)]
 pub struct RoundRobinStrategy {
     reader_index: AtomicUsize,
     writer_index: AtomicUsize,
-    router_index: AtomicUsize,
 }
 
 impl RoundRobinStrategy {
-    pub(crate) fn new(servers: &[BoltServer]) -> Self {
-        let readers: Vec<BoltServer> = servers
-            .iter()
-            .filter(|s| s.role == "READ")
-            .cloned()
-            .collect();
-        let writers: Vec<BoltServer> = servers
-            .iter()
-            .filter(|s| s.role == "WRITE")
-            .cloned()
-            .collect();
-        let routers: Vec<BoltServer> = servers
-            .iter()
-            .filter(|s| s.role == "ROUTE")
-            .cloned()
-            .collect();
-        let reader_index = AtomicUsize::new(readers.len());
-        let writer_index = AtomicUsize::new(writers.len());
-        let router_index = AtomicUsize::new(routers.len());
-        RoundRobinStrategy {
-            reader_index,
-            writer_index,
-            router_index,
-        }
-    }
-
     fn select(servers: &[BoltServer], index: &AtomicUsize) -> Option<BoltServer> {
         if servers.is_empty() {
             return None;
@@ -77,15 +51,6 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .collect::<Vec<BoltServer>>();
         Self::select(&writers, &self.writer_index)
     }
-
-    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
-        let routers = servers
-            .iter()
-            .filter(|s| s.role == "ROUTE")
-            .cloned()
-            .collect::<Vec<BoltServer>>();
-        Self::select(&routers, &self.router_index)
-    }
 }
 
 #[cfg(test)]
@@ -123,7 +88,7 @@ mod tests {
         };
         let all_servers = cluster_routing_table.resolve();
         assert_eq!(all_servers.len(), 4);
-        let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
+        let strategy = RoundRobinStrategy::default();
 
         let reader = strategy.select_reader(&all_servers).unwrap();
         assert_eq!(

@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::debug;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct BoltServer {
@@ -40,19 +41,15 @@ pub type Registry = DashMap<BoltServer, ConnectionPool>;
 pub(crate) struct ConnectionRegistry {
     config: Config,
     creation_time: Arc<Mutex<u64>>,
-    ttl: u64,
+    ttl: Arc<AtomicU64>,
     pub(crate) connections: Registry,
 }
 
 impl ConnectionRegistry {
     pub(crate) async fn new(
         config: &Config,
-        routing_table: Arc<RoutingTable>,
     ) -> Result<Self, Error> {
-        let ttl = routing_table.ttl;
-        let servers = routing_table.resolve();
-
-        let connections = Self::build_registry(config, &servers).await?;
+        let connections = Self::build_registry(config, &[]).await?;
         Ok(ConnectionRegistry {
             config: config.clone(),
             creation_time: Arc::new(Mutex::new(
@@ -61,7 +58,7 @@ impl ConnectionRegistry {
                     .unwrap()
                     .as_secs(),
             )),
-            ttl,
+            ttl: Arc::new(AtomicU64::new(0)),
             connections,
         })
     }
@@ -89,8 +86,8 @@ impl ConnectionRegistry {
             .as_secs();
         debug!("Checking if routing table is expired...");
         if let Some(mut guard) = self.creation_time.try_lock() {
-            if now - *guard > self.ttl {
-                debug!("Routing table expired, refreshing...");
+            if self.connections.is_empty() || now - *guard > self.ttl.load(Ordering::Relaxed) {
+                debug!("Routing table expired or empty, refreshing...");
                 let routing_table = f().await?;
                 debug!("Routing table refreshed: {:?}", routing_table);
                 let registry = &self.connections;
@@ -102,7 +99,12 @@ impl ConnectionRegistry {
                     registry.insert(server.clone(), create_pool(&self.config).await?);
                 }
                 registry.retain(|k, _| servers.contains(k));
-                debug!("Registry updated. New size is {}", registry.len());
+                let _ = self.ttl.fetch_update(
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                    |_ttl| Some(routing_table.ttl),
+                ).unwrap();
+                debug!("Registry updated. New size is {} with TTL {}s", registry.len(), routing_table.ttl);
                 *guard = now;
             }
         } else {
@@ -177,16 +179,14 @@ mod tests {
             fetch_size: 0,
             tls_config: ConnectionTLSConfig::None,
         };
-        let registry = ConnectionRegistry::new(&config, Arc::new(cluster_routing_table.clone()))
+        let registry = ConnectionRegistry::new(&config)
+            .await
+            .unwrap();
+        registry.update_if_expired(|| async { Ok(cluster_routing_table) })
             .await
             .unwrap();
         assert_eq!(registry.connections.len(), 5);
-        let strategy = RoundRobinStrategy::new(&cluster_routing_table.resolve());
-        let router = strategy.select_router(&registry.servers()).unwrap();
-        assert_eq!(
-            format!("{}:{}", router.address, router.port),
-            routers[0].addresses[0]
-        );
+        let strategy = RoundRobinStrategy::default();
         registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap());
         assert_eq!(registry.connections.len(), 4);
         let writer = strategy.select_writer(&registry.servers()).unwrap();

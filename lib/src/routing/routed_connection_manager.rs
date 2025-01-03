@@ -9,14 +9,15 @@ use std::sync::Arc;
 use std::time::Duration;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
-    crate::connection::Routing,
     crate::routing::{RouteBuilder, RoutingTable},
 };
+use crate::connection::{Connection, ConnectionInfo};
 
 #[derive(Clone)]
 pub struct RoutedConnectionManager {
     load_balancing_strategy: Arc<dyn LoadBalancingStrategy>,
     registry: Arc<ConnectionRegistry>,
+    #[allow(dead_code)]
     bookmarks: Arc<Mutex<Vec<String>>>,
     backoff: Arc<ExponentialBackoff>,
     config: Config,
@@ -25,10 +26,9 @@ pub struct RoutedConnectionManager {
 impl RoutedConnectionManager {
     pub async fn new(
         config: &Config,
-        routing_table: Arc<RoutingTable>,
         load_balancing_strategy: Arc<dyn LoadBalancingStrategy>,
     ) -> Result<Self, Error> {
-        let registry = Arc::new(ConnectionRegistry::new(config, routing_table.clone()).await?);
+        let registry = Arc::new(ConnectionRegistry::new(config).await?);
         let backoff = Arc::new(
             ExponentialBackoffBuilder::new()
                 .with_initial_interval(Duration::from_millis(1))
@@ -48,43 +48,20 @@ impl RoutedConnectionManager {
     }
 
     pub async fn refresh_routing_table(&self) -> Result<RoutingTable, Error> {
-        while let Some(router) = self.select_router() {
-            if let Some(pool) = self.registry.get_pool(&router) {
-                if let Ok(mut connection) = pool.get().await {
-                    debug!("Refreshing routing table from router {}", router.address);
-                    let bookmarks = self.bookmarks.lock().await;
-                    let bookmarks = bookmarks.iter().map(|b| b.as_str()).collect();
-                    let route = RouteBuilder::new(Routing::Yes(vec![]), bookmarks)
-                        .with_db(self.config.db.clone().unwrap_or_default())
-                        .build(connection.version());
-                    match connection.route(route).await {
-                        Ok(rt) => {
-                            debug!("Routing table refreshed: {:?}", rt);
-                            return Ok(rt);
-                        }
-                        Err(e) => {
-                            self.registry.mark_unavailable(&router);
-                            error!(
-                                "Failed to refresh routing table from router {}: {}",
-                                router.address, e
-                            );
-                        }
-                    }
-                } else {
-                    self.registry.mark_unavailable(&router);
-                    error!("Failed to create connection to router `{}`", router.address);
-                }
-            } else {
-                error!(
-                    "No connection manager available for router `{}` in the registry. Maybe it was marked as unavailable",
-                    router.address
-                );
-            }
+        let info = ConnectionInfo::new(
+            &self.config.uri,
+            &self.config.user,
+            &self.config.password,
+            &self.config.tls_config,
+        )?;
+        let mut connection = Connection::new(&info).await?;
+        let mut builder = RouteBuilder::new(info.routing, vec![]);
+        if let Some(db) = self.config.db.clone() {
+            builder = builder.with_db(db);
         }
-        // After trying all routers, we still couldn't refresh the routing table: return an error
-        Err(Error::ServerUnavailableError(
-            "No router available".to_string(),
-        ))
+        let rt = connection.route(builder.build(connection.version())).await?;
+        debug!("Fetched a new routing table: {:?}", rt);
+        Ok(rt)
     }
 
     pub(crate) async fn get(
@@ -142,9 +119,5 @@ impl RoutedConnectionManager {
 
     fn select_writer(&self) -> Option<BoltServer> {
         self.load_balancing_strategy.select_writer(&self.registry.servers())
-    }
-
-    fn select_router(&self) -> Option<BoltServer> {
-        self.load_balancing_strategy.select_router(&self.registry.servers())
     }
 }

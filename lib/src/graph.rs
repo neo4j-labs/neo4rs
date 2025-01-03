@@ -1,9 +1,8 @@
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
-    crate::connection::{Connection, ConnectionInfo, Routing},
+    crate::connection::{ConnectionInfo, Routing},
     crate::graph::ConnectionPoolManager::Routed,
-    crate::routing::{RoundRobinStrategy, RouteBuilder, RoutedConnectionManager},
-    log::info,
+    crate::routing::{RoundRobinStrategy, RoutedConnectionManager},
     std::sync::Arc,
 };
 
@@ -75,21 +74,10 @@ impl Graph {
                 &config.tls_config,
             )?;
             if matches!(info.routing, Routing::Yes(_)) {
-                let mut connection = Connection::new(&info).await?;
-                let mut builder = RouteBuilder::new(info.routing, vec![]);
-                if let Some(db) = config.db.clone() {
-                    builder = builder.with_db(db);
-                }
-                let rt = connection
-                    .route(builder.build(connection.version()))
-                    .await?;
-                connection.reset().await?;
-                info!("Connected to routing server, routing table: {:?}", rt);
                 let pool = Routed(
                     RoutedConnectionManager::new(
                         &config,
-                        Arc::new(rt.clone()),
-                        Arc::new(RoundRobinStrategy::new(&rt.resolve())),
+                        Arc::new(RoundRobinStrategy::default()),
                     )
                     .await?,
                 );
