@@ -4,7 +4,7 @@ use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::{Config, Error, Operation};
 use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use futures::lock::Mutex;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -51,7 +51,7 @@ impl RoutedConnectionManager {
         while let Some(router) = self.select_router() {
             if let Some(pool) = self.registry.get_pool(&router) {
                 if let Ok(mut connection) = pool.get().await {
-                    info!("Refreshing routing table from router {}", router.address);
+                    debug!("Refreshing routing table from router {}", router.address);
                     let bookmarks = self.bookmarks.lock().await;
                     let bookmarks = bookmarks.iter().map(|b| b.as_str()).collect();
                     let route = RouteBuilder::new(Routing::Yes(vec![]), bookmarks)
@@ -118,13 +118,16 @@ impl RoutedConnectionManager {
             } else {
                 // We couldn't find a connection manager for the server, it was probably marked unavailable
                 error!(
-                    "No connection manager available for router `{}` in the registry, marking as unavailable",
+                    "No connection manager available for router `{}` in the registry",
                     server.address
                 );
-                self.registry.mark_unavailable(&server);
+                return Err(Error::ServerUnavailableError(format!(
+                    "No connection manager available for router `{}` in the registry",
+                    server.address
+                )));
             }
         }
-        Err(Error::RoutingTableRefreshFailed(format!(
+        Err(Error::ServerUnavailableError(format!(
             "No server available for {op} operation"
         )))
     }
@@ -132,15 +135,15 @@ impl RoutedConnectionManager {
     pub(crate) fn backoff(&self) -> ExponentialBackoff {
         self.backoff.as_ref().clone()
     }
-    
+
     fn select_reader(&self) -> Option<BoltServer> {
         self.load_balancing_strategy.select_reader(&self.registry.servers())
     }
-    
+
     fn select_writer(&self) -> Option<BoltServer> {
         self.load_balancing_strategy.select_writer(&self.registry.servers())
     }
-    
+
     fn select_router(&self) -> Option<BoltServer> {
         self.load_balancing_strategy.select_router(&self.registry.servers())
     }

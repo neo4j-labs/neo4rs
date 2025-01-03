@@ -4,7 +4,7 @@ use crate::routing::{RoutingTable, Server};
 use crate::{Config, Error};
 use dashmap::DashMap;
 use futures::lock::Mutex;
-use log::{debug, info};
+use log::debug;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -87,12 +87,12 @@ impl ConnectionRegistry {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        info!("Checking if routing table is expired...");
+        debug!("Checking if routing table is expired...");
         if let Some(mut guard) = self.creation_time.try_lock() {
             if now - *guard > self.ttl {
-                info!("Routing table expired, refreshing...");
+                debug!("Routing table expired, refreshing...");
                 let routing_table = f().await?;
-                info!("Routing table refreshed: {:?}", routing_table);
+                debug!("Routing table refreshed: {:?}", routing_table);
                 let registry = &self.connections;
                 let servers = routing_table.resolve();
                 for server in servers.iter() {
@@ -102,9 +102,11 @@ impl ConnectionRegistry {
                     registry.insert(server.clone(), create_pool(&self.config).await?);
                 }
                 registry.retain(|k, _| servers.contains(k));
-                info!("Registry updated. New size is {}", registry.len());
+                debug!("Registry updated. New size is {}", registry.len());
                 *guard = now;
             }
+        } else {
+            debug!("Routing table is not expired");
         }
         Ok(())
     }
