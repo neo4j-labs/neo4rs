@@ -1,10 +1,10 @@
-use std::{fmt, marker::PhantomData};
+use std::{any::type_name, fmt, marker::PhantomData};
 
 use bytes::{Buf, Bytes};
 use serde::{
     de::{
-        self, value::SeqDeserializer, DeserializeSeed, EnumAccess, IntoDeserializer as _,
-        MapAccess, SeqAccess, VariantAccess, Visitor,
+        self, value::SeqDeserializer, DeserializeSeed, EnumAccess, IgnoredAny,
+        IntoDeserializer as _, MapAccess, SeqAccess, VariantAccess, Visitor,
     },
     forward_to_deserialize_any,
 };
@@ -207,8 +207,10 @@ impl<'de> Deserializer<'de> {
         let start = full_bytes.as_ptr();
         let end = self.bytes.as_ptr();
 
+        // SAFETY: both pointers are from the same allocation and end is >= start
         let len = unsafe { end.offset_from(start) };
         full_bytes.truncate(len.unsigned_abs());
+
         Ok(full_bytes)
     }
 
@@ -358,9 +360,17 @@ impl<'a> ItemsParser<'a> {
         self.excess = excess;
         self
     }
+
+    fn drain(&mut self) -> Result<(), Error> {
+        let bytes = self.bytes.get();
+        for _ in 0..(self.len + self.excess) {
+            Deserializer { bytes }.skip_next_item()?;
+        }
+        Ok(())
+    }
 }
 
-impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
+impl<'de> SeqAccess<'de> for ItemsParser<'_> {
     type Error = Error;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -368,10 +378,7 @@ impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
         T: DeserializeSeed<'de>,
     {
         if self.len == 0 {
-            let bytes = self.bytes.get();
-            for _ in 0..self.excess {
-                Deserializer { bytes }.skip_next_item()?;
-            }
+            self.drain()?;
             return Ok(None);
         }
         self.len -= 1;
@@ -388,7 +395,7 @@ impl<'a, 'de> SeqAccess<'de> for ItemsParser<'a> {
     }
 }
 
-impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
+impl<'de> MapAccess<'de> for ItemsParser<'_> {
     type Error = Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -420,7 +427,7 @@ impl<'a, 'de> MapAccess<'de> for ItemsParser<'a> {
     }
 }
 
-impl<'a, 'de> VariantAccess<'de> for ItemsParser<'a> {
+impl<'de> VariantAccess<'de> for ItemsParser<'_> {
     type Error = Error;
 
     fn unit_variant(mut self) -> Result<(), Self::Error> {
@@ -431,6 +438,11 @@ impl<'a, 'de> VariantAccess<'de> for ItemsParser<'a> {
     where
         T: DeserializeSeed<'de>,
     {
+        if type_name::<T>() == type_name::<PhantomData<IgnoredAny>>() {
+            self.drain()?;
+            return seed.deserialize(().into_deserializer());
+        }
+
         self.next_value_seed(seed)
     }
 
@@ -498,14 +510,14 @@ struct SharedBytes<'a> {
 }
 
 #[cfg(all(test, debug_assertions))]
-impl<'a> fmt::Debug for SharedBytes<'a> {
+impl fmt::Debug for SharedBytes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         crate::packstream::Dbg(unsafe { &*self.bytes }).fmt(f)
     }
 }
 
 #[cfg(not(all(test, debug_assertions)))]
-impl<'a> fmt::Debug for SharedBytes<'a> {
+impl fmt::Debug for SharedBytes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SharedBytes").finish_non_exhaustive()
     }
