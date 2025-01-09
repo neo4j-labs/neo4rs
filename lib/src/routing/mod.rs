@@ -88,8 +88,8 @@ impl<'a> RouteBuilder<'a> {
     }
 
     pub fn build(self, version: Version) -> Route<'a> {
-        match version {
-            Version::V4_4 => Route {
+        match version.cmp(&Version::V4_4) {
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Route {
                 routing: self.routing,
                 bookmarks: self.bookmarks,
                 extra: RouteExtra::V4_4(Extra {
@@ -97,7 +97,7 @@ impl<'a> RouteBuilder<'a> {
                     imp_user: self.imp_user,
                 }),
             },
-            _ => Route {
+            std::cmp::Ordering::Less => Route {
                 routing: self.routing,
                 bookmarks: self.bookmarks,
                 extra: RouteExtra::V4_3(self.db),
