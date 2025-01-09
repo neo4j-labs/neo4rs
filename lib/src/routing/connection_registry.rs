@@ -7,6 +7,7 @@ use futures::lock::Mutex;
 use log::debug;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct BoltServer {
@@ -40,7 +41,7 @@ pub type Registry = DashMap<BoltServer, ConnectionPool>;
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
     config: Config,
-    creation_time: Arc<Mutex<u64>>,
+    creation_time: Arc<Mutex<Instant>>,
     ttl: Arc<AtomicU64>,
     pub(crate) connections: Registry,
 }
@@ -49,12 +50,7 @@ impl ConnectionRegistry {
     pub(crate) fn new(config: &Config) -> Self {
         ConnectionRegistry {
             config: config.clone(),
-            creation_time: Arc::new(Mutex::new(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            )),
+            creation_time: Arc::new(Mutex::new(Instant::now())),
             ttl: Arc::new(AtomicU64::new(0)),
             connections: DashMap::new(),
         }
@@ -65,58 +61,55 @@ impl ConnectionRegistry {
         F: FnOnce() -> R,
         R: std::future::Future<Output = Result<RoutingTable, Error>>,
     {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = Instant::now();
         debug!("Checking if routing table is expired...");
-        if let Some(mut guard) = self.creation_time.try_lock() {
-            if self.connections.is_empty() || now - *guard > self.ttl.load(Ordering::Relaxed) {
-                debug!("Routing table expired or empty, refreshing...");
-                let routing_table = f().await?;
-                debug!("Routing table refreshed: {:?}", routing_table);
-                let registry = &self.connections;
-                let servers = routing_table.resolve();
-                let url = NeoUrl::parse(self.config.uri.as_str())?;
-                // Convert neo4j scheme to bolt scheme to create connection pools
-                let scheme = match url.scheme() {
-                    "neo4j" => "bolt",
-                    "neo4j+s" => "bolt+s",
-                    "neo4j+ssc" => "bolt+ssc",
-                    _ => return Err(Error::UnsupportedScheme(url.scheme().to_string())),
-                };
+        let mut guard = self.creation_time.lock().await;
+        if self.connections.is_empty()
+            || now.duration_since(*guard).as_secs() > self.ttl.load(Ordering::Relaxed)
+        {
+            debug!("Routing table expired or empty, refreshing...");
+            let routing_table = f().await?;
+            debug!("Routing table refreshed: {:?}", routing_table);
+            let registry = &self.connections;
+            let servers = routing_table.resolve();
+            let url = NeoUrl::parse(self.config.uri.as_str())?;
+            // Convert neo4j scheme to bolt scheme to create connection pools.
+            // We need to use the bolt scheme since we don't want new connections to be routed
+            let scheme = match url.scheme() {
+                "neo4j" => "bolt",
+                "neo4j+s" => "bolt+s",
+                "neo4j+ssc" => "bolt+ssc",
+                _ => return Err(Error::UnsupportedScheme(url.scheme().to_string())),
+            };
 
-                for server in servers.iter() {
-                    if registry.contains_key(server) {
-                        continue;
-                    }
-                    let uri = format!("{}://{}:{}", scheme, server.address, server.port);
-                    debug!("Creating pool for server: {}", uri);
-                    registry.insert(
-                        server.clone(),
-                        create_pool(&Config {
-                            uri,
-                            ..self.config.clone()
-                        })
-                        .await?,
-                    );
+            for server in servers.iter() {
+                if registry.contains_key(server) {
+                    continue;
                 }
-                registry.retain(|k, _| servers.contains(k));
-                let _ = self
-                    .ttl
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_ttl| {
-                        Some(routing_table.ttl)
+                let uri = format!("{}://{}:{}", scheme, server.address, server.port);
+                debug!("Creating pool for server: {}", uri);
+                registry.insert(
+                    server.clone(),
+                    create_pool(&Config {
+                        uri,
+                        ..self.config.clone()
                     })
-                    .unwrap();
-                debug!(
-                    "Registry updated. New size is {} with TTL {}s",
-                    registry.len(),
-                    routing_table.ttl
+                    .await?,
                 );
-                *guard = now;
             }
-        } else {
-            debug!("Routing table is not expired");
+            registry.retain(|k, _| servers.contains(k));
+            let _ = self
+                .ttl
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_ttl| {
+                    Some(routing_table.ttl)
+                })
+                .unwrap();
+            debug!(
+                "Registry updated. New size is {} with TTL {}s",
+                registry.len(),
+                routing_table.ttl
+            );
+            *guard = now;
         }
         Ok(())
     }
