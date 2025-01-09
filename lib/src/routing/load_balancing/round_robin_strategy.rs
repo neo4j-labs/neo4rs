@@ -14,13 +14,12 @@ impl RoundRobinStrategy {
             return None;
         }
 
-        let _ = index
-            .compare_exchange(
-                0,
-                servers.len(),
-                std::sync::atomic::Ordering::Relaxed,
-                std::sync::atomic::Ordering::Relaxed,
-            );
+        let _ = index.compare_exchange(
+            0,
+            servers.len(),
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         let i = index.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         if let Some(server) = servers.get(i - 1) {
             Some(server.clone())

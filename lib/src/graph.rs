@@ -5,7 +5,7 @@ use {
     crate::routing::RoutedConnectionManager,
 };
 
-use crate::graph::ConnectionPoolManager::Normal;
+use crate::graph::ConnectionPoolManager::Direct;
 use crate::pool::ManagedConnection;
 use crate::{
     config::{Config, ConfigBuilder, Database, LiveConfig},
@@ -23,7 +23,7 @@ use std::time::Duration;
 enum ConnectionPoolManager {
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     Routed(RoutedConnectionManager),
-    Normal(ConnectionPool),
+    Direct(ConnectionPool),
 }
 
 impl ConnectionPoolManager {
@@ -32,7 +32,7 @@ impl ConnectionPoolManager {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.get(operation).await,
-            Normal(pool) => pool.get().await.map_err(crate::Error::from),
+            Direct(pool) => pool.get().await.map_err(crate::Error::from),
         }
     }
 
@@ -40,7 +40,7 @@ impl ConnectionPoolManager {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.backoff(),
-            Normal(pool) => pool.manager().backoff(),
+            Direct(pool) => pool.manager().backoff(),
         }
     }
 }
@@ -79,7 +79,7 @@ impl Graph {
                     pool,
                 })
             } else {
-                let pool = Normal(create_pool(&config).await?);
+                let pool = Direct(create_pool(&config).await?);
                 Ok(Graph {
                     config: config.into_live_config(),
                     pool,
@@ -88,7 +88,7 @@ impl Graph {
         }
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
-            let pool = Normal(create_pool(&config).await?);
+            let pool = Direct(create_pool(&config).await?);
             Ok(Graph {
                 config: config.into_live_config(),
                 pool,
