@@ -60,12 +60,6 @@ impl Deref for Database {
     }
 }
 
-impl Default for Database {
-    fn default() -> Self {
-        Database("neo4j".into())
-    }
-}
-
 /// The configuration that is used once a connection is alive.
 #[derive(Debug, Clone)]
 pub struct LiveConfig {
