@@ -22,7 +22,6 @@ use begin::Begin;
 use bytes::Bytes;
 use failure::Failure;
 use ignore::Ignore;
-use log::debug;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
@@ -137,7 +136,6 @@ impl BoltRequest {
     }
 
     pub fn run(query: &str, params: BoltMap, extra: BoltMap) -> BoltRequest {
-        debug!("run query: {} with extra params {:?}", query, extra);
         BoltRequest::Run(Run::new(query.into(), params, extra))
     }
 
