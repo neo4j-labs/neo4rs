@@ -162,23 +162,7 @@ impl Graph {
         self.impl_run_on(self.config.db.clone(), q, Operation::Write)
             .await
     }
-
-    /// Runs a READ ONLY query on the configured database using a connection from the connection pool,
-    /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
-    ///
-    /// This operation retires the query on certain failures.
-    /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
-    /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
-    /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
-    ///
-    /// Use [`Graph::run`] for cases where you just want a write operation
-    ///
-    /// use [`Graph::execute`] when you are interested in the result stream
-    pub async fn run_read(&self, q: Query) -> Result<()> {
-        self.impl_run_on(self.config.db.clone(), q, Operation::Read)
-            .await
-    }
-
+    
     /// Runs a query on the provided database using a connection from the connection pool.
     /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
     ///
