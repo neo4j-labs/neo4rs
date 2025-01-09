@@ -143,8 +143,8 @@ impl Graph {
 
     #[allow(unused_variables)]
     async fn impl_start_txn_on(&self, db: Option<Database>, operation: Operation) -> Result<Txn> {
-        let connection = self.pool.get(Some(operation)).await?;
-        Txn::new(db, self.config.fetch_size, connection).await
+        let connection = self.pool.get(Some(operation.clone())).await?;
+        Txn::new(db, self.config.fetch_size, connection, operation).await
     }
 
     /// Runs a query on the configured database using a connection from the connection pool,

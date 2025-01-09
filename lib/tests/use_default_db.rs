@@ -26,50 +26,32 @@ async fn use_default_db() {
     let graph = neo4j.graph();
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    {
-        let default_db = graph
-            .execute_on("system", query("SHOW DEFAULT DATABASE"), Operation::Read)
-            .await
-            .unwrap()
-            .column_into_stream::<String>("name")
-            .try_fold(None::<String>, |acc, db| async { Ok(acc.or(Some(db))) })
-            .await
-            .unwrap()
-            .unwrap();
+    let query_stream = graph
+        .execute_on("system", query("SHOW DEFAULT DATABASE"), Operation::Read)
+        .await;
 
-        if default_db != dbname {
-            eprintln!(
-                concat!(
-                    "Skipping test: The test must run against a testcontainer ",
-                    "or have `{}` configured as the default database"
-                ),
-                dbname
-            );
-            return;
-        }
-    }
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    {
-        let default_db = graph
-            .execute_on("system", query("SHOW DEFAULT DATABASE"))
-            .await
-            .unwrap()
-            .column_into_stream::<String>("name")
-            .try_fold(None::<String>, |acc, db| async { Ok(acc.or(Some(db))) })
-            .await
-            .unwrap()
-            .unwrap();
+    let query_stream = graph
+        .execute_on("system", query("SHOW DEFAULT DATABASE"))
+        .await;
 
-        if default_db != dbname {
-            eprintln!(
-                concat!(
-                    "Skipping test: The test must run against a testcontainer ",
-                    "or have `{}` configured as the default database"
-                ),
-                dbname
-            );
-            return;
-        }
+    let default_db = query_stream
+        .unwrap()
+        .column_into_stream::<String>("name")
+        .try_fold(None::<String>, |acc, db| async { Ok(acc.or(Some(db))) })
+        .await
+        .unwrap()
+        .unwrap();
+
+    if default_db != dbname {
+        eprintln!(
+            concat!(
+                "Skipping test: The test must run against a testcontainer ",
+                "or have `{}` configured as the default database"
+            ),
+            dbname
+        );
+        return;
     }
 
     let id = uuid::Uuid::new_v4();
@@ -77,40 +59,31 @@ async fn use_default_db() {
         .run(query("CREATE (:Node { uuid: $uuid })").param("uuid", id.to_string()))
         .await
         .unwrap();
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    {
-        let count = graph
-            .execute_on(
-                dbname.as_str(),
-                query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
-                    .param("uuid", id.to_string()),
-                Operation::Read,
-            )
-            .await
-            .unwrap()
-            .column_into_stream::<u64>("result")
-            .try_fold(0, |sum, count| async move { Ok(sum + count) })
-            .await
-            .unwrap();
 
-        assert_eq!(count, 1);
-    }
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    let query_stream = graph
+        .execute_on(
+            dbname.as_str(),
+            query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
+                .param("uuid", id.to_string()),
+            Operation::Read,
+        )
+        .await;
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    {
-        let count = graph
-            .execute_on(
-                dbname.as_str(),
-                query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
-                    .param("uuid", id.to_string()),
-            )
-            .await
-            .unwrap()
-            .column_into_stream::<u64>("result")
-            .try_fold(0, |sum, count| async move { Ok(sum + count) })
-            .await
-            .unwrap();
+    let query_stream = graph
+        .execute_on(
+            dbname.as_str(),
+            query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
+                .param("uuid", id.to_string()),
+        )
+        .await;
 
-        assert_eq!(count, 1);
-    }
+    let count = query_stream
+        .unwrap()
+        .column_into_stream::<u64>("result")
+        .try_fold(0, |sum, count| async move { Ok(sum + count) })
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
 }

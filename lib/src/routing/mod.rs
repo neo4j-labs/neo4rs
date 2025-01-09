@@ -7,11 +7,17 @@ use {crate::connection::Routing, serde::Deserialize};
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RouteExtra {
+    V4_3(Option<Database>),
+    V4_4(Extra),
+}
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Route<'a> {
     pub(crate) routing: Routing,
     pub(crate) bookmarks: Vec<&'a str>,
-    pub(crate) db: Option<Database>,
-    pub(crate) extra: Option<Extra>,
+    pub(crate) extra: RouteExtra,
 }
 
 // NOTE: this structure will be needed in the future when we implement the Bolt protocol v4.4
@@ -86,8 +92,7 @@ impl<'a> RouteBuilder<'a> {
             Version::V4_4 => Route {
                 routing: self.routing,
                 bookmarks: self.bookmarks,
-                db: None,
-                extra: Some(Extra {
+                extra: RouteExtra::V4_4(Extra {
                     db: self.db,
                     imp_user: self.imp_user,
                 }),
@@ -95,8 +100,7 @@ impl<'a> RouteBuilder<'a> {
             _ => Route {
                 routing: self.routing,
                 bookmarks: self.bookmarks,
-                db: self.db,
-                extra: None,
+                extra: RouteExtra::V4_3(self.db),
             },
         }
     }
@@ -104,23 +108,26 @@ impl<'a> RouteBuilder<'a> {
 
 impl Display for Route<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let (db, imp_user) = if let Some(extra) = self.extra.as_ref() {
-            let db = extra
-                .db
-                .clone()
-                .map(|d| d.to_string())
-                .unwrap_or("null".to_string());
-            let imp_user = extra.imp_user.clone().unwrap_or("null".to_string());
-            (db, imp_user)
-        } else {
-            let db = self
-                .db
-                .clone()
-                .map(|d| d.to_string())
-                .unwrap_or("null".to_string());
-            let imp_user = "null".to_string();
-            (db, imp_user)
+        let (db, imp_user) = match self.extra {
+            RouteExtra::V4_3(ref db) => {
+                let db = db
+                    .clone()
+                    .map(|d| d.to_string())
+                    .unwrap_or("null".to_string());
+                let imp_user = "null".to_string();
+                (db, imp_user)
+            }
+            RouteExtra::V4_4(ref extra) => {
+                let db = extra
+                    .db
+                    .clone()
+                    .map(|d| d.to_string())
+                    .unwrap_or("null".to_string());
+                let imp_user = extra.imp_user.clone().unwrap_or("null".to_string());
+                (db, imp_user)
+            }
         };
+
         write!(
             f,
             "ROUTE {{ {} }} [{}] {} {}",

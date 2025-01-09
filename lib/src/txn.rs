@@ -26,6 +26,7 @@ impl Txn {
         db: Option<Database>,
         fetch_size: usize,
         mut connection: ManagedConnection,
+        operation: Operation,
     ) -> Result<Self> {
         let begin = BoltRequest::begin(db.as_deref());
         match connection.send_recv(begin).await? {
@@ -33,7 +34,7 @@ impl Txn {
                 db,
                 fetch_size,
                 connection,
-                operation: Operation::Write, // TODO: pass the operation from the outside
+                operation,
             }),
             msg => Err(msg.into_error("BEGIN")),
         }

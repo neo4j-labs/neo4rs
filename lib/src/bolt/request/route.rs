@@ -1,6 +1,6 @@
 use crate::bolt::{ExpectedResponse, Summary};
 use crate::connection::{NeoUrl, Routing};
-use crate::routing::{Extra, Route, RoutingTable};
+use crate::routing::{Extra, Route, RouteExtra, RoutingTable};
 use serde::ser::{SerializeMap, SerializeStructVariant};
 use serde::{Deserialize, Serialize};
 use std::fmt::{format, Display, Formatter};
@@ -14,7 +14,6 @@ impl<'a> ExpectedResponse for Route<'a> {
     type Response = Summary<Response>;
 }
 
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 impl Serialize for Routing {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -25,7 +24,7 @@ impl Serialize for Routing {
             Routing::Yes(routing) => {
                 let mut map = serializer.serialize_map(Some(routing.len()))?;
                 for (k, v) in routing {
-                    map.serialize_entry(k.to_string().as_str(), v.to_string().as_str())?;
+                    map.serialize_entry(k.value.as_str(), v.value.as_str())?;
                 }
                 map.end()
             }
@@ -33,7 +32,6 @@ impl Serialize for Routing {
     }
 }
 
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 impl Serialize for Route<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -42,18 +40,18 @@ impl Serialize for Route<'_> {
         let mut structure = serializer.serialize_struct_variant("Request", 0x66, "ROUTE", 3)?;
         structure.serialize_field("routing", &self.routing)?;
         structure.serialize_field("bookmarks", &self.bookmarks)?;
-        if let Some(extra) = &self.extra {
-            structure.serialize_field("extra", extra)?;
-        } else if let Some(db) = &self.db {
-            structure.serialize_field("db", &db.to_string())?;
-        } else {
-            structure.skip_field("db")?; // Render a null value
+        match self.extra {
+            RouteExtra::V4_3(ref db) => {
+                structure.serialize_field("db", db)?;
+            }
+            RouteExtra::V4_4(ref extra) => {
+                structure.serialize_field("extra", extra)?;
+            }
         }
         structure.end()
     }
 }
 
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 impl Serialize for Extra {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -141,6 +139,35 @@ mod tests {
             .null()
             .tiny_string("imp_user")
             .null()
+            .build();
+
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn serialize_with_db_v4_4() {
+        let builder = RouteBuilder::new(
+            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            vec!["bookmark"],
+        );
+        let route = builder
+            .with_db("neo4j".into())
+            .with_imp_user("Foo")
+            .build(Version::V4_4);
+        let serialized = route.to_bytes().unwrap();
+
+        let expected = bolt()
+            .structure(3, 0x66)
+            .tiny_map(1)
+            .tiny_string("address")
+            .tiny_string("localhost:7687")
+            .tiny_list(1)
+            .tiny_string("bookmark")
+            .tiny_map(2)
+            .tiny_string("db")
+            .tiny_string("neo4j")
+            .tiny_string("imp_user")
+            .tiny_string("Foo")
             .build();
 
         assert_eq!(serialized, expected);

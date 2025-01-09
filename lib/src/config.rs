@@ -19,7 +19,7 @@ impl Serialize for Database {
     where
         S: serde::Serializer,
     {
-        self.0.serialize(serializer)
+        (*self.0).serialize(serializer)
     }
 }
 
