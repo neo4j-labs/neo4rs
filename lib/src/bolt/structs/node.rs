@@ -188,7 +188,10 @@ mod tests {
     use serde_test::{assert_de_tokens, Token};
     use test_case::{test_case, test_matrix};
 
-    use crate::packstream::{bolt, from_bytes_ref, BoltBytesBuilder, Data};
+    use crate::{
+        bolt::LegacyDateTime,
+        packstream::{bolt, from_bytes_ref, BoltBytesBuilder, Data},
+    };
 
     use super::*;
 
@@ -334,5 +337,34 @@ mod tests {
             .tiny_string("name")
             .tiny_string("Alice")
             .build()
+    }
+
+    fn deserialize_properties_with_structs() {
+        let mut data = Data::new(
+            bolt()
+                .structure(3, 0x4E)
+                .tiny_int(42)
+                .tiny_list(1)
+                .tiny_string("Label")
+                .tiny_map(1)
+                .tiny_string("p")
+                .structure(3, b'F')
+                .int32(42)
+                .tiny_int(0)
+                .tiny_int(0)
+                .build(),
+        );
+        let mut node: NodeRef = from_bytes_ref(&mut data).unwrap();
+
+        assert_eq!(node.id(), 42);
+        assert_eq!(node.labels(), &["Label"]);
+        assert_eq!(node.element_id(), None);
+
+        assert_eq!(node.keys(), &["p"]);
+
+        let p = node.get::<LegacyDateTime>("p").unwrap().unwrap();
+        assert_eq!(p.seconds_since_epoch(), 42);
+        assert_eq!(p.nanoseconds(), 0);
+        assert_eq!(p.timezone_offset_seconds(), 0);
     }
 }
