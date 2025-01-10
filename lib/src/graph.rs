@@ -162,7 +162,7 @@ impl Graph {
         self.impl_run_on(self.config.db.clone(), q, Operation::Write)
             .await
     }
-    
+
     /// Runs a query on the provided database using a connection from the connection pool.
     /// It doesn't return any [`DetachedRowStream`] as the `run` abstraction discards any stream.
     ///
