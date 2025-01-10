@@ -5,7 +5,7 @@ use crate::{
             element::ElementDataDeserializer,
             node::BoltNodeVisitor,
             path::BoltPathVisitor,
-            point::{self, BoltPointDeserializer, BoltPointVisitor},
+            point::{BoltPointDeserializer, BoltPointVisitor},
             rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
             BoltKind,
