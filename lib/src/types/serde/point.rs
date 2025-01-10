@@ -140,6 +140,33 @@ impl<'de, P: FromBuilder, E: Error> Visitor<'de> for BoltPointVisitor<P, E> {
         write!(formatter, "struct {}", std::any::type_name::<P>())
     }
 
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut point = BoltPointBuilder::default();
+
+        point.sr_id(|| {
+            seq.next_element::<BoltInteger>().map_or_else(Err, |item| {
+                item.ok_or_else(|| Error::missing_field("sr_id"))
+            })
+        })?;
+        point.x(|| {
+            seq.next_element::<BoltFloat>()
+                .map_or_else(Err, |item| item.ok_or_else(|| Error::missing_field("x")))
+        })?;
+        point.y(|| {
+            seq.next_element::<BoltFloat>()
+                .map_or_else(Err, |item| item.ok_or_else(|| Error::missing_field("y")))
+        })?;
+        if let Some(z) = seq.next_element::<BoltFloat>().transpose() {
+            point.z(|| z)?;
+        }
+
+        let point = point.build()?;
+        Ok(point)
+    }
+
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: ::serde::de::MapAccess<'de>,
@@ -281,8 +308,9 @@ impl<'de, E: Error, I: Iterator<Item = Result<Field, &'static str>>> SeqAccess<'
     where
         T: DeserializeSeed<'de>,
     {
-        self.next_key::<Field>()?;
-        self.next_value_seed(seed).map(Some)
+        self.next_key::<Field>()?
+            .map(|_| self.next_value_seed(seed))
+            .transpose()
     }
 }
 

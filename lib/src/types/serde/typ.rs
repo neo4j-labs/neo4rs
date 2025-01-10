@@ -231,13 +231,10 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
                 .tuple_variant(1, BoltUnboundedRelationVisitor)
                 .map(BoltType::UnboundedRelation),
             BoltKind::Point2D => variant
-                .struct_variant(
-                    &point::Field::NAMES[..3],
-                    BoltPointVisitor::_2d::<A::Error>(),
-                )
+                .tuple_variant(3, BoltPointVisitor::_2d::<A::Error>())
                 .map(BoltType::Point2D),
             BoltKind::Point3D => variant
-                .struct_variant(point::Field::NAMES, BoltPointVisitor::_3d::<A::Error>())
+                .tuple_variant(4, BoltPointVisitor::_3d::<A::Error>())
                 .map(BoltType::Point3D),
             BoltKind::Bytes => variant.tuple_variant(1, self),
             BoltKind::Path => variant
