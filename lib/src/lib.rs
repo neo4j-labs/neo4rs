@@ -465,6 +465,8 @@ mod messages;
 mod packstream;
 mod pool;
 mod query;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+mod routing;
 mod row;
 mod stream;
 #[cfg(feature = "unstable-result-summary")]
@@ -493,5 +495,21 @@ pub use crate::types::{
     BoltPoint2D, BoltPoint3D, BoltRelation, BoltString, BoltTime, BoltType, BoltUnboundedRelation,
 };
 pub use crate::version::Version;
+use std::fmt::Display;
 
 pub(crate) use messages::Success;
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Operation {
+    Read,
+    Write,
+}
+
+impl Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operation::Read => write!(f, "READ"),
+            Operation::Write => write!(f, "WRITE"),
+        }
+    }
+}

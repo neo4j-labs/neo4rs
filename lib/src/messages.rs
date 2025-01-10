@@ -12,7 +12,6 @@ mod rollback;
 mod run;
 mod success;
 
-use crate::messages::ignore::Ignore;
 use crate::{
     errors::{Error, Result},
     types::{BoltMap, BoltWireFormat},
@@ -22,6 +21,7 @@ use crate::{
 use begin::Begin;
 use bytes::Bytes;
 use failure::Failure;
+use ignore::Ignore;
 use record::Record;
 use run::Run;
 pub(crate) use success::Success;
@@ -135,8 +135,8 @@ impl BoltRequest {
         BoltRequest::Hello(hello::Hello::new(data))
     }
 
-    pub fn run(db: Option<&str>, query: &str, params: BoltMap) -> BoltRequest {
-        BoltRequest::Run(Run::new(db.map(Into::into), query.into(), params))
+    pub fn run(query: &str, params: BoltMap, extra: BoltMap) -> BoltRequest {
+        BoltRequest::Run(Run::new(query.into(), params, extra))
     }
 
     #[cfg_attr(

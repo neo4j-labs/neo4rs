@@ -14,6 +14,7 @@ use crate::{
 pub struct Query {
     query: String,
     params: BoltMap,
+    extra: BoltMap,
 }
 
 impl Query {
@@ -21,11 +22,17 @@ impl Query {
         Query {
             query,
             params: BoltMap::default(),
+            extra: BoltMap::default(),
         }
     }
 
     pub fn param<T: Into<BoltType>>(mut self, key: &str, value: T) -> Self {
         self.params.put(key.into(), value.into());
+        self
+    }
+
+    pub fn extra<T: Into<BoltType>>(mut self, key: &str, value: T) -> Self {
+        self.extra.put(key.into(), value.into());
         self
     }
 
@@ -41,16 +48,28 @@ impl Query {
         self
     }
 
+    pub fn extras<K, V>(mut self, input_params: impl IntoIterator<Item = (K, V)>) -> Self
+    where
+        K: Into<BoltString>,
+        V: Into<BoltType>,
+    {
+        for (key, value) in input_params {
+            self.extra.put(key.into(), value.into());
+        }
+
+        self
+    }
+
     pub fn has_param_key(&self, key: &str) -> bool {
         self.params.value.contains_key(key)
     }
 
-    pub(crate) async fn run(
-        self,
-        db: Option<&str>,
-        connection: &mut ManagedConnection,
-    ) -> Result<()> {
-        let request = BoltRequest::run(db, &self.query, self.params);
+    pub fn has_extra_key(&self, key: &str) -> bool {
+        self.extra.value.contains_key(key)
+    }
+
+    pub(crate) async fn run(self, connection: &mut ManagedConnection) -> Result<()> {
+        let request = BoltRequest::run(&self.query, self.params, self.extra);
         Self::try_run(request, connection)
             .await
             .map_err(unwrap_backoff)
@@ -58,32 +77,29 @@ impl Query {
 
     pub(crate) async fn run_retryable(
         &self,
-        db: Option<&str>,
         connection: &mut ManagedConnection,
     ) -> QueryResult<()> {
-        let request = BoltRequest::run(db, &self.query, self.params.clone());
+        let request = BoltRequest::run(&self.query, self.params.clone(), self.extra.clone());
         Self::try_run(request, connection).await
     }
 
     pub(crate) async fn execute_retryable(
         &self,
-        db: Option<&str>,
         fetch_size: usize,
         mut connection: ManagedConnection,
     ) -> QueryResult<DetachedRowStream> {
-        let request = BoltRequest::run(db, &self.query, self.params.clone());
+        let request = BoltRequest::run(&self.query, self.params.clone(), self.extra.clone());
         Self::try_execute(request, fetch_size, &mut connection)
             .await
             .map(|stream| DetachedRowStream::new(stream, connection))
     }
 
-    pub(crate) async fn execute_mut<'conn>(
+    pub(crate) async fn execute_mut(
         self,
-        db: Option<&str>,
         fetch_size: usize,
-        connection: &'conn mut ManagedConnection,
+        connection: &mut ManagedConnection,
     ) -> Result<RowStream> {
-        let run = BoltRequest::run(db, &self.query, self.params);
+        let run = BoltRequest::run(&self.query, self.params, self.extra);
         Self::try_execute(run, fetch_size, connection)
             .await
             .map_err(unwrap_backoff)

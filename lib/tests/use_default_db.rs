@@ -25,9 +25,17 @@ async fn use_default_db() {
     };
     let graph = neo4j.graph();
 
-    let default_db = graph
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    let query_stream = graph
+        .execute_on("system", query("SHOW DEFAULT DATABASE"), Operation::Read)
+        .await;
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    let query_stream = graph
         .execute_on("system", query("SHOW DEFAULT DATABASE"))
-        .await
+        .await;
+
+    let default_db = query_stream
         .unwrap()
         .column_into_stream::<String>("name")
         .try_fold(None::<String>, |acc, db| async { Ok(acc.or(Some(db))) })
@@ -52,18 +60,30 @@ async fn use_default_db() {
         .await
         .unwrap();
 
-    let count = graph
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    let query_stream = graph
+        .execute_on(
+            dbname.as_str(),
+            query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
+                .param("uuid", id.to_string()),
+            Operation::Read,
+        )
+        .await;
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    let query_stream = graph
         .execute_on(
             dbname.as_str(),
             query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
                 .param("uuid", id.to_string()),
         )
-        .await
+        .await;
+
+    let count = query_stream
         .unwrap()
         .column_into_stream::<u64>("result")
         .try_fold(0, |sum, count| async move { Ok(sum + count) })
         .await
         .unwrap();
-
     assert_eq!(count, 1);
 }
