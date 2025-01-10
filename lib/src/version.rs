@@ -19,8 +19,6 @@ impl Version {
         bytes.put_u32(0x0304); // V4_3
         bytes.put_u32(0x0104); // V4_1
         bytes.put_u32(0x0004); // V4
-        bytes.put_u32(0);
-        bytes.put_u32(0);
     }
 
     pub fn parse(version_bytes: [u8; 4]) -> Result<Version> {
