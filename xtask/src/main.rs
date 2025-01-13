@@ -95,6 +95,7 @@ fn update_min_lock() -> Result {
     let pin_versions: &[(String, &str)] = &[
         ("home".to_owned(), "0.5.9"),
         ("serde_repr".to_owned(), "0.1.5"),
+        ("testcontainers-modules".to_owned(), "0.11.4"),
     ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, &sh, &cargo, krate, version)?;
