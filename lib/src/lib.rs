@@ -481,7 +481,7 @@ pub use crate::errors::{
     Error, Neo4jClientErrorKind, Neo4jError, Neo4jErrorKind, Neo4jSecurityErrorKind, Result,
 };
 pub use crate::graph::{query, Graph};
-pub use crate::query::Query;
+pub use crate::query::{Query, QueryParameter};
 pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
 pub use crate::stream::{DetachedRowStream, RowItem, RowStream};
 pub use crate::txn::Txn;
