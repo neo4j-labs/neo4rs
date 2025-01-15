@@ -54,7 +54,10 @@ async fn use_default_db() {
 
     let id = uuid::Uuid::new_v4();
     graph
-        .run(query("CREATE (:Node { uuid: $uuid })").param("uuid", id.to_string()))
+        .run(query!(
+            "CREATE (:Node {{ uuid: {uuid} }})",
+            uuid = id.to_string()
+        ))
         .await
         .unwrap();
 
@@ -62,8 +65,10 @@ async fn use_default_db() {
     let query_stream = graph
         .execute_on(
             dbname.as_str(),
-            query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
-                .param("uuid", id.to_string()),
+            query!(
+                "MATCH (n:Node {{uuid: {uuid}}}) RETURN count(n) AS result",
+                uuid = id.to_string()
+            ),
             Operation::Read,
         )
         .await;
@@ -72,8 +77,10 @@ async fn use_default_db() {
     let query_stream = graph
         .execute_on(
             dbname.as_str(),
-            query("MATCH (n:Node {uuid: $uuid}) RETURN count(n) AS result")
-                .param("uuid", id.to_string()),
+            query!(
+                "MATCH (n:Node {{uuid: {uuid}}}) RETURN count(n) AS result",
+                uuid = id.to_string()
+            ),
         )
         .await;
 

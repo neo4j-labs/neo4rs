@@ -10,7 +10,10 @@ async fn missing_properties() {
 
     let a_val = None::<String>;
     let mut result = graph
-        .execute(query("CREATE (ts:TestStruct {a: $a}) RETURN ts").param("a", a_val))
+        .execute(query!(
+            "CREATE (ts:TestStruct {{a: {a}}}) RETURN ts",
+            a = a_val
+        ))
         .await
         .unwrap();
     let row = result.next().await.unwrap().unwrap();

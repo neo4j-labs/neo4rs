@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use neo4rs::*;
+use neo4rs::query;
 use serde::Deserialize;
 
 mod container;
@@ -19,7 +19,7 @@ async fn txn_changes_db() {
                 return;
             }
 
-            std::panic::panic_any(e);
+            std::panic::panic_any(e.to_string());
         }
     };
     let graph = neo4j.graph();
@@ -46,18 +46,13 @@ async fn txn_changes_db() {
 
     let mut txn = graph.start_txn().await.unwrap();
     let mut databases = txn
-        .execute(
-            query(&format!(
-                concat!(
-                    "SHOW TRANSACTIONS YIELD * WHERE username = $username AND currentQuery ",
-                    "STARTS WITH $query AND toLower({status_field}) = $status RETURN database"
-                ),
-                status_field = status_field
-            ))
-            .param("username", "neo4j")
-            .param("query", "SHOW TRANSACTIONS YIELD ")
-            .param("status", "running"),
-        )
+        .execute(query!(
+            "SHOW TRANSACTIONS YIELD * WHERE username = {username} AND currentQuery
+STARTS WITH {query} AND toLower({status_field}) = {status} RETURN database",
+            username = "neo4j",
+            query = "SHOW TRANSACTIONS YIELD ",
+            status = "running",
+        ))
         .await
         .unwrap();
 
