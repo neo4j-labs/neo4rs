@@ -52,8 +52,8 @@ impl Txn {
     }
 
     /// Runs a single query and discards the stream.
-    pub async fn run(&mut self, q: Query) -> Result<()> {
-        let mut query = q.clone();
+    pub async fn run(&mut self, q: impl Into<Query>) -> Result<()> {
+        let mut query = q.into();
         if let Some(db) = self.db.as_ref() {
             query = query.extra("db", db.to_string());
         }
@@ -68,8 +68,8 @@ impl Txn {
     }
 
     /// Executes a query and returns a [`RowStream`]
-    pub async fn execute(&mut self, q: Query) -> Result<RowStream> {
-        let mut query = q.clone();
+    pub async fn execute(&mut self, q: impl Into<Query>) -> Result<RowStream> {
+        let mut query = q.into();
         if let Some(db) = self.db.as_ref() {
             query = query.extra("db", db.to_string());
         }
