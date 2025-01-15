@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use neo4rs::*;
+use neo4rs::{query, Operation};
 
 mod container;
 
@@ -27,13 +27,11 @@ async fn use_default_db() {
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     let query_stream = graph
-        .execute_on("system", query("SHOW DEFAULT DATABASE"), Operation::Read)
+        .execute_on("system", "SHOW DEFAULT DATABASE", Operation::Read)
         .await;
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    let query_stream = graph
-        .execute_on("system", query("SHOW DEFAULT DATABASE"))
-        .await;
+    let query_stream = graph.execute_on("system", "SHOW DEFAULT DATABASE").await;
 
     let default_db = query_stream
         .unwrap()

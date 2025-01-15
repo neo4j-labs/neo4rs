@@ -1,5 +1,5 @@
 use futures::stream::{self, StreamExt, TryStreamExt};
-use neo4rs::{query, ConfigBuilder, Graph};
+use neo4rs::{ConfigBuilder, Graph};
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +35,7 @@ async fn main() {
 
 async fn work(i: u64, graph: Graph) -> (u64, u64, u64) {
     graph
-        .run(query(
+        .run(
             "
 CREATE
   (dan:Person {name: 'Dan'}),
@@ -77,12 +77,12 @@ CREATE
   (elsa)-[:BUYS {amount: 3}]->(chocolate),
   (elsa)-[:BUYS {amount: 3}]->(milk)
 ",
-        ))
+        )
         .await
         .unwrap();
 
     let node_count = graph
-        .execute(query("MATCH (n) RETURN count(n) AS count"))
+        .execute("MATCH (n) RETURN count(n) AS count")
         .await
         .unwrap()
         .column_into_stream::<u64>("count")
@@ -91,7 +91,7 @@ CREATE
         .unwrap();
 
     let rel_count = graph
-        .execute(query("MATCH ()-[r]->() RETURN count(r) AS count"))
+        .execute("MATCH ()-[r]->() RETURN count(r) AS count")
         .await
         .unwrap()
         .column_into_stream::<u64>("count")
