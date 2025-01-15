@@ -158,8 +158,8 @@ impl Graph {
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
-    pub async fn run(&self, q: Query) -> Result<()> {
-        self.impl_run_on(self.config.db.clone(), q, Operation::Write)
+    pub async fn run(&self, q: impl Into<Query>) -> Result<()> {
+        self.impl_run_on(self.config.db.clone(), q.into(), Operation::Write)
             .await
     }
 
@@ -178,15 +178,16 @@ impl Graph {
     pub async fn run_on(
         &self,
         db: impl Into<Database>,
-        q: Query,
+        q: impl Into<Query>,
         operation: Operation,
     ) -> Result<()> {
-        self.impl_run_on(Some(db.into()), q, operation).await
+        self.impl_run_on(Some(db.into()), q.into(), operation).await
     }
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    pub async fn run_on(&self, db: impl Into<Database>, q: Query) -> Result<()> {
-        self.impl_run_on(Some(db.into()), q, Operation::Write).await
+    pub async fn run_on(&self, db: impl Into<Database>, q: impl Into<Query>) -> Result<()> {
+        self.impl_run_on(Some(db.into()), q.into(), Operation::Write)
+            .await
     }
 
     #[allow(unused_variables)]
@@ -229,8 +230,8 @@ impl Graph {
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
-    pub async fn execute(&self, q: Query) -> Result<DetachedRowStream> {
-        self.impl_execute_on(self.config.db.clone(), q, Operation::Write)
+    pub async fn execute(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
+        self.impl_execute_on(self.config.db.clone(), q.into(), Operation::Write)
             .await
     }
 
@@ -240,8 +241,8 @@ impl Graph {
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
-    pub async fn execute_read(&self, q: Query) -> Result<DetachedRowStream> {
-        self.impl_execute_on(self.config.db.clone(), q, Operation::Read)
+    pub async fn execute_read(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
+        self.impl_execute_on(self.config.db.clone(), q.into(), Operation::Read)
             .await
     }
 
@@ -255,10 +256,11 @@ impl Graph {
     pub async fn execute_on(
         &self,
         db: impl Into<Database>,
-        q: Query,
+        q: impl Into<Query>,
         operation: Operation,
     ) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), q, operation).await
+        self.impl_execute_on(Some(db.into()), q.into(), operation)
+            .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -267,8 +269,12 @@ impl Graph {
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    pub async fn execute_on(&self, db: impl Into<Database>, q: Query) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), q, Operation::Write)
+    pub async fn execute_on(
+        &self,
+        db: impl Into<Database>,
+        q: impl Into<Query>,
+    ) -> Result<DetachedRowStream> {
+        self.impl_execute_on(Some(db.into()), q.into(), Operation::Write)
             .await
     }
 
