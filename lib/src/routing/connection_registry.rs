@@ -183,7 +183,7 @@ mod tests {
     use super::*;
     use crate::auth::ConnectionTLSConfig;
     use crate::routing::load_balancing::LoadBalancingStrategy;
-    use crate::routing::RoundRobinStrategy;
+    use crate::routing::{RoundRobinStrategy, RoutingTable};
     use crate::routing::Server;
     use std::future::Future;
     use std::pin::Pin;
