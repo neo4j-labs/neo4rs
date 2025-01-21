@@ -150,12 +150,17 @@ impl ConfigBuilder {
         self
     }
 
+    /// A CA certificate to use to validate the server's certificate.
+    /// 
+    /// This is required if the server's certificate is not signed by a known CA.
     pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
         self.tls_config =
             ConnectionTLSConfig::ClientCACertificate(ClientCertificate::new(client_cert));
         self
     }
 
+    /// Skip SSL validation. This is not recommended for production use.
+    /// This is true by default when connecting to the server using `neo4j+ssc` or 'bolt+ssc' schemes.
     pub fn skip_ssl_validation(mut self) -> Self {
         self.tls_config = ConnectionTLSConfig::NoSSLValidation;
         self
