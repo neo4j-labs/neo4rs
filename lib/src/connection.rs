@@ -324,18 +324,26 @@ impl ConnectionInfo {
     ) -> Result<Self> {
         let mut url = NeoUrl::parse(uri)?;
 
-        let (routing, encryption) = match url.scheme() {
-            "bolt" | "" => (false, false),
-            "bolt+s" => (false, true),
-            "bolt+ssc" => (false, true),
-            "neo4j" => (true, false),
-            "neo4j+s" => (true, true),
-            "neo4j+ssc" => (true, true),
+        let (routing, encryption, validation) = match url.scheme() {
+            "bolt" | "" => (false, false, false),
+            "bolt+s" => (false, true, true),
+            "bolt+ssc" => (false, true, false),
+            "neo4j" => (true, false, false),
+            "neo4j+s" => (true, true, true),
+            "neo4j+ssc" => (true, true, false),
             otherwise => return Err(Error::UnsupportedScheme(otherwise.to_owned())),
         };
 
         let encryption = encryption
-            .then(|| Self::tls_connector(url.host(), tls_config))
+            .then(|| {
+                // do not apply validation if using a self-signed certificate,as the documentation suggests
+                let config = if !validation {
+                    &ConnectionTLSConfig::NoSSLValidation
+                } else {
+                    tls_config
+                };
+                Self::tls_connector(url.host(), config)
+            })
             .transpose()?;
 
         let routing = if routing {
