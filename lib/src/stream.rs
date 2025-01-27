@@ -233,7 +233,10 @@ impl RowStream {
                             None
                         }
                     },
-                    Summary::Ignored => None,
+                    Summary::Ignored => {
+                        self.state = State::Complete(None);
+                        return Err(Error::RequestIgnoredError);
+                    }
                     Summary::Failure(f) => {
                         self.state = State::Complete(None);
                         return Err(f.into_error());
