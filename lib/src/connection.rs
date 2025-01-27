@@ -337,7 +337,11 @@ impl ConnectionInfo {
         let encryption = encryption
             .then(|| {
                 // do not apply validation if using a self-signed certificate,as the documentation suggests
-                let config = if !validation { &ConnectionTLSConfig::NoSSLValidation } else { tls_config };
+                let config = if !validation {
+                    &ConnectionTLSConfig::NoSSLValidation
+                } else {
+                    tls_config
+                };
                 Self::tls_connector(url.host(), config)
             })
             .transpose()?;

@@ -151,7 +151,7 @@ impl ConfigBuilder {
     }
 
     /// A CA certificate to use to validate the server's certificate.
-    /// 
+    ///
     /// This is required if the server's certificate is not signed by a known CA.
     pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
         self.tls_config =
