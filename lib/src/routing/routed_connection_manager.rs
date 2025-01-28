@@ -85,15 +85,19 @@ impl RoutedConnectionManager {
             }
         }
         debug!("Routing table is empty for requested {op} operation, forcing refresh");
-        self.channel
-            .send(RegistryCommand::Refresh)
-            .await
-            .map_err(|e| {
+        match self.channel.send(RegistryCommand::Refresh).await {
+            Ok(_) => {
+                debug!("Forced refresh command sent to background updater");
+            }
+            Err(e) => {
                 error!("Failed to send refresh command to registry: {}", e);
-                Error::RoutingTableRefreshFailed(
-                    "Failed to send refresh command to registry".to_string(),
-                )
-            })?;
+                self.channel.send(RegistryCommand::Stop).await.unwrap();
+                return Err(Error::RoutingTableRefreshFailed(
+                    "Failed to send refresh command to registry with an empty routing table"
+                        .to_string(),
+                ));
+            }
+        }
         Err(Error::ServerUnavailableError(format!(
             "No server available for {op} operation"
         )))
