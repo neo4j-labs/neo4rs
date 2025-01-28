@@ -1,6 +1,8 @@
 mod connection_registry;
 mod load_balancing;
 mod routed_connection_manager;
+mod routing_table_provider;
+
 use std::fmt::{Display, Formatter};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {crate::connection::Routing, serde::Deserialize};
@@ -29,7 +31,7 @@ pub struct Extra {
     pub(crate) imp_user: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", derive(Deserialize))]
 pub struct RoutingTable {
     pub(crate) ttl: u64,
@@ -163,3 +165,4 @@ use crate::routing::connection_registry::BoltServer;
 use crate::{Database, Version};
 pub use load_balancing::round_robin_strategy::RoundRobinStrategy;
 pub use routed_connection_manager::RoutedConnectionManager;
+pub use routing_table_provider::ClusterRoutingTableProvider;
