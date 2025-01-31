@@ -85,19 +85,15 @@ impl RoutedConnectionManager {
             }
         }
         debug!("Routing table is empty for requested {op} operation, forcing refresh");
-        match self.channel.send(RegistryCommand::Refresh).await {
-            Ok(_) => {
-                debug!("Forced refresh command sent to background updater");
-            }
-            Err(e) => {
+        self.channel
+            .send(RegistryCommand::Refresh)
+            .await
+            .map_err(|e| {
                 error!("Failed to send refresh command to registry: {}", e);
-                self.channel.send(RegistryCommand::Stop).await.unwrap();
-                return Err(Error::RoutingTableRefreshFailed(
-                    "Failed to send refresh command to registry with an empty routing table"
-                        .to_string(),
-                ));
-            }
-        }
+                Error::RoutingTableRefreshFailed(
+                    "Failed to send refresh command to registry".to_string(),
+                )
+            })?;
         Err(Error::ServerUnavailableError(format!(
             "No server available for {op} operation"
         )))
@@ -134,12 +130,4 @@ impl RoutedConnectionManager {
     pub(crate) async fn clear_bookmarks(&self) {
         self.bookmarks.lock().await.clear();
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_routed_connection_manager() {}
 }

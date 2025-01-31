@@ -134,9 +134,9 @@ pub(crate) async fn start_background_updater(
                     interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                 }
                 // Handle forced updates
-                Some(cmd) = rx.recv() => {
+                cmd = rx.recv() => {
                     match cmd {
-                        RegistryCommand::Refresh => {
+                        Some(RegistryCommand::Refresh) => {
                             ttl = match refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone()).await {
                                 Ok(ttl) => ttl,
                                 Err(e) => {
@@ -146,7 +146,7 @@ pub(crate) async fn start_background_updater(
                             };
                             interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                         }
-                        RegistryCommand::Stop => {
+                        Some(RegistryCommand::Stop) | None => {
                             debug!("Stopping background updater");
                             break;
                         }
