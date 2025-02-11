@@ -83,6 +83,29 @@ pub struct Counters {
     pub system_updates: u64,
 }
 
+impl Counters {
+    pub fn merge(&mut self, other: &Self) {
+        self.nodes_created += other.nodes_created;
+        self.nodes_deleted += other.nodes_deleted;
+        self.relationships_created += other.relationships_created;
+        self.relationships_deleted += other.relationships_deleted;
+        self.properties_set += other.properties_set;
+        self.labels_added += other.labels_added;
+        self.labels_removed += other.labels_removed;
+        self.indexes_added += other.indexes_added;
+        self.indexes_removed += other.indexes_removed;
+        self.constraints_added += other.constraints_added;
+        self.constraints_removed += other.constraints_removed;
+        self.system_updates += other.system_updates;
+    }
+}
+
+impl std::ops::AddAssign<&Counters> for Counters {
+    fn add_assign(&mut self, other: &Counters) {
+        self.merge(other);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(from = "SummaryBuilder")]
 pub enum Streaming {

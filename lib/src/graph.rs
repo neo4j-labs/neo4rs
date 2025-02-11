@@ -3,11 +3,13 @@ use {
     crate::connection::{ConnectionInfo, Routing},
     crate::graph::ConnectionPoolManager::Routed,
     crate::routing::{ClusterRoutingTableProvider, RoutedConnectionManager},
+    crate::summary::ResultSummary,
     log::debug,
 };
 
 use crate::graph::ConnectionPoolManager::Direct;
 use crate::pool::ManagedConnection;
+use crate::RunResult;
 use crate::{
     config::{Config, ConfigBuilder, Database, LiveConfig},
     errors::Result,
@@ -163,7 +165,7 @@ impl Graph {
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
-    pub async fn run(&self, q: impl Into<Query>) -> Result<()> {
+    pub async fn run(&self, q: impl Into<Query>) -> Result<RunResult> {
         self.impl_run_on(self.config.db.clone(), q.into(), Operation::Write)
             .await
     }
@@ -185,7 +187,7 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
         operation: Operation,
-    ) -> Result<()> {
+    ) -> Result<ResultSummary> {
         self.impl_run_on(Some(db.into()), q.into(), operation).await
     }
 
@@ -201,7 +203,7 @@ impl Graph {
         db: Option<Database>,
         q: Query,
         operation: Operation,
-    ) -> Result<()> {
+    ) -> Result<RunResult> {
         backoff::future::retry_notify(
             self.pool.backoff(),
             || {
