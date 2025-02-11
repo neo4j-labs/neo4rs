@@ -90,8 +90,7 @@ async fn refresh_routing_table(
             create_pool(&Config {
                 uri,
                 ..config.clone()
-            })
-            .await?,
+            })?,
         );
     }
     registry.connections.retain(|k, _| servers.contains(k));
@@ -103,7 +102,7 @@ async fn refresh_routing_table(
     Ok(routing_table.ttl)
 }
 
-pub(crate) async fn start_background_updater(
+pub(crate) fn start_background_updater(
     config: &Config,
     registry: Arc<ConnectionRegistry>,
     provider: Arc<Box<dyn RoutingTableProvider>>,

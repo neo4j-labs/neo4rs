@@ -55,7 +55,7 @@ impl Manager for ConnectionManager {
     }
 }
 
-pub async fn create_pool(config: &Config) -> Result<ConnectionPool> {
+pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
     let mgr = ConnectionManager::new(
         &config.uri,
         &config.user,
