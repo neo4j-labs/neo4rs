@@ -80,47 +80,6 @@ impl DetachedRowStream {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum RowItem<T = Row> {
-    Row(T),
-    #[cfg(feature = "unstable-result-summary")]
-    Summary(BoxedSummary),
-}
-
-impl<T> RowItem<T> {
-    pub fn row(&self) -> Option<&T> {
-        match self {
-            RowItem::Row(row) => Some(row),
-            #[cfg(feature = "unstable-result-summary")]
-            _ => None,
-        }
-    }
-
-    #[cfg(feature = "unstable-result-summary")]
-    pub fn summary(&self) -> Option<&ResultSummary> {
-        match self {
-            RowItem::Summary(summary) => Some(summary),
-            _ => None,
-        }
-    }
-
-    pub fn into_row(self) -> Option<T> {
-        match self {
-            RowItem::Row(row) => Some(row),
-            #[cfg(feature = "unstable-result-summary")]
-            _ => None,
-        }
-    }
-
-    #[cfg(feature = "unstable-result-summary")]
-    pub fn into_summary(self) -> Option<BoxedSummary> {
-        match self {
-            RowItem::Summary(summary) => Some(summary),
-            _ => None,
-        }
-    }
-}
-
 impl RowStream {
     /// A call to next() will return a row from an internal buffer if the buffer has any entries,
     /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows
