@@ -1,16 +1,18 @@
-use crate::connection::{Connection, ConnectionInfo};
 use crate::pool::ManagedConnection;
-use crate::routing::connection_registry::{BoltServer, ConnectionRegistry};
+use crate::routing::connection_registry::{
+    start_background_updater, BoltServer, ConnectionRegistry, RegistryCommand,
+};
 use crate::routing::load_balancing::LoadBalancingStrategy;
+use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::RoundRobinStrategy;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::routing::{RouteBuilder, RoutingTable};
 use crate::{Config, Error, Operation};
 use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use futures::lock::Mutex;
 use log::{debug, error};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub struct RoutedConnectionManager {
@@ -19,12 +21,14 @@ pub struct RoutedConnectionManager {
     #[allow(dead_code)]
     bookmarks: Arc<Mutex<Vec<String>>>,
     backoff: Arc<ExponentialBackoff>,
-    config: Config,
+    channel: Sender<RegistryCommand>,
 }
 
 impl RoutedConnectionManager {
-    pub async fn new(config: &Config) -> Result<Self, Error> {
-        let registry = Arc::new(ConnectionRegistry::new(config));
+    pub async fn new(
+        config: &Config,
+        provider: Box<dyn RoutingTableProvider>,
+    ) -> Result<Self, Error> {
         let backoff = Arc::new(
             ExponentialBackoffBuilder::new()
                 .with_initial_interval(Duration::from_millis(1))
@@ -34,44 +38,22 @@ impl RoutedConnectionManager {
                 .build(),
         );
 
+        let connection_registry = Arc::new(ConnectionRegistry::default());
+        let channel =
+            start_background_updater(config, connection_registry.clone(), provider.into()).await;
         Ok(RoutedConnectionManager {
             load_balancing_strategy: Arc::new(RoundRobinStrategy::default()),
-            connection_registry: registry,
             bookmarks: Arc::new(Mutex::new(vec![])),
+            connection_registry,
             backoff,
-            config: config.clone(),
+            channel,
         })
-    }
-
-    pub async fn refresh_routing_table(&self) -> Result<RoutingTable, Error> {
-        let info = ConnectionInfo::new(
-            &self.config.uri,
-            &self.config.user,
-            &self.config.password,
-            &self.config.tls_config,
-        )?;
-        let mut connection = Connection::new(&info).await?;
-        let mut builder = RouteBuilder::new(info.routing, vec![]);
-        if let Some(db) = self.config.db.clone() {
-            builder = builder.with_db(db);
-        }
-        let rt = connection
-            .route(builder.build(connection.version()))
-            .await?;
-        debug!("Fetched a new routing table: {:?}", rt);
-        Ok(rt)
     }
 
     pub(crate) async fn get(
         &self,
         operation: Option<Operation>,
     ) -> Result<ManagedConnection, Error> {
-        // We probably need to do this in a more efficient way, since this will block the request of a connection
-        // while we refresh the routing table. We should probably have a separate thread that refreshes the routing
-        self.connection_registry
-            .update_if_expired(|| self.refresh_routing_table())
-            .await?;
-
         let op = operation.unwrap_or(Operation::Write);
         while let Some(server) = match op {
             Operation::Write => self.select_writer(),
@@ -102,6 +84,16 @@ impl RoutedConnectionManager {
                 )));
             }
         }
+        debug!("Routing table is empty for requested {op} operation, forcing refresh");
+        self.channel
+            .send(RegistryCommand::Refresh)
+            .await
+            .map_err(|e| {
+                error!("Failed to send refresh command to registry: {}", e);
+                Error::RoutingTableRefreshFailed(
+                    "Failed to send refresh command to registry".to_string(),
+                )
+            })?;
         Err(Error::ServerUnavailableError(format!(
             "No server available for {op} operation"
         )))
@@ -119,5 +111,23 @@ impl RoutedConnectionManager {
     fn select_writer(&self) -> Option<BoltServer> {
         self.load_balancing_strategy
             .select_writer(&self.connection_registry.servers())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) async fn add_bookmark(&self, bookmark: String) {
+        self.bookmarks.lock().await.push(bookmark);
+    }
+
+    #[allow(dead_code)]
+    pub(crate) async fn remove_bookmark(&self, bookmark: &str) {
+        let mut bookmarks = self.bookmarks.lock().await;
+        if let Some(index) = bookmarks.iter().position(|b| b == bookmark) {
+            bookmarks.remove(index);
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) async fn clear_bookmarks(&self) {
+        self.bookmarks.lock().await.clear();
     }
 }

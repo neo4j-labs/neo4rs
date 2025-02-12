@@ -2,7 +2,8 @@
 use {
     crate::connection::{ConnectionInfo, Routing},
     crate::graph::ConnectionPoolManager::Routed,
-    crate::routing::RoutedConnectionManager,
+    crate::routing::{ClusterRoutingTableProvider, RoutedConnectionManager},
+    log::debug,
 };
 
 use crate::graph::ConnectionPoolManager::Direct;
@@ -73,7 +74,11 @@ impl Graph {
                 &config.tls_config,
             )?;
             if matches!(info.routing, Routing::Yes(_)) {
-                let pool = Routed(RoutedConnectionManager::new(&config).await?);
+                debug!("Routing enabled, creating a routed connection manager");
+                let pool = Routed(
+                    RoutedConnectionManager::new(&config, Box::new(ClusterRoutingTableProvider))
+                        .await?,
+                );
                 Ok(Graph {
                     config: config.into_live_config(),
                     pool,
