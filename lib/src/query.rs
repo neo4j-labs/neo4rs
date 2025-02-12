@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{Discard, Summary, WrapExtra as _};
+use crate::{bolt::Summary, summary::ResultSummary};
 use crate::{
     errors::Result,
     messages::{BoltRequest, BoltResponse},
@@ -10,6 +10,11 @@ use crate::{
     types::{BoltList, BoltMap, BoltString, BoltType},
     Error, Success,
 };
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+pub type RunResult = ResultSummary;
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+pub type RunResult = ();
 
 /// Abstracts a cypher query that is sent to neo4j server.
 #[derive(Clone)]
@@ -83,7 +88,7 @@ impl Query {
         &self.params
     }
 
-    pub(crate) async fn run(self, connection: &mut ManagedConnection) -> Result<()> {
+    pub(crate) async fn run(self, connection: &mut ManagedConnection) -> Result<RunResult> {
         let request = BoltRequest::run(&self.query, self.params, self.extra);
         Self::try_run(request, connection)
             .await
@@ -93,7 +98,7 @@ impl Query {
     pub(crate) async fn run_retryable(
         &self,
         connection: &mut ManagedConnection,
-    ) -> QueryResult<()> {
+    ) -> QueryResult<RunResult> {
         let request = BoltRequest::run(&self.query, self.params.clone(), self.extra.clone());
         Self::try_run(request, connection).await
     }
@@ -120,24 +125,12 @@ impl Query {
             .map_err(unwrap_backoff)
     }
 
-    async fn try_run(request: BoltRequest, connection: &mut ManagedConnection) -> QueryResult<()> {
-        let _ = Self::try_request(request, connection).await?;
-
-        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        {
-            match connection.send_recv(BoltRequest::discard_all()).await {
-                Ok(BoltResponse::Success(_)) => Ok(()),
-                otherwise => wrap_error(otherwise, "DISCARD"),
-            }
-        }
-
-        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-        {
-            match connection.send_recv_as(Discard::all()).await {
-                Ok(Summary::Success(_discard_success)) => Ok(()),
-                otherwise => wrap_error(otherwise, "DISCARD"),
-            }
-        }
+    async fn try_run(
+        request: BoltRequest,
+        connection: &mut ManagedConnection,
+    ) -> QueryResult<RunResult> {
+        let result = Self::try_execute(request, 4096, connection).await?;
+        Ok(result.finish(connection).await?)
     }
 
     async fn try_execute(

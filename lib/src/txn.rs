@@ -7,7 +7,7 @@ use crate::{
     pool::ManagedConnection,
     query::Query,
     stream::RowStream,
-    Operation,
+    Operation, RunResult,
 };
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
@@ -40,6 +40,22 @@ impl Txn {
         }
     }
 
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    /// Runs multiple queries one after the other in the same connection,
+    /// merging all counters from each result summary.
+    pub async fn run_queries<Q: Into<Query>>(
+        &mut self,
+        queries: impl IntoIterator<Item = Q>,
+    ) -> Result<crate::summary::Counters> {
+        let mut counters = crate::summary::Counters::default();
+        for query in queries {
+            let summary = self.run(query.into()).await?;
+            counters += summary.stats();
+        }
+        Ok(counters)
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     /// Runs multiple queries one after the other in the same connection
     pub async fn run_queries<Q: Into<Query>>(
         &mut self,
@@ -52,7 +68,7 @@ impl Txn {
     }
 
     /// Runs a single query and discards the stream.
-    pub async fn run(&mut self, q: impl Into<Query>) -> Result<()> {
+    pub async fn run(&mut self, q: impl Into<Query>) -> Result<RunResult> {
         let mut query = q.into();
         if let Some(db) = self.db.as_ref() {
             query = query.extra("db", db.to_string());

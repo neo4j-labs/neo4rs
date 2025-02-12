@@ -13,7 +13,7 @@ use crate::{
     row::Row,
     txn::TransactionHandle,
     types::BoltList,
-    DeError,
+    DeError, RunResult,
 };
 
 use futures::{stream::try_unfold, TryStream};
@@ -25,11 +25,6 @@ use std::collections::VecDeque;
 type BoxedSummary = Box<ResultSummary>;
 #[cfg(not(feature = "unstable-result-summary"))]
 type BoxedSummary = ();
-
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-type FinishResult = ResultSummary;
-#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-type FinishResult = ();
 
 /// An abstraction over a stream of rows, this is returned as a result of [`crate::Txn::execute`].
 ///
@@ -250,7 +245,7 @@ impl RowStream {
 
     /// Stop consuming the stream and return a summary, if available.
     /// Stopping the stream will also discard any messages on the server side.
-    pub async fn finish(mut self, mut handle: impl TransactionHandle) -> Result<FinishResult> {
+    pub async fn finish(mut self, mut handle: impl TransactionHandle) -> Result<RunResult> {
         self.buffer.clear();
 
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -440,7 +435,7 @@ impl DetachedRowStream {
 
     /// Stop consuming the stream and return a summary, if available.
     /// Stopping the stream will also discard any messages on the server side.
-    pub async fn finish(mut self) -> Result<FinishResult> {
+    pub async fn finish(mut self) -> Result<RunResult> {
         self.stream.finish(&mut self.connection).await
     }
 
