@@ -405,33 +405,6 @@ impl ser::SerializeMap for MapSerializer<'_> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<(), Self::Error>
-    where
-        K: ser::Serialize + ?Sized,
-        V: ser::Serialize + ?Sized,
-    {
-        if key.serialize(SpecialKeySerializer).is_ok() {
-            match value.serialize(SpecialValueSerializer) {
-                Ok(map_size) => match self {
-                    MapSerializer::Known(ser) => ser,
-                    MapSerializer::Unknown { ser, len, .. } => {
-                        let rhs = map_size as isize;
-                        let (res, overflowed) = len.overflowing_sub(rhs);
-                        let overflowed = overflowed ^ (rhs < 0);
-                        let res = if overflowed { isize::MIN } else { res };
-                        *len = res;
-                        ser
-                    }
-                }
-                .map_header(map_size),
-                Err(_) => Err(Error::LengthOverflow),
-            }
-        } else {
-            self.serialize_key(key)?;
-            self.serialize_value(value)
-        }
-    }
-
     fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
     where
         T: ser::Serialize + ?Sized,
@@ -457,6 +430,33 @@ impl ser::SerializeMap for MapSerializer<'_> {
         };
 
         value.serialize(&mut **ser)
+    }
+
+    fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<(), Self::Error>
+    where
+        K: ser::Serialize + ?Sized,
+        V: ser::Serialize + ?Sized,
+    {
+        if key.serialize(SpecialKeySerializer).is_ok() {
+            match value.serialize(SpecialValueSerializer) {
+                Ok(map_size) => match self {
+                    MapSerializer::Known(ser) => ser,
+                    MapSerializer::Unknown { ser, len, .. } => {
+                        let rhs = map_size as isize;
+                        let (res, overflowed) = len.overflowing_sub(rhs);
+                        let overflowed = overflowed ^ (rhs < 0);
+                        let res = if overflowed { isize::MIN } else { res };
+                        *len = res;
+                        ser
+                    }
+                }
+                .map_header(map_size),
+                Err(_) => Err(Error::LengthOverflow),
+            }
+        } else {
+            self.serialize_key(key)?;
+            self.serialize_value(value)
+        }
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {

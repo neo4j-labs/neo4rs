@@ -443,15 +443,15 @@ impl<S: SerializeMap> Serializer for &mut InnerMapSerializer<S> {
         self.value(v)
     }
 
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
         T: Serialize + ?Sized,
     {
         value.serialize(self)
-    }
-
-    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
