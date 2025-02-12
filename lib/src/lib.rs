@@ -22,7 +22,7 @@
 //!    let pass = "neo";
 //!    let id = uuid::Uuid::new_v4().to_string();
 //!
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/example.rs")]
 //! }
@@ -49,7 +49,7 @@
 //!        .max_connections(10)
 //!        .build()
 //!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
+//!    let graph = Graph::connect(config).unwrap();
 //!
 #![doc = include_str!("../include/configurations.rs")]
 //! }
@@ -68,7 +68,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/nodes.rs")]
 //! }
@@ -91,7 +91,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/transactions.rs")]
 //! }
@@ -117,7 +117,7 @@
 //!        .fetch_size(1)
 //!        .build()
 //!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
+//!    let graph = Graph::connect(config).unwrap();
 //!
 #![doc = include_str!("../include/streams_within_a_transaction.rs")]
 //! }
@@ -141,7 +141,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/result_stream.rs")]
 //! }
@@ -166,7 +166,7 @@ async fn main() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Graph::new(uri, user, pass).await.unwrap();
+    let graph = Graph::new(uri, user, pass).unwrap();
 
 "##
 )]
@@ -188,7 +188,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/rollback_a_transaction.rs")]
 //! }
@@ -213,7 +213,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/txn_vs_graph.rs")]
 //! }
@@ -233,7 +233,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/relationships.rs")]
 //! }
@@ -250,7 +250,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/unbounded_relationships.rs")]
 //! }
@@ -272,7 +272,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 //!    let qry = "
 //!        WITH point({ x: 2.3, y: 4.5, crs: 'cartesian' }) AS p1,
@@ -295,7 +295,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/raw_bytes.rs")]
 //! }
@@ -313,7 +313,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/durations.rs")]
 //! }
@@ -333,7 +333,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/dates.rs")]
 //! }
@@ -362,7 +362,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/time_as_param.rs")]
 //! }
@@ -379,7 +379,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/parse_time_from_result.rs")]
 //! }
@@ -410,7 +410,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/datetime_as_param.rs")]
 //! }
@@ -426,7 +426,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/parse_datetime_from_result.rs")]
 //! }
@@ -445,7 +445,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/path.rs")]
 //! }

@@ -23,16 +23,16 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Graph::new(&uri, user, pass).await.unwrap();
+    let graph = Graph::new(&uri, user, pass).unwrap();
     for _ in 1..=42 {
         let graph = graph.clone();
         tokio::spawn(async move {
             let mut result = graph.execute(
-           query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
-        ).await.unwrap();
-            while let Ok(Some(row)) = result.next().await {
-            let node: Node = row.get("p").unwrap();
-            let name: String = node.get("name").unwrap();
+               query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
+            ).await.unwrap();
+            while let Some(row) = result.next().await.unwrap() {
+                let node: Node = row.get("p").unwrap();
+                let name: String = node.get("name").unwrap();
                 println!("{}", name);
             }
         });
