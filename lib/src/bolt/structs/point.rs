@@ -418,12 +418,10 @@ impl<'de> Deserialize<'de> for Point {
                 match tag {
                     Some(0x58) => map.next_value::<Point2D>().map(|p| p.to_point()),
                     Some(0x59) => map.next_value::<Point3D>().map(|p| p.to_point()),
-                    Some(tag) => {
-                        return Err(serde::de::Error::invalid_type(
-                            serde::de::Unexpected::Other(&format!("struct with tag {:02X}", tag)),
-                            &"a Bolt struct (tag {:02X})",
-                        ))
-                    }
+                    Some(tag) => Err(serde::de::Error::invalid_type(
+                        serde::de::Unexpected::Other(&format!("struct with tag {:02X}", tag)),
+                        &"a Bolt struct (tag {:02X})",
+                    )),
                     None => Err(serde::de::Error::missing_field("tag")),
                 }
             }
