@@ -22,45 +22,18 @@
     }
 
     //
-    // next_or_summary
+    // next + finish
 
     let mut stream = graph
         .execute(query("CREATE (n:Node {prop: 'frobnicate'}) RETURN n"))
         .await
         .unwrap();
 
-    let Ok(Some(row)) = stream.next_or_summary().await else { panic!() };
-    assert!(row.row().is_some());
-    assert!(row.summary().is_none());
+    let Ok(Some(row)) = stream.next().await else { panic!() };
+    assert_item(row.to().unwrap());
 
-    assert_item(row.row().unwrap().to().unwrap());
-
-    let Ok(Some(row)) = stream.next_or_summary().await else { panic!() };
-    assert!(row.row().is_none());
-    assert!(row.summary().is_some());
-
-    assert_summary(row.summary().unwrap());
-
-
-    //
-    // as_items
-
-    let mut stream = graph
-        .execute(query("CREATE (n:Node {prop: 'frobnicate'}) RETURN n"))
-        .await
-        .unwrap();
-
-    let items = stream.as_items::<N>()
-        .try_collect::<Vec<_>>()
-        .await
-        .unwrap();
-
-    for item in items {
-        match item {
-            RowItem::Row(row) => assert_item(row),
-            RowItem::Summary(summary) => assert_summary(&summary),
-        }
-    }
+    let Ok(summary) = stream.finish().await else { panic!() };
+    assert_summary(&summary);
 
 
     //
@@ -76,7 +49,7 @@
         .await
         .unwrap();
 
-    let Ok(Some(summary)) = stream.finish().await else { panic!() };
+    let Ok(summary) = stream.finish().await else { panic!() };
 
     for item in items {
         assert_item(item);
