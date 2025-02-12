@@ -1,5 +1,7 @@
 use futures::TryStreamExt;
-use neo4rs::{query, Operation};
+use neo4rs::query;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use neo4rs::Operation;
 
 mod container;
 
