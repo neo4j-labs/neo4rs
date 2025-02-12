@@ -85,6 +85,12 @@ pub enum Error {
     #[error("conversion error")]
     ConversionError,
 
+    #[error("No more rows available in the query result")]
+    NoMoreRows,
+
+    #[error("Result contains more than one row")]
+    NotSingleResult,
+
     #[error("{0}")]
     AuthenticationError(String),
 
