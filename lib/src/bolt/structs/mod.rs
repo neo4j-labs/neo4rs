@@ -50,7 +50,7 @@ pub enum BoltRef<'de> {
     LegacyDateTimeZoneId(LegacyDateTimeZoneIdRef<'de>),
 }
 
-impl<'de> From<()> for BoltRef<'de> {
+impl From<()> for BoltRef<'_> {
     fn from(_: ()) -> Self {
         Self::Null
     }

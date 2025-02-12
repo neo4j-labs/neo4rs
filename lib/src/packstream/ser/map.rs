@@ -9,15 +9,15 @@ use ::serde::ser::{
 #[derive(Debug, PartialEq, Eq)]
 pub struct AsMap<'a, T: ?Sized>(pub &'a T);
 
-impl<'a, T: ?Sized> Copy for AsMap<'a, T> {}
+impl<T: ?Sized> Copy for AsMap<'_, T> {}
 
-impl<'a, T: ?Sized> Clone for AsMap<'a, T> {
+impl<T: ?Sized> Clone for AsMap<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T: ?Sized + Serialize> Serialize for AsMap<'a, T> {
+impl<T: ?Sized + Serialize> Serialize for AsMap<'_, T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         as_map(serializer, self.0)
     }
@@ -375,7 +375,7 @@ impl<S: SerializeMap> InnerMapSerializer<S> {
     }
 }
 
-impl<'a, S: SerializeMap> Serializer for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> Serializer for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -572,7 +572,7 @@ impl<'a, S: SerializeMap> Serializer for &'a mut InnerMapSerializer<S> {
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeSeq for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeSeq for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -606,7 +606,7 @@ impl<'a, S: SerializeMap> SerializeSeq for &'a mut InnerMapSerializer<S> {
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeTuple for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeTuple for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -640,7 +640,7 @@ impl<'a, S: SerializeMap> SerializeTuple for &'a mut InnerMapSerializer<S> {
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeTupleStruct for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeTupleStruct for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -682,7 +682,7 @@ impl<'a, S: SerializeMap> SerializeTupleStruct for &'a mut InnerMapSerializer<S>
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeMap for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeMap for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -725,7 +725,7 @@ impl<'a, S: SerializeMap> SerializeMap for &'a mut InnerMapSerializer<S> {
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeTupleVariant for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeTupleVariant for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -762,7 +762,7 @@ impl<'a, S: SerializeMap> SerializeTupleVariant for &'a mut InnerMapSerializer<S
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeStruct for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeStruct for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 
@@ -798,7 +798,7 @@ impl<'a, S: SerializeMap> SerializeStruct for &'a mut InnerMapSerializer<S> {
 //     }
 // }
 
-impl<'a, S: SerializeMap> SerializeStructVariant for &'a mut InnerMapSerializer<S> {
+impl<S: SerializeMap> SerializeStructVariant for &mut InnerMapSerializer<S> {
     type Ok = ();
     type Error = S::Error;
 

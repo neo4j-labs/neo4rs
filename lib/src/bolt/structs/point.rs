@@ -275,7 +275,7 @@ impl<'de> Deserialize<'de> for Crs {
     {
         struct Vis;
 
-        impl<'de> serde::de::Visitor<'de> for Vis {
+        impl serde::de::Visitor<'_> for Vis {
             type Value = Crs;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

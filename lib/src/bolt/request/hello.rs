@@ -90,13 +90,13 @@ enum ServerRouting<'a> {
     WithContext { context: Box<[(&'a str, &'a str)]> },
 }
 
-impl<'a> ServerRouting<'a> {
+impl ServerRouting<'_> {
     fn is_none(&self) -> bool {
         matches!(self, ServerRouting::No)
     }
 }
 
-impl<'a> Serialize for ServerRouting<'a> {
+impl Serialize for ServerRouting<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -121,11 +121,11 @@ pub struct Response {
     pub(crate) connection_id: String,
 }
 
-impl<'a> ExpectedResponse for Hello<'a> {
+impl ExpectedResponse for Hello<'_> {
     type Response = Summary<Response>;
 }
 
-impl<'a> Serialize for Hello<'a> {
+impl Serialize for Hello<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
