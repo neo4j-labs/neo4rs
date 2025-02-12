@@ -15,7 +15,7 @@ type Map = std::collections::HashMap<MapKey, MapValue>;
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 type MapKey = crate::BoltString;
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-type MapValue = create::BoltType;
+type MapValue = crate::BoltType;
 #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
 type Map = crate::BoltMap;
 

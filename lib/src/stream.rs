@@ -164,7 +164,7 @@ impl RowStream {
             .and_then(|row| row.to::<T>().map_err(Error::DeserializationError))
     }
 
-    /// Return the first [`create::Row`] in the result.
+    /// Return the first [`crate::Row`] in the result.
     ///
     /// If there are 0 results, [`Error::NoMoreRows`] is returned.
     /// If there are 2 or more results, [`Error::NotSingleResult`] is returned.
@@ -179,7 +179,7 @@ impl RowStream {
         Ok(row)
     }
 
-    /// Return the first [`create::Row`] in the result.
+    /// Return the first [`crate::Row`] in the result.
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// If there are 0 results, [`Error::NoMoreRows`] is returned.
@@ -193,7 +193,7 @@ impl RowStream {
             .and_then(|row| row.to::<T>().map_err(Error::DeserializationError))
     }
 
-    /// Return the first [`create::Row`] buffered result without consuming it.
+    /// Return the first [`crate::Row`] buffered result without consuming it.
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
     /// only buffered results are inspected and no actual communication is done.
@@ -204,7 +204,7 @@ impl RowStream {
         self.buffer.front()
     }
 
-    /// Return the first [`create::Row`] buffered result without consuming it,
+    /// Return the first [`crate::Row`] buffered result without consuming it,
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
@@ -218,7 +218,7 @@ impl RowStream {
             .and_then(|row| row.to::<T>().map_err(Error::DeserializationError))
     }
 
-    /// Return the first [`create::Row`] buffered result and consume it.
+    /// Return the first [`crate::Row`] buffered result and consume it.
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
     /// only buffered results are inspected and no actual communication is done.
@@ -229,7 +229,7 @@ impl RowStream {
         self.buffer.pop_front()
     }
 
-    /// Return the first [`create::Row`] buffered result and consume it,
+    /// Return the first [`crate::Row`] buffered result and consume it,
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
@@ -370,7 +370,7 @@ impl DetachedRowStream {
         self.stream.next_as(&mut self.connection).await
     }
 
-    /// Return the first [`create::Row`] in the result.
+    /// Return the first [`crate::Row`] in the result.
     ///
     /// If there are 0 results, [`Error::NoMoreRows`] is returned.
     /// If there are 2 or more results, [`Error::NotSingleResult`] is returned.
@@ -378,7 +378,7 @@ impl DetachedRowStream {
         self.stream.single(&mut self.connection).await
     }
 
-    /// Return the first [`create::Row`] in the result.
+    /// Return the first [`crate::Row`] in the result.
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// If there are 0 results, [`Error::NoMoreRows`] is returned.
@@ -387,7 +387,7 @@ impl DetachedRowStream {
         self.stream.single_as(&mut self.connection).await
     }
 
-    /// Return the first [`create::Row`] buffered result without consuming it.
+    /// Return the first [`crate::Row`] buffered result without consuming it.
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
     /// only buffered results are inspected and no actual communication is done.
@@ -398,7 +398,7 @@ impl DetachedRowStream {
         self.stream.peek()
     }
 
-    /// Return the first [`create::Row`] buffered result without consuming it,
+    /// Return the first [`crate::Row`] buffered result without consuming it,
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
@@ -410,7 +410,7 @@ impl DetachedRowStream {
         self.stream.peek_as()
     }
 
-    /// Return the first [`create::Row`] buffered result and consume it.
+    /// Return the first [`crate::Row`] buffered result and consume it.
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
     /// only buffered results are inspected and no actual communication is done.
@@ -421,7 +421,7 @@ impl DetachedRowStream {
         self.stream.pop()
     }
 
-    /// Return the first [`create::Row`] buffered result and consume it,
+    /// Return the first [`crate::Row`] buffered result and consume it,
     /// converted into a `T` by calling [`crate::row::Row::to`].
     ///
     /// Note that this method is not `async` and does not require a `TransactionHandle` because
