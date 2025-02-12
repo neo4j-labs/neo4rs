@@ -98,7 +98,7 @@ pub enum Error {
     InvalidTypeMarker(String),
 
     #[error("{0}")]
-    DeserializationError(DeError),
+    DeserializationError(#[from] DeError),
 
     #[error("Failed to fetch the routing table [{}]: {}", _0.0, _0.1)]
     RoutingTableError((String, String)),
