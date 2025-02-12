@@ -16,6 +16,9 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## API Documentation: [![Docs.rs][docs-badge]][docs-url]
 
+## [Getting Started](https://neo4j.com/docs/getting-started/languages-guides/community-drivers/#neo4j-rust)
+
+
 ## Example
 
 ```rust
