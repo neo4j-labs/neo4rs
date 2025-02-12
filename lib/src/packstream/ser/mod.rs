@@ -344,7 +344,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeSeq for &'a mut Serializer {
+impl ser::SerializeSeq for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -360,7 +360,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeTuple for &'a mut Serializer {
+impl ser::SerializeTuple for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -376,7 +376,7 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
+impl ser::SerializeTupleStruct for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -401,36 +401,9 @@ pub(super) enum MapSerializer<'a> {
     },
 }
 
-impl<'a> ser::SerializeMap for MapSerializer<'a> {
+impl ser::SerializeMap for MapSerializer<'_> {
     type Ok = ();
     type Error = Error;
-
-    fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<(), Self::Error>
-    where
-        K: ser::Serialize + ?Sized,
-        V: ser::Serialize + ?Sized,
-    {
-        if key.serialize(SpecialKeySerializer).is_ok() {
-            match value.serialize(SpecialValueSerializer) {
-                Ok(map_size) => match self {
-                    MapSerializer::Known(ser) => ser,
-                    MapSerializer::Unknown { ser, len, .. } => {
-                        let rhs = map_size as isize;
-                        let (res, overflowed) = len.overflowing_sub(rhs);
-                        let overflowed = overflowed ^ (rhs < 0);
-                        let res = if overflowed { isize::MIN } else { res };
-                        *len = res;
-                        ser
-                    }
-                }
-                .map_header(map_size),
-                Err(_) => Err(Error::LengthOverflow),
-            }
-        } else {
-            self.serialize_key(key)?;
-            self.serialize_value(value)
-        }
-    }
 
     fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
     where
@@ -457,6 +430,33 @@ impl<'a> ser::SerializeMap for MapSerializer<'a> {
         };
 
         value.serialize(&mut **ser)
+    }
+
+    fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<(), Self::Error>
+    where
+        K: ser::Serialize + ?Sized,
+        V: ser::Serialize + ?Sized,
+    {
+        if key.serialize(SpecialKeySerializer).is_ok() {
+            match value.serialize(SpecialValueSerializer) {
+                Ok(map_size) => match self {
+                    MapSerializer::Known(ser) => ser,
+                    MapSerializer::Unknown { ser, len, .. } => {
+                        let rhs = map_size as isize;
+                        let (res, overflowed) = len.overflowing_sub(rhs);
+                        let overflowed = overflowed ^ (rhs < 0);
+                        let res = if overflowed { isize::MIN } else { res };
+                        *len = res;
+                        ser
+                    }
+                }
+                .map_header(map_size),
+                Err(_) => Err(Error::LengthOverflow),
+            }
+        } else {
+            self.serialize_key(key)?;
+            self.serialize_value(value)
+        }
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -495,7 +495,7 @@ impl<'a> ser::SerializeMap for MapSerializer<'a> {
     }
 }
 
-impl<'a> ser::SerializeStruct for &'a mut Serializer {
+impl ser::SerializeStruct for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -512,7 +512,7 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
+impl ser::SerializeTupleVariant for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -528,7 +528,7 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
+impl ser::SerializeStructVariant for &mut Serializer {
     type Ok = ();
     type Error = Error;
 

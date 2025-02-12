@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for RawBytes {
     {
         struct RawBytesVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for RawBytesVisitor {
+        impl serde::de::Visitor<'_> for RawBytesVisitor {
             type Value = Bytes;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

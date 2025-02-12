@@ -10,7 +10,7 @@ pub struct Response {
     pub rt: RoutingTable,
 }
 
-impl<'a> ExpectedResponse for Route<'a> {
+impl ExpectedResponse for Route<'_> {
     type Response = Summary<Response>;
 }
 

@@ -363,7 +363,7 @@ impl<'a, T> Single<'a, T> {
     }
 }
 
-impl<'a, 'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'a, T> {
+impl<'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'_, T> {
     type Value = Option<T>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -377,7 +377,7 @@ impl<'a, 'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'a, T> 
 
         struct Filter<'a>(&'a str);
 
-        impl<'a, 'de> Visitor<'de> for Filter<'a> {
+        impl<'de> Visitor<'de> for Filter<'_> {
             type Value = Key;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -435,7 +435,7 @@ impl<'a, 'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'a, T> 
             }
         }
 
-        impl<'a, 'de> DeserializeSeed<'de> for Filter<'a> {
+        impl<'de> DeserializeSeed<'de> for Filter<'_> {
             type Value = Key;
 
             fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -448,7 +448,7 @@ impl<'a, 'de, T: Deserialize<'de> + 'de> DeserializeSeed<'de> for Single<'a, T> 
 
         struct Vis<'a, 'de, T>(&'a str, PhantomData<&'de T>);
 
-        impl<'a, 'de, T: Deserialize<'de> + 'de> Visitor<'de> for Vis<'a, 'de, T> {
+        impl<'de, T: Deserialize<'de> + 'de> Visitor<'de> for Vis<'_, 'de, T> {
             type Value = Option<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
