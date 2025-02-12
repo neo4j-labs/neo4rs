@@ -52,7 +52,7 @@ impl Point2D {
         }
     }
 
-    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, ConversionError> {
+    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, PointConversionError> {
         self.to_point().as_nav()
     }
 }
@@ -110,13 +110,13 @@ impl Point3D {
         }
     }
 
-    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, ConversionError> {
+    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, PointConversionError> {
         self.to_point().as_nav()
     }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-pub enum ConversionError {
+pub enum PointConversionError {
     #[error("The coordinate system is not in {0}")]
     WrongSystem(Crs),
     #[error("The point is not defined on the {0} ellipsoid.")]
@@ -225,16 +225,16 @@ pub enum Point {
 }
 
 impl Point {
-    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, ConversionError> {
+    pub fn as_nav(&self) -> Result<nav_types::WGS84<f64>, PointConversionError> {
         match self {
             Point::Wgs842d(p) => p
                 .to_nav()
-                .ok_or(ConversionError::UndefinedPosition(Crs::Wgs842D)),
+                .ok_or(PointConversionError::UndefinedPosition(Crs::Wgs842D)),
             Point::Wgs843d(p) => p
                 .to_nav()
-                .ok_or(ConversionError::UndefinedPosition(Crs::Wgs843D)),
-            Point::Cartesian2d(_) => Err(ConversionError::WrongSystem(Crs::Wgs842D)),
-            Point::Cartesian3d(_) => Err(ConversionError::WrongSystem(Crs::Wgs843D)),
+                .ok_or(PointConversionError::UndefinedPosition(Crs::Wgs843D)),
+            Point::Cartesian2d(_) => Err(PointConversionError::WrongSystem(Crs::Wgs842D)),
+            Point::Cartesian3d(_) => Err(PointConversionError::WrongSystem(Crs::Wgs843D)),
         }
     }
 

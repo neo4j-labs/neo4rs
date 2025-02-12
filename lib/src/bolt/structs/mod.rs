@@ -5,10 +5,10 @@ pub use self::datetime::{
     DateTime, DateTimeZoneId, DateTimeZoneIdRef, LegacyDateTime, LegacyDateTimeZoneId,
     LegacyDateTimeZoneIdRef, LocalDateTime,
 };
-pub use self::duration::Duration;
+pub use self::duration::{Duration, DurationConversionError};
 pub use self::node::{Node, NodeRef};
 pub use self::path::{Path, PathRef, Segment};
-pub use self::point::{Point2D, Point3D};
+pub use self::point::{Point2D, Point3D, PointConversionError};
 pub use self::rel::{Relationship, RelationshipRef};
 pub use self::time::{LocalTime, Time};
 

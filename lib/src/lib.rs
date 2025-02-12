@@ -22,7 +22,7 @@
 //!    let pass = "neo";
 //!    let id = uuid::Uuid::new_v4().to_string();
 //!
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/example.rs")]
 //! }
@@ -49,7 +49,7 @@
 //!        .max_connections(10)
 //!        .build()
 //!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
+//!    let graph = Graph::connect(config).unwrap();
 //!
 #![doc = include_str!("../include/configurations.rs")]
 //! }
@@ -68,7 +68,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/nodes.rs")]
 //! }
@@ -91,7 +91,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/transactions.rs")]
 //! }
@@ -117,7 +117,7 @@
 //!        .fetch_size(1)
 //!        .build()
 //!        .unwrap();
-//!    let graph = Graph::connect(config).await.unwrap();
+//!    let graph = Graph::connect(config).unwrap();
 //!
 #![doc = include_str!("../include/streams_within_a_transaction.rs")]
 //! }
@@ -141,7 +141,7 @@
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/result_stream.rs")]
 //! }
@@ -152,11 +152,7 @@
     feature = "unstable-result-summary",
     doc = r##"### Streaming summary
 
-To get access to the result summary after streaming a [`RowStream`], you can use the [`RowStream::next_or_summary`] method.
-Alternatively, you can use one of the [`RowStream::as_row_items`], [`RowStream::as_items`], or [`RowStream::column_to_items`]
-methods to get the result as a stream of [`RowItem`], whis an enum of either the row or the summary.
-The last option is to use one of the [`RowStream::into_stream`], [`RowStream::into_stream_as`], or [`RowStream::column_into_stream`] methods
-and after the stream is consumed, call [`RowStream::finish`] to get the summary.
+To get access to the result summary after streaming a [`RowStream`], use the [`RowStream::finish`] method.
 
 ```no_run
 use neo4rs::*;
@@ -166,7 +162,7 @@ async fn main() {
     let uri = "127.0.0.1:7687";
     let user = "neo4j";
     let pass = "neo";
-    let graph = Graph::new(uri, user, pass).await.unwrap();
+    let graph = Graph::new(uri, user, pass).unwrap();
 
 "##
 )]
@@ -188,7 +184,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/rollback_a_transaction.rs")]
 //! }
@@ -213,7 +209,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/txn_vs_graph.rs")]
 //! }
@@ -233,7 +229,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/relationships.rs")]
 //! }
@@ -250,7 +246,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/unbounded_relationships.rs")]
 //! }
@@ -272,7 +268,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 //!    let qry = "
 //!        WITH point({ x: 2.3, y: 4.5, crs: 'cartesian' }) AS p1,
@@ -295,7 +291,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/raw_bytes.rs")]
 //! }
@@ -313,7 +309,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/durations.rs")]
 //! }
@@ -333,7 +329,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/dates.rs")]
 //! }
@@ -362,7 +358,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/time_as_param.rs")]
 //! }
@@ -379,7 +375,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/parse_time_from_result.rs")]
 //! }
@@ -410,7 +406,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/datetime_as_param.rs")]
 //! }
@@ -426,7 +422,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/parse_datetime_from_result.rs")]
 //! }
@@ -445,7 +441,7 @@ async fn main() {
 //!    let uri = "127.0.0.1:7687";
 //!    let user = "neo4j";
 //!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).await.unwrap();
+//!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
 #![doc = include_str!("../include/path.rs")]
 //! }
