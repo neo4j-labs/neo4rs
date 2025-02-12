@@ -41,12 +41,12 @@ impl Duration {
     }
 
     /// Returns the duration as [`std::time::Duration`], or an error if the conversion failed.
-    /// The error can be recovered using [`ConversionError::recover`].
-    pub fn as_duration(self) -> Result<StdDuration, ConversionError> {
+    /// The error can be recovered using [`DurationConversionError::recover`].
+    pub fn as_duration(self) -> Result<StdDuration, DurationConversionError> {
         if self.months == 0 {
             calculate_duration([0, self.days, self.seconds], self.nanoseconds)
         } else {
-            Err(ConversionError::EstimationRequired(DurationUnits {
+            Err(DurationConversionError::EstimationRequired(DurationUnits {
                 months: self.months,
                 days: self.days,
                 seconds: self.seconds,
@@ -56,7 +56,7 @@ impl Duration {
     }
 
     /// Returns the duration as [`std::time::Duration`], while recovering from any error.
-    /// See [`ConversionError::recover`] for more details.
+    /// See [`DurationConversionError::recover`] for more details.
     pub fn force_as_duration(self) -> StdDuration {
         self.as_duration().unwrap_or_else(|e| e.deep_recover())
     }
@@ -90,7 +90,7 @@ pub struct DurationUnits {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-pub enum ConversionError {
+pub enum DurationConversionError {
     /// The [`Duration`] contained a month part.
     ///
     /// The length of a month varies by month-of-year.
@@ -122,28 +122,28 @@ pub enum ConversionError {
     Negative(StdDuration),
 }
 
-impl ConversionError {
+impl DurationConversionError {
     /// Try to recover from the conversion error and return a `std::time::Duration` if possible.
-    /// See [`ConversionError`] for more details.
+    /// See [`DurationConversionError`] for more details.
     ///
     /// For `EstimationRequired`, possible values after recovery are `Overflow` and `Negative`.
     /// For `Overflow`, possible values after recovery are `Negative`.
     /// Recovery will always succeed for `Negative`.
     ///
-    /// To recover through all possible values, use [`ConversionError::deep_recover`].
+    /// To recover through all possible values, use [`DurationConversionError::deep_recover`].
     pub fn recover(self) -> Result<StdDuration, Self> {
         match self {
-            ConversionError::EstimationRequired(units) => {
+            DurationConversionError::EstimationRequired(units) => {
                 calculate_duration([units.months, units.days, units.seconds], units.nanoseconds)
             }
-            ConversionError::Overflow(sign) => {
+            DurationConversionError::Overflow(sign) => {
                 if sign >= 0 {
                     Ok(StdDuration::MAX)
                 } else {
                     Err(Self::Negative(StdDuration::MAX))
                 }
             }
-            ConversionError::Negative(duration) => Ok(duration),
+            DurationConversionError::Negative(duration) => Ok(duration),
         }
     }
 
@@ -162,7 +162,7 @@ impl ConversionError {
 fn calculate_duration(
     [months, days, secs]: [i64; 3],
     nanos: i32,
-) -> Result<StdDuration, ConversionError> {
+) -> Result<StdDuration, DurationConversionError> {
     const NANOS_PER_SECOND: i32 = 1_000_000_000;
     const SECONDS_PER_DAY: u32 = 86400;
     const SECONDS_PER_MONTH: u32 = {
@@ -186,13 +186,13 @@ fn calculate_duration(
     };
 
     let sign = seconds.signum() as i32;
-    let seconds =
-        u64::try_from(seconds.unsigned_abs()).map_err(|_| ConversionError::Overflow(sign))?;
+    let seconds = u64::try_from(seconds.unsigned_abs())
+        .map_err(|_| DurationConversionError::Overflow(sign))?;
 
     let duration = StdDuration::new(seconds, subsecond);
 
     if sign < 0 {
-        Err(ConversionError::Negative(duration))
+        Err(DurationConversionError::Negative(duration))
     } else {
         Ok(duration)
     }

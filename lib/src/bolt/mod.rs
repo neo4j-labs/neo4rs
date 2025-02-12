@@ -18,8 +18,9 @@ pub use request::{
 };
 pub use structs::{
     Bolt, BoltRef, Date, DateDuration, DateTime, DateTimeZoneId, DateTimeZoneIdRef, Duration,
-    LegacyDateTime, LegacyDateTimeZoneId, LegacyDateTimeZoneIdRef, LocalDateTime, LocalTime, Node,
-    NodeRef, Path, PathRef, Point2D, Point3D, Relationship, RelationshipRef, Segment, Time,
+    DurationConversionError, LegacyDateTime, LegacyDateTimeZoneId, LegacyDateTimeZoneIdRef,
+    LocalDateTime, LocalTime, Node, NodeRef, Path, PathRef, Point2D, Point3D, PointConversionError,
+    Relationship, RelationshipRef, Segment, Time,
 };
 pub use summary::{Failure, Success, Summary};
 
