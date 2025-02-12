@@ -184,7 +184,7 @@ impl Neo4jContainer {
                 .and_then(|o| std::fs::File::open(o).ok())
                 .into_iter()
                 .flat_map(|o| std::io::BufReader::new(o).lines())
-                .any(|o| o.map_or(false, |line| line.trim() == image_name));
+                .any(|o| o.is_ok_and(|line| line.trim() == image_name));
 
             if !has_license_acceptance {
                 return Err(format!(
