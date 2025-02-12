@@ -18,7 +18,6 @@ async fn main() {
             .build()
             .unwrap(),
     )
-    .await
     .unwrap();
 
     stream::iter(1..=1337)

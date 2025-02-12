@@ -245,7 +245,7 @@ impl Neo4jContainer {
             .build()
             .unwrap();
 
-        Graph::connect(config).await.unwrap()
+        Graph::connect(config).unwrap()
     }
 }
 

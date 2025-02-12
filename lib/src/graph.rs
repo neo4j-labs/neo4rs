@@ -66,7 +66,7 @@ impl Graph {
     /// Connects to the database with configurations provided.
     ///
     /// You can build a config using [`ConfigBuilder::default()`].
-    pub async fn connect(config: Config) -> Result<Self> {
+    pub fn connect(config: Config) -> Result<Self> {
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
             let info = ConnectionInfo::new(
@@ -77,16 +77,16 @@ impl Graph {
             )?;
             if matches!(info.routing, Routing::Yes(_)) {
                 debug!("Routing enabled, creating a routed connection manager");
-                let pool = Routed(
-                    RoutedConnectionManager::new(&config, Box::new(ClusterRoutingTableProvider))
-                        .await?,
-                );
+                let pool = Routed(RoutedConnectionManager::new(
+                    &config,
+                    Box::new(ClusterRoutingTableProvider),
+                )?);
                 Ok(Graph {
                     config: config.into_live_config(),
                     pool,
                 })
             } else {
-                let pool = Direct(create_pool(&config).await?);
+                let pool = Direct(create_pool(&config)?);
                 Ok(Graph {
                     config: config.into_live_config(),
                     pool,
@@ -95,7 +95,7 @@ impl Graph {
         }
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
-            let pool = Direct(create_pool(&config).await?);
+            let pool = Direct(create_pool(&config)?);
             Ok(Graph {
                 config: config.into_live_config(),
                 pool,
@@ -104,7 +104,7 @@ impl Graph {
     }
 
     /// Connects to the database with default configurations
-    pub async fn new(
+    pub fn new(
         uri: impl Into<String>,
         user: impl Into<String>,
         password: impl Into<String>,
@@ -114,7 +114,7 @@ impl Graph {
             .user(user)
             .password(password)
             .build()?;
-        Self::connect(config).await
+        Self::connect(config)
     }
 
     /// Starts a new transaction on the configured database.

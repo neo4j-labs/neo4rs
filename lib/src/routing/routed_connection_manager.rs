@@ -25,10 +25,7 @@ pub struct RoutedConnectionManager {
 }
 
 impl RoutedConnectionManager {
-    pub async fn new(
-        config: &Config,
-        provider: Box<dyn RoutingTableProvider>,
-    ) -> Result<Self, Error> {
+    pub fn new(config: &Config, provider: Box<dyn RoutingTableProvider>) -> Result<Self, Error> {
         let backoff = Arc::new(
             ExponentialBackoffBuilder::new()
                 .with_initial_interval(Duration::from_millis(1))
@@ -40,7 +37,7 @@ impl RoutedConnectionManager {
 
         let connection_registry = Arc::new(ConnectionRegistry::default());
         let channel =
-            start_background_updater(config, connection_registry.clone(), provider.into()).await;
+            start_background_updater(config, connection_registry.clone(), provider.into());
         Ok(RoutedConnectionManager {
             load_balancing_strategy: Arc::new(RoundRobinStrategy::default()),
             bookmarks: Arc::new(Mutex::new(vec![])),
