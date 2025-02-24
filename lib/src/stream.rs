@@ -245,11 +245,11 @@ impl RowStream {
 
     /// Stop consuming the stream and return a summary, if available.
     /// Stopping the stream will also discard any messages on the server side.
-    pub async fn finish(mut self, mut handle: impl TransactionHandle) -> Result<RunResult> {
+    pub async fn finish(&mut self, mut handle: impl TransactionHandle) -> Result<RunResult> {
         self.buffer.clear();
 
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-        match self.state {
+        match &self.state {
             State::Ready => {
                 let summary = {
                     let connected = handle.connection();
@@ -273,7 +273,7 @@ impl RowStream {
                 };
                 Ok(summary)
             }
-            State::Complete(summary) => Ok(*summary),
+            State::Complete(summary) => Ok(*summary.clone()),
         }
 
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
@@ -435,7 +435,7 @@ impl DetachedRowStream {
 
     /// Stop consuming the stream and return a summary, if available.
     /// Stopping the stream will also discard any messages on the server side.
-    pub async fn finish(mut self) -> Result<RunResult> {
+    pub async fn finish(&mut self) -> Result<RunResult> {
         self.stream.finish(&mut self.connection).await
     }
 

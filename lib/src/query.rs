@@ -129,7 +129,7 @@ impl Query {
         request: BoltRequest,
         connection: &mut ManagedConnection,
     ) -> QueryResult<RunResult> {
-        let result = Self::try_execute(request, 4096, connection).await?;
+        let mut result = Self::try_execute(request, 4096, connection).await?;
         Ok(result.finish(connection).await?)
     }
 
