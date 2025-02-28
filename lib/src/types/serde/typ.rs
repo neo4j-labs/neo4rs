@@ -2,6 +2,7 @@ use crate::{
     types::{
         serde::{
             date_time::BoltDateTimeVisitor,
+            duration::BoltDurationVisitor,
             element::ElementDataDeserializer,
             node::BoltNodeVisitor,
             path::BoltPathVisitor,
@@ -240,7 +241,9 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
             BoltKind::Path => variant
                 .tuple_variant(1, BoltPathVisitor)
                 .map(BoltType::Path),
-            BoltKind::Duration => variant.tuple_variant(1, self),
+            BoltKind::Duration => variant
+                .tuple_variant(1, BoltDurationVisitor)
+                .map(BoltType::Duration),
             BoltKind::Date => variant
                 .tuple_variant(1, BoltDateTimeVisitor::<BoltDate>::new())
                 .map(BoltType::Date),
@@ -328,7 +331,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Point3D(p) => p
                 .into_deserializer()
                 .deserialize_struct(name, fields, visitor),
-            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access_external()),
             _ => self.unexpected(visitor),
         }
     }
@@ -360,7 +363,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             BoltType::Point3D(p) => p
                 .into_deserializer()
                 .deserialize_newtype_struct(name, visitor),
-            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access_external()),
             BoltType::DateTimeZoneId(dtz) if name == "Timezone" => {
                 visitor.visit_newtype_struct(BorrowedStrDeserializer::new(dtz.tz_id()))
             }
@@ -378,7 +381,8 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
             }
             BoltType::Point2D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
             BoltType::Point3D(p) => p.into_deserializer().deserialize_tuple(len, visitor),
-            BoltType::Duration(d) if len == 2 => visitor.visit_seq(d.seq_access()),
+            BoltType::Duration(d) if len == 2 => visitor.visit_seq(d.seq_access_external()),
+            BoltType::Duration(d) if len == 4 => visitor.visit_seq(d.seq_access_bolt()),
             BoltType::DateTimeZoneId(dtz) => visitor.visit_seq(
                 dtz.seq_access(
                     std::any::type_name::<V>()
@@ -879,7 +883,8 @@ impl<'de> VariantAccess<'de> for BoltEnum<'de> {
             BoltType::Point3D(p) => BoltPointDeserializer::new(p).deserialize_tuple(len, visitor),
             BoltType::Bytes(b) => visitor.visit_borrowed_bytes(&b.value),
             BoltType::Path(p) => ElementDataDeserializer::new(p).tuple_variant(len, visitor),
-            BoltType::Duration(d) => visitor.visit_seq(d.seq_access()),
+            BoltType::Duration(d) if len == 1 => visitor.visit_seq(d.seq_access_bolt()),
+            BoltType::Duration(d) => visitor.visit_seq(d.seq_access_external()),
             BoltType::Date(d) => visitor.visit_map(d.map_access()),
             BoltType::Time(t) => visitor.visit_map(t.map_access()),
             BoltType::LocalTime(t) => visitor.visit_map(t.map_access()),
@@ -2004,6 +2009,20 @@ mod tests {
         assert_eq!(actual, duration);
 
         let actual = bolt.to::<time::Duration>().unwrap();
+        assert_eq!(actual, duration);
+    }
+
+    #[test]
+    fn duration_roundtrip() {
+        let duration = BoltDuration::from(Duration::new(42, 1337));
+
+        let bolt = BoltType::Duration(duration.clone());
+
+        let actual = bolt.to::<BoltType>().unwrap();
+        let BoltType::Duration(actual) = actual else {
+            panic!()
+        };
+
         assert_eq!(actual, duration);
     }
 

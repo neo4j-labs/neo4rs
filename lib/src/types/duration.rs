@@ -4,10 +4,10 @@ use neo4rs_macros::BoltStruct;
 #[derive(Debug, PartialEq, Eq, Clone, BoltStruct)]
 #[signature(0xB4, 0x45)]
 pub struct BoltDuration {
-    months: BoltInteger,
-    days: BoltInteger,
-    seconds: BoltInteger,
-    nanoseconds: BoltInteger,
+    pub(crate) months: BoltInteger,
+    pub(crate) days: BoltInteger,
+    pub(crate) seconds: BoltInteger,
+    pub(crate) nanoseconds: BoltInteger,
 }
 
 impl BoltDuration {
@@ -31,10 +31,6 @@ impl BoltDuration {
             .saturating_add(self.days.value.saturating_mul(24 * 3600))
             .saturating_add(self.months.value.saturating_mul(2_629_800))
     }
-
-    pub(crate) fn nanoseconds(&self) -> i64 {
-        self.nanoseconds.value
-    }
 }
 
 impl From<std::time::Duration> for BoltDuration {
@@ -53,8 +49,7 @@ impl From<std::time::Duration> for BoltDuration {
 impl From<BoltDuration> for std::time::Duration {
     fn from(value: BoltDuration) -> Self {
         //TODO: clarify month issue
-        let seconds =
-            value.seconds.value + (value.days.value * 24 * 3600) + (value.months.value * 2_629_800);
+        let seconds = value.seconds();
         std::time::Duration::new(seconds as u64, value.nanoseconds.value as u32)
     }
 }

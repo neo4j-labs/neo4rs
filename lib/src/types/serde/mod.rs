@@ -10,6 +10,7 @@ mod builder;
 mod cenum;
 mod date_time;
 mod de;
+mod duration;
 mod element;
 mod error;
 mod kind;
