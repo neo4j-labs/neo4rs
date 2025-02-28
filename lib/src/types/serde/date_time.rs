@@ -2,13 +2,15 @@ use core::fmt;
 use std::{iter::Peekable, marker::PhantomData};
 
 use serde::de::{
-    value::{BorrowedStrDeserializer, MapDeserializer, SeqDeserializer},
+    value::{BorrowedStrDeserializer, MapDeserializer},
     DeserializeSeed, Error, IntoDeserializer, MapAccess, SeqAccess, Visitor,
 };
 
-use crate::types::{serde::builder::SetOnce, BoltLocalDateTime, BoltString};
 use crate::{
-    types::{BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger},
+    types::{
+        serde::builder::SetOnce, BoltDateTime, BoltDateTimeZoneId, BoltInteger, BoltLocalDateTime,
+        BoltString,
+    },
     DeError,
 };
 
@@ -54,12 +56,6 @@ impl BoltDateTimeZoneId {
 
     pub(crate) fn map_access(&self) -> impl MapAccess<'_, Error = DeError> {
         BoltDateTimeZoneIdAccess::fields(self)
-    }
-}
-
-impl BoltDuration {
-    pub(crate) fn seq_access(&self) -> impl SeqAccess<'_, Error = DeError> {
-        SeqDeserializer::new([self.seconds(), self.nanoseconds()].into_iter())
     }
 }
 
