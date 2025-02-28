@@ -66,8 +66,10 @@ fn update_msrv_lock() -> Result {
 
     let pin_versions: &[(String, &str)] = &[
         ("home".to_owned(), "0.5.9"),
+        ("litemap".to_owned(), "0.7.4"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
+        ("zerofrom".to_owned(), "0.1.5"),
     ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, &sh, &cargo, krate, version)?;
@@ -95,9 +97,11 @@ fn update_min_lock() -> Result {
 
     let pin_versions: &[(String, &str)] = &[
         ("home".to_owned(), "0.5.9"),
+        ("litemap".to_owned(), "0.7.4"),
         ("serde_repr".to_owned(), "0.1.5"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
+        ("zerofrom".to_owned(), "0.1.5"),
     ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, &sh, &cargo, krate, version)?;
