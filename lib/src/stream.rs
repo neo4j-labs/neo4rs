@@ -125,7 +125,7 @@ impl RowStream {
                 if self.state == State::Ready {
                     let pull = BoltRequest::pull(self.fetch_size, self.qid);
                     let connection = handle.connection();
-                    connection.send(pull).await?;
+                    let _ = connection.send(pull).await;
 
                     self.state = loop {
                         match connection.recv().await {
