@@ -20,6 +20,7 @@ use futures::{stream::try_unfold, TryStream};
 use serde::de::DeserializeOwned;
 
 use std::collections::VecDeque;
+use log::debug;
 
 #[cfg(feature = "unstable-result-summary")]
 type BoxedSummary = Box<ResultSummary>;
@@ -90,7 +91,7 @@ impl RowStream {
                 if self.state == State::Ready {
                     let pull = Pull::some(self.fetch_size as i64).for_query(self.qid);
                     let connection = handle.connection();
-                    connection.send_as(pull).await?;
+                    let _ = connection.send_as(pull).await;
                     self.state = loop {
                         let response = connection
                             .recv_as::<Response<Vec<Bolt>, Streaming>>()
