@@ -20,7 +20,7 @@ use futures::{stream::try_unfold, TryStream};
 use serde::de::DeserializeOwned;
 
 use std::collections::VecDeque;
-use log::debug;
+use log::{debug, warn};
 
 #[cfg(feature = "unstable-result-summary")]
 type BoxedSummary = Box<ResultSummary>;
@@ -91,7 +91,9 @@ impl RowStream {
                 if self.state == State::Ready {
                     let pull = Pull::some(self.fetch_size as i64).for_query(self.qid);
                     let connection = handle.connection();
-                    let _ = connection.send_as(pull).await;
+                    if let Err(e) = connection.send_as(pull).await {
+                        warn!("Failed to send PULL request: {}", e);
+                    }
                     self.state = loop {
                         let response = connection
                             .recv_as::<Response<Vec<Bolt>, Streaming>>()
@@ -125,7 +127,9 @@ impl RowStream {
                 if self.state == State::Ready {
                     let pull = BoltRequest::pull(self.fetch_size, self.qid);
                     let connection = handle.connection();
-                    let _ = connection.send(pull).await;
+                    if let Err(e) = connection.send(pull).await {
+                        warn!("Failed to send PULL request: {}", e);
+                    }
 
                     self.state = loop {
                         match connection.recv().await {
