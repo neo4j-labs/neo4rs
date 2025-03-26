@@ -62,6 +62,14 @@ impl IntoIterator for BoltList {
     }
 }
 
+impl<T: Into<BoltType>> FromIterator<T> for BoltList {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        BoltList {
+            value: iter.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 impl From<BoltList> for Vec<String> {
     fn from(value: BoltList) -> Self {
         value.value.into_iter().map(|x| x.to_string()).collect()
