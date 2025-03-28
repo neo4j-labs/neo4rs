@@ -163,6 +163,10 @@ impl BoltRequest {
         BoltRequest::Discard(discard::Discard::new(-1, query_id))
     }
 
+    #[cfg_attr(
+        feature = "unstable-bolt-protocol-impl-v2",
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
+    )]
     pub fn begin(db: Option<&str>) -> BoltRequest {
         let extra = db.into_iter().map(|db| ("db".into(), db.into())).collect();
         let begin = Begin::new(extra);

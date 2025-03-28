@@ -8,6 +8,7 @@ pub(crate) trait RoutingTableProvider: Send + Sync {
     fn fetch_routing_table(
         &self,
         config: &Config,
+        bookmarks: &[String],
     ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>>;
 }
 
@@ -17,8 +18,10 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
     fn fetch_routing_table(
         &self,
         config: &Config,
+        bookmarks: &[String],
     ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
         let config = config.clone();
+        let bookmarks = bookmarks.to_vec();
         Box::pin(async move {
             let info = ConnectionInfo::new(
                 &config.uri,
@@ -27,7 +30,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
                 &config.tls_config,
             )?;
             let mut connection = Connection::new(&info).await?;
-            let mut builder = RouteBuilder::new(info.routing, vec![]);
+            let mut builder = RouteBuilder::new(info.routing, bookmarks);
             if let Some(db) = config.db.clone() {
                 builder = builder.with_db(db);
             }
