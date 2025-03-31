@@ -7,6 +7,7 @@
     let mut result = graph.execute(query("MATCH (p:Person) WHERE p.id = $id RETURN p.id").param("id", id.clone())).await.unwrap();
     assert!(result.next().await.unwrap().is_none());
     let bookmark = txn.commit().await.unwrap();
+    assert!(bookmark.is_some());
     if let Some(ref b) = bookmark {
         println!("Got a bookmark after commit: {:?}", b);
     }

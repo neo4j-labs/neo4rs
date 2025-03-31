@@ -148,28 +148,38 @@
 //!
 //! ```
 //!
-//! ### Bookmarks and transactions
-//!
-//! Start a new transaction using [`Graph::start_txn`], which will return a handle [`Txn`] that can
-//! be used to [`Txn::commit`] or [`Txn::rollback`] the transaction. The commit message eventually returns
-//! a bookmark which can be used to start a new transaction with the same state.
-//!
-//!
-//! ```no_run
-//! use neo4rs::*;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let uri = "127.0.0.1:7687";
-//!    let user = "neo4j";
-//!    let pass = "neo";
-//!    let graph = Graph::new(uri, user, pass).unwrap();
-//!
-#![doc = include_str!("../include/bookmarks.rs")]
-//! }
-//!
-//! ```
-//!
+#![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = r##"### Bookmarks and transactions
+
+Start a new transaction using [`Graph::start_txn`], which will return a handle [`Txn`] that can
+be used to [`Txn::commit`] or [`Txn::rollback`] the transaction. The commit message eventually returns
+a bookmark which can be used to start a new transaction with the same state.
+
+```no_run
+use neo4rs::*;
+
+#[tokio::main]
+async fn main() {
+   let uri = "127.0.0.1:7687";
+   let user = "neo4j";
+   let pass = "neo";
+   let graph = Graph::new(uri, user, pass).unwrap();
+
+"##
+)]
+#![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = include_str!("../include/bookmarks.rs")
+)]
+#![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = r"
+}
+```
+
+"
+)]
 #![cfg_attr(
     feature = "unstable-result-summary",
     doc = r##"### Streaming summary

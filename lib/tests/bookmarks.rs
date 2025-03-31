@@ -1,3 +1,4 @@
+#![cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use neo4rs::*;
 
 mod container;
