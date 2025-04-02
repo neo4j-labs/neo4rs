@@ -1,9 +1,7 @@
-use crate::bolt::{ExpectedResponse, Hello, Summary};
-use crate::routing::Route;
+use crate::bolt::{ExpectedResponse, Summary};
 use crate::{Database, Version};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,9 +58,9 @@ impl<'a> BeginBuilder<'a> {
         }
     }
 
-    pub fn with_bookmarks(mut self, bookmarks: Vec<impl Display>) -> Self {
+    pub fn with_bookmarks(mut self, bookmarks: impl IntoIterator<Item=impl Display>) -> Self {
         self.bookmarks = bookmarks
-            .iter()
+            .into_iter()
             .map(|b| b.to_string())
             .collect::<Vec<String>>();
         self
@@ -215,7 +213,6 @@ mod tests {
     use crate::bolt::Message;
     use crate::packstream::bolt;
     use crate::{Database, Version};
-    use std::collections::HashMap;
 
     #[test]
     fn serialize() {

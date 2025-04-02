@@ -165,7 +165,7 @@ impl BoltRequest {
 
     #[cfg_attr(
         feature = "unstable-bolt-protocol-impl-v2",
-        deprecated(since = "0.9.0", note = "Use `crate::bolt::Discard` instead.")
+        deprecated(since = "0.9.0", note = "Use `crate::bolt::Begin` instead.")
     )]
     pub fn begin(db: Option<&str>) -> BoltRequest {
         let extra = db.into_iter().map(|db| ("db".into(), db.into())).collect();
