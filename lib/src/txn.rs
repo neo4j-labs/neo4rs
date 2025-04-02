@@ -141,25 +141,23 @@ impl Txn {
     }
 
     /// Commits the transaction in progress
-    pub async fn commit(mut self) -> Result<Option<String>> {
-        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        {
-            let commit = BoltRequest::commit();
-            match self.connection.send_recv(commit).await? {
-                BoltResponse::Success(_) => Ok(None),
-                msg => Err(msg.into_error("COMMIT")),
-            }
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    pub async fn commit(mut self) -> Result<()> {
+        let commit = BoltRequest::commit();
+        match self.connection.send_recv(commit).await? {
+            BoltResponse::Success(_) => Ok(None),
+            msg => Err(msg.into_error("COMMIT")),
         }
+    }
 
-        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-        {
-            match self.connection.send_recv_as(Commit).await? {
-                Summary::Success(resp) => {
-                    self.save_bookmark_state(&resp.metadata);
-                    Ok(self.bookmark)
-                }
-                msg => Err(msg.into_error("COMMIT")),
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn commit(mut self) -> Result<Option<String>> {
+        match self.connection.send_recv_as(Commit).await? {
+            Summary::Success(resp) => {
+                self.save_bookmark_state(&resp.metadata);
+                Ok(self.bookmark)
             }
+            msg => Err(msg.into_error("COMMIT")),
         }
     }
 
