@@ -1,16 +1,16 @@
 use crate::bolt::{ExpectedResponse, Summary};
-use crate::connection::{NeoUrl, Routing};
+use crate::connection::Routing;
 use crate::routing::{Extra, Route, RouteExtra, RoutingTable};
 use serde::ser::{SerializeMap, SerializeStructVariant};
 use serde::{Deserialize, Serialize};
-use std::fmt::{format, Display, Formatter};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Response {
     pub rt: RoutingTable,
 }
 
-impl ExpectedResponse for Route<'_> {
+impl ExpectedResponse for Route {
     type Response = Summary<Response>;
 }
 
@@ -32,7 +32,7 @@ impl Serialize for Routing {
     }
 }
 
-impl Serialize for Route<'_> {
+impl Serialize for Route {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -70,14 +70,14 @@ mod tests {
     use crate::bolt::{Message, MessageResponse};
     use crate::connection::Routing;
     use crate::packstream::bolt;
-    use crate::routing::{Route, RouteBuilder};
+    use crate::routing::RouteBuilder;
     use crate::{Database, Version};
 
     #[test]
     fn serialize() {
         let route = RouteBuilder::new(
             Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
-            vec!["bookmark"],
+            vec!["bookmark".into()],
         )
         .with_db(Database::from("neo4j"))
         .build(Version::V4_3);
@@ -100,7 +100,7 @@ mod tests {
     fn serialize_no_db() {
         let builder = RouteBuilder::new(
             Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
-            vec!["bookmark"],
+            vec!["bookmark".into()],
         );
         let route = builder.build(Version::V4_3);
         let serialized = route.to_bytes().unwrap();
@@ -122,7 +122,7 @@ mod tests {
     fn serialize_no_db_v4_4() {
         let builder = RouteBuilder::new(
             Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
-            vec!["bookmark"],
+            vec!["bookmark".into()],
         );
         let route = builder.build(Version::V4_4);
         let serialized = route.to_bytes().unwrap();
@@ -148,7 +148,7 @@ mod tests {
     fn serialize_with_db_v4_4() {
         let builder = RouteBuilder::new(
             Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
-            vec!["bookmark"],
+            vec!["bookmark".into()],
         );
         let route = builder
             .with_db("neo4j".into())

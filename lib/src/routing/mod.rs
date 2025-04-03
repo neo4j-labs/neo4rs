@@ -16,9 +16,9 @@ pub enum RouteExtra {
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Route<'a> {
+pub struct Route {
     pub(crate) routing: Routing,
-    pub(crate) bookmarks: Vec<&'a str>,
+    pub(crate) bookmarks: Vec<String>,
     pub(crate) extra: RouteExtra,
 }
 
@@ -58,14 +58,14 @@ pub struct Server {
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub struct RouteBuilder<'a> {
     routing: Routing,
-    bookmarks: Vec<&'a str>,
+    bookmarks: Vec<String>,
     db: Option<Database>,
-    imp_user: Option<String>,
+    imp_user: Option<&'a str>,
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 impl<'a> RouteBuilder<'a> {
-    pub fn new(routing: Routing, bookmarks: Vec<&'a str>) -> Self {
+    pub fn new(routing: Routing, bookmarks: Vec<String>) -> Self {
         Self {
             routing,
             bookmarks,
@@ -84,19 +84,19 @@ impl<'a> RouteBuilder<'a> {
     #[allow(dead_code)]
     pub fn with_imp_user(self, imp_user: &'a str) -> Self {
         Self {
-            imp_user: Some(imp_user.to_string()),
+            imp_user: Some(imp_user),
             ..self
         }
     }
 
-    pub fn build(self, version: Version) -> Route<'a> {
+    pub fn build(self, version: Version) -> Route {
         match version.cmp(&Version::V4_4) {
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Route {
                 routing: self.routing,
                 bookmarks: self.bookmarks,
                 extra: RouteExtra::V4_4(Extra {
                     db: self.db,
-                    imp_user: self.imp_user,
+                    imp_user: self.imp_user.map(|s| s.to_string()),
                 }),
             },
             std::cmp::Ordering::Less => Route {
@@ -108,7 +108,7 @@ impl<'a> RouteBuilder<'a> {
     }
 }
 
-impl Display for Route<'_> {
+impl Display for Route {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let (db, imp_user) = match self.extra {
             RouteExtra::V4_3(ref db) => {
