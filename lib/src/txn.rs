@@ -145,7 +145,7 @@ impl Txn {
     pub async fn commit(mut self) -> Result<()> {
         let commit = BoltRequest::commit();
         match self.connection.send_recv(commit).await? {
-            BoltResponse::Success(_) => Ok(None),
+            BoltResponse::Success(_) => Ok(()),
             msg => Err(msg.into_error("COMMIT")),
         }
     }
