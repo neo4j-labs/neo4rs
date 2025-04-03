@@ -58,7 +58,7 @@ impl<'a> BeginBuilder<'a> {
         }
     }
 
-    pub fn with_bookmarks(mut self, bookmarks: impl IntoIterator<Item=impl Display>) -> Self {
+    pub fn with_bookmarks(mut self, bookmarks: impl IntoIterator<Item = impl Display>) -> Self {
         self.bookmarks = bookmarks
             .into_iter()
             .map(|b| b.to_string())
