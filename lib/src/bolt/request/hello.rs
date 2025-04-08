@@ -1,10 +1,10 @@
-use std::{borrow::Borrow, collections::HashMap};
+use std::borrow::Borrow;
 
 use crate::{
     bolt::{ExpectedResponse, Summary},
     Version,
 };
-use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hello<'a> {
@@ -119,6 +119,13 @@ impl Serialize for ServerRouting<'_> {
 pub struct Response {
     pub(crate) server: String,
     pub(crate) connection_id: String,
+    pub(crate) hints: Option<ConnectionsHints>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct ConnectionsHints {
+    #[serde(rename = "connection.recv_timeout_seconds")]
+    connection_recv_timeout_seconds: u32,
 }
 
 impl ExpectedResponse for Hello<'_> {
@@ -254,5 +261,27 @@ mod tests {
 
         assert_eq!(response.server, "Neo4j/4.1.4");
         assert_eq!(response.connection_id, "bolt-31");
+    }
+
+    #[test]
+    fn parse_with_hints() {
+        let data = bolt()
+            .tiny_map(3)
+            .tiny_string("server")
+            .tiny_string("Neo4j/4.1.4")
+            .tiny_string("connection_id")
+            .tiny_string("bolt-31")
+            .tiny_string("hints")
+            .tiny_map(1)
+            .string8("connection.recv_timeout_seconds")
+            .tiny_int(120)
+            .build();
+
+        let response = Response::parse(data).unwrap();
+
+        assert_eq!(response.server, "Neo4j/4.1.4");
+        assert_eq!(response.connection_id, "bolt-31");
+        assert!(response.hints.is_some());
+        assert_eq!(response.hints.unwrap().connection_recv_timeout_seconds, 120);
     }
 }
