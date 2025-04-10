@@ -125,7 +125,7 @@ pub struct Response {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ConnectionsHints {
     #[serde(rename = "connection.recv_timeout_seconds")]
-    connection_recv_timeout_seconds: u32,
+    connection_recv_timeout_seconds: Option<u32>,
 }
 
 impl ExpectedResponse for Hello<'_> {
@@ -282,6 +282,13 @@ mod tests {
         assert_eq!(response.server, "Neo4j/4.1.4");
         assert_eq!(response.connection_id, "bolt-31");
         assert!(response.hints.is_some());
-        assert_eq!(response.hints.unwrap().connection_recv_timeout_seconds, 120);
+        assert_eq!(
+            response
+                .hints
+                .unwrap()
+                .connection_recv_timeout_seconds
+                .unwrap(),
+            120
+        );
     }
 }
