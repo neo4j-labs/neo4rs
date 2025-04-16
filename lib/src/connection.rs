@@ -4,7 +4,8 @@ use crate::messages::HelloBuilder;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
     crate::bolt::{
-        ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
+        ConnectionsHints, ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset,
+        Summary,
     },
     log::debug,
 };
@@ -45,6 +46,9 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 pub struct Connection {
     version: Version,
     stream: BufStream<ConnectionStream>,
+    #[allow(unused)]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    hints: Option<ConnectionsHints>,
 }
 
 impl Connection {
@@ -94,6 +98,8 @@ impl Connection {
         Connection {
             version,
             stream: BufStream::new(stream.into()),
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            hints: None,
         }
     }
 
@@ -120,7 +126,10 @@ impl Connection {
         let hello = self.send_recv_as(hello).await?;
 
         match hello {
-            Summary::Success(_msg) => Ok(()),
+            Summary::Success(msg) => {
+                self.hints = msg.metadata.hints;
+                Ok(())
+            }
             Summary::Ignored => Err(Error::RequestIgnoredError),
             Summary::Failure(msg) => Err(Error::AuthenticationError(msg.message)),
         }
