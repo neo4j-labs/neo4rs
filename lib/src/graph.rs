@@ -20,7 +20,7 @@ use crate::{
     Operation,
 };
 use backoff::{Error, ExponentialBackoff};
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone)]
 enum ConnectionPoolManager {
@@ -79,7 +79,7 @@ impl Graph {
                 debug!("Routing enabled, creating a routed connection manager");
                 let pool = Routed(RoutedConnectionManager::new(
                     &config,
-                    Box::new(ClusterRoutingTableProvider),
+                    Arc::new(ClusterRoutingTableProvider),
                 )?);
                 Ok(Graph {
                     config: config.into_live_config(),

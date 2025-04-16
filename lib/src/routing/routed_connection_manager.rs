@@ -10,8 +10,7 @@ use crate::{Config, Error, Operation};
 use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use futures::lock::Mutex;
 use log::{debug, error};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
@@ -24,7 +23,7 @@ pub struct RoutedConnectionManager {
 }
 
 impl RoutedConnectionManager {
-    pub fn new(config: &Config, provider: Box<dyn RoutingTableProvider>) -> Result<Self, Error> {
+    pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
         let backoff = Arc::new(
             ExponentialBackoffBuilder::new()
                 .with_initial_interval(Duration::from_millis(1))
@@ -35,8 +34,7 @@ impl RoutedConnectionManager {
         );
 
         let connection_registry = Arc::new(ConnectionRegistry::default());
-        let channel =
-            start_background_updater(config, connection_registry.clone(), provider.into());
+        let channel = start_background_updater(config, connection_registry.clone(), provider);
         Ok(RoutedConnectionManager {
             load_balancing_strategy: Arc::new(RoundRobinStrategy::default()),
             bookmarks: Arc::new(Mutex::new(vec![])),

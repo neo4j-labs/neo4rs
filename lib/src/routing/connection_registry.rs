@@ -63,7 +63,7 @@ impl Default for ConnectionRegistry {
 async fn refresh_routing_table(
     config: Config,
     registry: Arc<ConnectionRegistry>,
-    provider: Arc<Box<dyn RoutingTableProvider>>,
+    provider: Arc<dyn RoutingTableProvider>,
     bookmarks: &[String],
 ) -> Result<u64, Error> {
     debug!("Routing table expired or empty, refreshing...");
@@ -109,7 +109,7 @@ async fn refresh_routing_table(
 pub(crate) fn start_background_updater(
     config: &Config,
     registry: Arc<ConnectionRegistry>,
-    provider: Arc<Box<dyn RoutingTableProvider>>,
+    provider: Arc<dyn RoutingTableProvider>,
 ) -> Sender<RegistryCommand> {
     let config_clone = config.clone();
     let (tx, mut rx) = mpsc::channel(1);
@@ -266,9 +266,7 @@ mod tests {
         let ttl = refresh_routing_table(
             config.clone(),
             registry.clone(),
-            Arc::new(Box::new(TestRoutingTableProvider::new(
-                cluster_routing_table,
-            ))),
+            Arc::new(TestRoutingTableProvider::new(cluster_routing_table)),
             &[],
         )
         .await
