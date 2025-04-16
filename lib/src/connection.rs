@@ -269,7 +269,7 @@ impl Connection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Routing {
     No,
-    Yes(Vec<(BoltString, BoltString)>),
+    Yes(Arc<[(BoltString, BoltString)]>),
 }
 
 impl From<Routing> for Option<BoltMap> {
@@ -278,8 +278,8 @@ impl From<Routing> for Option<BoltMap> {
             Routing::No => None,
             Routing::Yes(routing) => Some(
                 routing
-                    .into_iter()
-                    .map(|(k, v)| (k, BoltType::String(v)))
+                    .iter()
+                    .map(|(k, v)| (k.clone(), BoltType::String(v.clone())))
                     .collect(),
             ),
         }
@@ -360,7 +360,8 @@ impl ConnectionInfo {
                 "Client-side routing is in experimental mode.",
                 "It is possible that operations against a cluster (such as Aura) will fail."
             ));
-            Routing::Yes(url.routing_context())
+            let context = url.routing_context();
+            Routing::Yes(context.into())
         } else {
             Routing::No
         };

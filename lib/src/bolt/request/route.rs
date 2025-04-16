@@ -23,7 +23,7 @@ impl Serialize for Routing {
             Routing::No => serializer.serialize_none(),
             Routing::Yes(routing) => {
                 let mut map = serializer.serialize_map(Some(routing.len()))?;
-                for (k, v) in routing {
+                for (k, v) in routing.iter() {
                     map.serialize_entry(k.value.as_str(), v.value.as_str())?;
                 }
                 map.end()
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn serialize() {
         let route = RouteBuilder::new(
-            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            Routing::Yes([("address".into(), "localhost:7687".into())].into()),
             vec!["bookmark".into()],
         )
         .with_db(Database::from("neo4j"))
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn serialize_no_db() {
         let builder = RouteBuilder::new(
-            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            Routing::Yes([("address".into(), "localhost:7687".into())].into()),
             vec!["bookmark".into()],
         );
         let route = builder.build(Version::V4_3);
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn serialize_no_db_v4_4() {
         let builder = RouteBuilder::new(
-            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            Routing::Yes([("address".into(), "localhost:7687".into())].into()),
             vec!["bookmark".into()],
         );
         let route = builder.build(Version::V4_4);
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn serialize_with_db_v4_4() {
         let builder = RouteBuilder::new(
-            Routing::Yes(vec![("address".into(), "localhost:7687".into())]),
+            Routing::Yes([("address".into(), "localhost:7687".into())].into()),
             vec!["bookmark".into()],
         );
         let route = builder
