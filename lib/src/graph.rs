@@ -5,6 +5,7 @@ use {
     crate::routing::{ClusterRoutingTableProvider, RoutedConnectionManager},
     crate::summary::ResultSummary,
     log::debug,
+    std::sync::Arc,
 };
 
 use crate::graph::ConnectionPoolManager::Direct;
@@ -20,7 +21,7 @@ use crate::{
     Operation,
 };
 use backoff::{Error, ExponentialBackoff};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 #[derive(Clone)]
 enum ConnectionPoolManager {
