@@ -75,7 +75,7 @@ impl Graph {
                 &config.password,
                 &config.tls_config,
             )?;
-            if matches!(info.routing, Routing::Yes(_)) {
+            if matches!(info.init.routing, Routing::Yes(_)) {
                 debug!("Routing enabled, creating a routed connection manager");
                 let pool = Routed(RoutedConnectionManager::new(
                     &config,

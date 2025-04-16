@@ -30,7 +30,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
                 &config.tls_config,
             )?;
             let mut connection = Connection::new(&info).await?;
-            let mut builder = RouteBuilder::new(info.routing, bookmarks);
+            let mut builder = RouteBuilder::new(info.init.routing, bookmarks);
             if let Some(db) = config.db.clone() {
                 builder = builder.with_db(db);
             }
