@@ -1141,7 +1141,7 @@ mod tests {
     #[test]
     fn tuple_struct_from_map_fails() {
         // We do not support this since maps are unordered and
-        // we cannot gurantee that the values are in the same
+        // we cannot guarantee that the values are in the same
         // order as the tuple struct fields.
         #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
         struct Person(String, u8);
@@ -2063,9 +2063,9 @@ mod tests {
         let bolt = BoltLocalTime::from(time);
         let bolt = BoltType::LocalTime(bolt);
 
-        let acutal = bolt.to::<(NaiveTime, Option<Offset>)>().unwrap();
-        assert_eq!(acutal.0, time);
-        assert_eq!(acutal.1, None);
+        let actual = bolt.to::<(NaiveTime, Option<Offset>)>().unwrap();
+        assert_eq!(actual.0, time);
+        assert_eq!(actual.1, None);
     }
 
     #[test]

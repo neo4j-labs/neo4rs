@@ -1,27 +1,32 @@
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+use crate::messages::{BoltRequest, BoltResponse};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::bolt::{Commit, Rollback, Summary};
+use {
+    crate::bolt::{Begin, Commit, Rollback, Summary},
+    crate::bookmarks::Bookmark,
+    log::debug,
+};
+
 use crate::{
-    config::Database,
-    errors::Result,
-    messages::{BoltRequest, BoltResponse},
-    pool::ManagedConnection,
-    query::Query,
-    stream::RowStream,
+    config::Database, errors::Result, pool::ManagedConnection, query::Query, stream::RowStream,
     Operation, RunResult,
 };
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
 ///
-/// When a transation is started, a dedicated connection is resered and moved into the handle which
+/// When a transaction is started, a dedicated connection is reserved and moved into the handle which
 /// will be released to the connection pool when the [`Txn`] handle is dropped.
 pub struct Txn {
     db: Option<Database>,
     fetch_size: usize,
     connection: ManagedConnection,
     operation: Operation,
+    #[allow(dead_code)]
+    bookmark: Option<String>,
 }
 
 impl Txn {
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub(crate) async fn new(
         db: Option<Database>,
         fetch_size: usize,
@@ -35,8 +40,34 @@ impl Txn {
                 fetch_size,
                 connection,
                 operation,
+                bookmark: None,
             }),
             msg => Err(msg.into_error("BEGIN")),
+        }
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub(crate) async fn new(
+        db: Option<Database>,
+        fetch_size: usize,
+        mut connection: ManagedConnection,
+        operation: Operation,
+        bookmarks: &[String],
+    ) -> Result<Self> {
+        debug!("Starting transaction with bookmarks: {:?}", bookmarks);
+        let begin = Begin::builder(db.as_deref())
+            .with_bookmarks(bookmarks.to_vec())
+            .build(connection.version());
+        match connection.send_recv_as(begin).await? {
+            Summary::Success(response) => Ok(Txn {
+                db: response.metadata.db.or(db),
+                fetch_size,
+                connection,
+                operation,
+                bookmark: None,
+            }),
+            Summary::Ignored => Err(crate::errors::Error::Ignored("Failed to start transaction")),
+            Summary::Failure(failure) => Err(failure.into_error()),
         }
     }
 
@@ -51,6 +82,7 @@ impl Txn {
         for query in queries {
             let summary = self.run(query.into()).await?;
             counters += summary.stats();
+            self.save_bookmark_state(&summary);
         }
         Ok(counters)
     }
@@ -80,7 +112,14 @@ impl Txn {
                 Operation::Write => "w",
             },
         );
-        query.run(&mut self.connection).await
+        match query.run(&mut self.connection).await {
+            Ok(result) => {
+                #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                self.save_bookmark_state(&result);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Executes a query and returns a [`RowStream`]
@@ -102,22 +141,23 @@ impl Txn {
     }
 
     /// Commits the transaction in progress
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub async fn commit(mut self) -> Result<()> {
-        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        {
-            let commit = BoltRequest::commit();
-            match self.connection.send_recv(commit).await? {
-                BoltResponse::Success(_) => Ok(()),
-                msg => Err(msg.into_error("COMMIT")),
-            }
+        let commit = BoltRequest::commit();
+        match self.connection.send_recv(commit).await? {
+            BoltResponse::Success(_) => Ok(()),
+            msg => Err(msg.into_error("COMMIT")),
         }
+    }
 
-        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-        {
-            match self.connection.send_recv_as(Commit).await? {
-                Summary::Success(_) => Ok(()),
-                msg => Err(msg.into_error("COMMIT")),
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn commit(mut self) -> Result<Option<String>> {
+        match self.connection.send_recv_as(Commit).await? {
+            Summary::Success(resp) => {
+                self.save_bookmark_state(&resp.metadata);
+                Ok(self.bookmark)
             }
+            msg => Err(msg.into_error("COMMIT")),
         }
     }
 
@@ -143,6 +183,20 @@ impl Txn {
 
     pub fn handle(&mut self) -> &mut impl TransactionHandle {
         self
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub fn last_bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    fn save_bookmark_state(&mut self, summary: &impl Bookmark) {
+        if let Some(bookmark) = summary.get_bookmark() {
+            self.bookmark = Some(bookmark.to_string());
+        } else {
+            self.bookmark = None;
+        }
     }
 }
 

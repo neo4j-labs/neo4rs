@@ -149,6 +149,38 @@
 //! ```
 //!
 #![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = r##"### Bookmarks and transactions
+
+Start a new transaction using [`Graph::start_txn`], which will return a handle [`Txn`] that can
+be used to [`Txn::commit`] or [`Txn::rollback`] the transaction. The commit message eventually returns
+a bookmark which can be used to start a new transaction with the same state.
+
+```no_run
+use neo4rs::*;
+
+#[tokio::main]
+async fn main() {
+   let uri = "127.0.0.1:7687";
+   let user = "neo4j";
+   let pass = "neo";
+   let graph = Graph::new(uri, user, pass).unwrap();
+
+"##
+)]
+#![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = include_str!("../include/bookmarks.rs")
+)]
+#![cfg_attr(
+    feature = "unstable-bolt-protocol-impl-v2",
+    doc = r"
+}
+```
+
+"
+)]
+#![cfg_attr(
     feature = "unstable-result-summary",
     doc = r##"### Streaming summary
 
@@ -166,7 +198,10 @@ async fn main() {
 
 "##
 )]
-#![cfg_attr(feature="unstable-result-summary", doc = include_str!("../include/result_summary.rs"))]
+#![cfg_attr(
+    feature = "unstable-result-summary",
+    doc = include_str!("../include/result_summary.rs")
+)]
 #![cfg_attr(
     feature = "unstable-result-summary",
     doc = r"
@@ -451,6 +486,7 @@ async fn main() {
 mod auth;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub mod bolt;
+mod bookmarks;
 mod config;
 mod connection;
 mod convert;
@@ -491,14 +527,19 @@ pub use crate::types::{
     BoltPoint2D, BoltPoint3D, BoltRelation, BoltString, BoltTime, BoltType, BoltUnboundedRelation,
 };
 pub use crate::version::Version;
-use std::fmt::Display;
-
 pub(crate) use messages::Success;
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operation {
     Read,
     Write,
+}
+
+impl Operation {
+    pub fn is_read(&self) -> bool {
+        matches!(self, Operation::Read)
+    }
 }
 
 impl Display for Operation {

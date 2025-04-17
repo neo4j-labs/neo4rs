@@ -5,6 +5,7 @@ use {
     crate::routing::{ClusterRoutingTableProvider, RoutedConnectionManager},
     crate::summary::ResultSummary,
     log::debug,
+    std::sync::Arc,
 };
 
 use crate::graph::ConnectionPoolManager::Direct;
@@ -75,11 +76,11 @@ impl Graph {
                 &config.password,
                 &config.tls_config,
             )?;
-            if matches!(info.routing, Routing::Yes(_)) {
+            if matches!(info.init.routing, Routing::Yes(_)) {
                 debug!("Routing enabled, creating a routed connection manager");
                 let pool = Routed(RoutedConnectionManager::new(
                     &config,
-                    Box::new(ClusterRoutingTableProvider),
+                    Arc::new(ClusterRoutingTableProvider),
                 )?);
                 Ok(Graph {
                     config: config.into_live_config(),
@@ -123,7 +124,7 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn(&self) -> Result<Txn> {
-        self.impl_start_txn_on(self.config.db.clone(), Operation::Write)
+        self.impl_start_txn_on(self.config.db.clone(), Operation::Write, &[])
             .await
     }
 
@@ -133,9 +134,17 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub async fn start_txn_as(&self, operation: Operation) -> Result<Txn> {
-        self.impl_start_txn_on(self.config.db.clone(), operation)
-            .await
+    pub async fn start_txn_as(
+        &self,
+        operation: Operation,
+        bookmarks: Option<Vec<String>>,
+    ) -> Result<Txn> {
+        self.impl_start_txn_on(
+            self.config.db.clone(),
+            operation,
+            bookmarks.as_deref().unwrap_or_default(),
+        )
+        .await
     }
 
     /// Starts a new transaction on the provided database.
@@ -144,14 +153,26 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
-        self.impl_start_txn_on(Some(db.into()), Operation::Write)
+        self.impl_start_txn_on(Some(db.into()), Operation::Write, &[])
             .await
     }
 
     #[allow(unused_variables)]
-    async fn impl_start_txn_on(&self, db: Option<Database>, operation: Operation) -> Result<Txn> {
+    async fn impl_start_txn_on(
+        &self,
+        db: Option<Database>,
+        operation: Operation,
+        bookmarks: &[String],
+    ) -> Result<Txn> {
         let connection = self.pool.get(Some(operation.clone())).await?;
-        Txn::new(db, self.config.fetch_size, connection, operation).await
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            Txn::new(db, self.config.fetch_size, connection, operation, bookmarks).await
+        }
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            Txn::new(db, self.config.fetch_size, connection, operation).await
+        }
     }
 
     /// Runs a query on the configured database using a connection from the connection pool,
@@ -204,7 +225,8 @@ impl Graph {
         q: Query,
         operation: Operation,
     ) -> Result<RunResult> {
-        backoff::future::retry_notify(
+        let is_read = operation.is_read();
+        let result = backoff::future::retry_notify(
             self.pool.backoff(),
             || {
                 let pool = &self.pool;
@@ -213,13 +235,7 @@ impl Graph {
                 if let Some(db) = db.as_deref() {
                     query = query.extra("db", db);
                 }
-                query = query.extra(
-                    "mode",
-                    match operation {
-                        Operation::Read => "r",
-                        Operation::Write => "w",
-                    },
-                );
+                query = query.extra("mode", if is_read { "r" } else { "w" });
                 async move {
                     let mut connection =
                         pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
@@ -228,7 +244,33 @@ impl Graph {
             },
             Self::log_retry,
         )
-        .await
+        .await;
+
+        match result {
+            Ok(result) => {
+                #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+                {
+                    if let Some(bookmark) = result.bookmark.as_deref() {
+                        match &self.pool {
+                            Routed(routed) => {
+                                routed.add_bookmark(bookmark).await;
+                            }
+                            Direct(_) => {}
+                        }
+                    } else if is_read {
+                        match &self.pool {
+                            Routed(routed) => {
+                                debug!("No bookmark received after a read operation, discarding all bookmarks");
+                                routed.clear_bookmarks().await;
+                            }
+                            Direct(_) => {}
+                        }
+                    }
+                }
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Executes a READ/WRITE query on the configured database and returns a [`DetachedRowStream`]
@@ -303,13 +345,7 @@ impl Graph {
                     query = query.extra("db", db);
                 }
                 let operation = operation.clone();
-                query = query.param(
-                    "mode",
-                    match operation {
-                        Operation::Read => "r",
-                        Operation::Write => "w",
-                    },
-                );
+                query = query.param("mode", if operation.is_read() { "r" } else { "w" });
                 async move {
                     let connection = pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
                     query.execute_retryable(fetch_size, connection).await

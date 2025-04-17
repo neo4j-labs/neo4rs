@@ -4,7 +4,8 @@ use crate::messages::HelloBuilder;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
     crate::bolt::{
-        ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset, Summary,
+        ConnectionsHints, ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset,
+        Summary,
     },
     log::debug,
 };
@@ -45,12 +46,15 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 pub struct Connection {
     version: Version,
     stream: BufStream<ConnectionStream>,
+    #[allow(unused)]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    hints: Option<ConnectionsHints>,
 }
 
 impl Connection {
     pub(crate) async fn new(info: &ConnectionInfo) -> Result<Self> {
-        let mut connection = Self::prepare(info).await?;
-        let hello = info.to_hello(connection.version);
+        let mut connection = Self::prepare(&info.prepare).await?;
+        let hello = info.init.to_hello(connection.version);
         connection.hello(hello).await?;
         Ok(connection)
     }
@@ -59,14 +63,14 @@ impl Connection {
         self.version
     }
 
-    pub(crate) async fn prepare(info: &ConnectionInfo) -> Result<Self> {
-        let mut stream = match &info.host {
-            Host::Domain(domain) => TcpStream::connect((&**domain, info.port)).await?,
-            Host::Ipv4(ip) => TcpStream::connect((*ip, info.port)).await?,
-            Host::Ipv6(ip) => TcpStream::connect((*ip, info.port)).await?,
+    pub(crate) async fn prepare(opts: &PrepareOpts) -> Result<Self> {
+        let mut stream = match &opts.host {
+            Host::Domain(domain) => TcpStream::connect((&**domain, opts.port)).await?,
+            Host::Ipv4(ip) => TcpStream::connect((*ip, opts.port)).await?,
+            Host::Ipv6(ip) => TcpStream::connect((*ip, opts.port)).await?,
         };
 
-        Ok(match &info.encryption {
+        Ok(match &opts.encryption {
             Some((connector, domain)) => {
                 let mut stream = connector.connect(domain.clone(), stream).await?;
                 let version = Self::init(&mut stream).await?;
@@ -94,6 +98,8 @@ impl Connection {
         Connection {
             version,
             stream: BufStream::new(stream.into()),
+            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+            hints: None,
         }
     }
 
@@ -120,14 +126,17 @@ impl Connection {
         let hello = self.send_recv_as(hello).await?;
 
         match hello {
-            Summary::Success(_msg) => Ok(()),
+            Summary::Success(msg) => {
+                self.hints = msg.metadata.hints;
+                Ok(())
+            }
             Summary::Ignored => Err(Error::RequestIgnoredError),
             Summary::Failure(msg) => Err(Error::AuthenticationError(msg.message)),
         }
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub async fn route(&mut self, route: Route<'_>) -> Result<RoutingTable> {
+    pub async fn route(&mut self, route: Route) -> Result<RoutingTable> {
         debug!("Routing request: {}", route);
         let route = self.send_recv_as(route).await?;
 
@@ -260,7 +269,7 @@ impl Connection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Routing {
     No,
-    Yes(Vec<(BoltString, BoltString)>),
+    Yes(Arc<[(BoltString, BoltString)]>),
 }
 
 impl From<Routing> for Option<BoltMap> {
@@ -269,8 +278,8 @@ impl From<Routing> for Option<BoltMap> {
             Routing::No => None,
             Routing::Yes(routing) => Some(
                 routing
-                    .into_iter()
-                    .map(|(k, v)| (k, BoltType::String(v)))
+                    .iter()
+                    .map(|(k, v)| (k.clone(), BoltType::String(v.clone())))
                     .collect(),
             ),
         }
@@ -293,24 +302,78 @@ impl Display for Routing {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct PrepareOpts {
+    pub(crate) host: Host<Arc<str>>,
+    pub(crate) port: u16,
+    pub(crate) encryption: Option<(TlsConnector, ServerName<'static>)>,
+}
+
+impl Debug for PrepareOpts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrepareOpts")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("encryption", &self.encryption.is_some())
+            .finish()
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct InitOpts {
+    pub(crate) user: Arc<str>,
+    pub(crate) password: Arc<str>,
+    pub(crate) routing: Routing,
+}
+
+impl Debug for InitOpts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InitOpts")
+            .field("user", &self.user)
+            .field("password", &"***")
+            .field("routing", &self.routing)
+            .finish()
+    }
+}
+
+impl InitOpts {
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    pub(crate) fn to_hello(&self, version: Version) -> BoltRequest {
+        HelloBuilder::new(&*self.user, &*self.password)
+            .with_routing(self.routing.clone())
+            .build(version)
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub(crate) fn to_hello(&self, version: Version) -> Hello {
+        match self.routing {
+            Routing::No => HelloBuilder::new(&self.user, &self.password).build(version),
+            Routing::Yes(ref routing) => HelloBuilder::new(&self.user, &self.password)
+                .with_routing(
+                    routing
+                        .iter()
+                        .map(|(k, v)| (k.value.as_str(), v.value.as_str())),
+                )
+                .build(version),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct ConnectionInfo {
-    pub user: Arc<str>,
-    pub password: Arc<str>,
-    pub host: Host<Arc<str>>,
-    pub port: u16,
-    pub routing: Routing,
-    pub encryption: Option<(TlsConnector, ServerName<'static>)>,
+    pub(crate) prepare: PrepareOpts,
+    pub(crate) init: InitOpts,
 }
 
 impl Debug for ConnectionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConnectionInfo")
-            .field("user", &self.user)
+            .field("user", &self.init.user)
             .field("password", &"***")
-            .field("host", &self.host)
-            .field("port", &self.port)
-            .field("routing", &self.routing)
-            .field("encryption", &self.encryption.is_some())
+            .field("host", &self.prepare.host)
+            .field("port", &self.prepare.port)
+            .field("routing", &self.init.routing)
+            .field("encryption", &self.prepare.encryption.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -351,7 +414,8 @@ impl ConnectionInfo {
                 "Client-side routing is in experimental mode.",
                 "It is possible that operations against a cluster (such as Aura) will fail."
             ));
-            Routing::Yes(url.routing_context())
+            let context = url.routing_context();
+            Routing::Yes(context.into())
         } else {
             Routing::No
         };
@@ -364,14 +428,19 @@ impl ConnectionInfo {
             Host::Ipv6(d) => Host::Ipv6(d),
         };
 
-        Ok(Self {
-            user: user.into(),
-            password: password.into(),
+        let prepare = PrepareOpts {
             host,
             port: url.port(),
             encryption,
+        };
+
+        let init = InitOpts {
+            user: user.into(),
+            password: password.into(),
             routing,
-        })
+        };
+
+        Ok(Self { prepare, init })
     }
 
     fn tls_connector(
@@ -422,27 +491,6 @@ impl ConnectionInfo {
         };
 
         Ok((connector, domain))
-    }
-
-    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    pub(crate) fn to_hello(&self, version: Version) -> BoltRequest {
-        HelloBuilder::new(&*self.user, &*self.password)
-            .with_routing(self.routing.clone())
-            .build(version)
-    }
-
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub(crate) fn to_hello(&self, version: Version) -> Hello {
-        match self.routing {
-            Routing::No => HelloBuilder::new(&self.user, &self.password).build(version),
-            Routing::Yes(ref routing) => HelloBuilder::new(&self.user, &self.password)
-                .with_routing(
-                    routing
-                        .iter()
-                        .map(|(k, v)| (k.value.as_str(), v.value.as_str())),
-                )
-                .build(version),
-        }
     }
 }
 

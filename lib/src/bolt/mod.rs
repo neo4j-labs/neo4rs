@@ -14,7 +14,8 @@ mod structs;
 mod summary;
 
 pub use request::{
-    Commit, Discard, Goodbye, Hello, HelloBuilder, Pull, Reset, Rollback, WrapExtra,
+    Begin, Commit, ConnectionsHints, Discard, Goodbye, Hello, HelloBuilder, Pull, Reset, Rollback,
+    WrapExtra,
 };
 pub use structs::{
     Bolt, BoltRef, Date, DateDuration, DateTime, DateTimeZoneId, DateTimeZoneIdRef, Duration,
@@ -24,7 +25,7 @@ pub use structs::{
 };
 pub use summary::{Failure, Success, Summary};
 
-use crate::packstream::{self, de, from_bytes, from_bytes_ref, ser, to_bytes, Data};
+use crate::packstream::{de, from_bytes, from_bytes_ref, ser, to_bytes, Data};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.

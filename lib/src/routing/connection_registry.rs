@@ -7,8 +7,8 @@ use dashmap::DashMap;
 use log::debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, Mutex};
 
 /// Represents a Bolt server, with its address, port and role.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,7 +48,7 @@ pub(crate) struct ConnectionRegistry {
 
 #[allow(dead_code)]
 pub(crate) enum RegistryCommand {
-    Refresh,
+    Refresh(Vec<String>),
     Stop,
 }
 
@@ -63,11 +63,15 @@ impl Default for ConnectionRegistry {
 async fn refresh_routing_table(
     config: Config,
     registry: Arc<ConnectionRegistry>,
-    provider: Arc<Box<dyn RoutingTableProvider>>,
+    provider: Arc<dyn RoutingTableProvider>,
+    bookmarks: &[String],
 ) -> Result<u64, Error> {
     debug!("Routing table expired or empty, refreshing...");
-    let routing_table = provider.fetch_routing_table(&config).await?;
-    debug!("Routing table refreshed: {:?}", routing_table);
+    let routing_table = provider.fetch_routing_table(&config, bookmarks).await?;
+    debug!(
+        "Routing table refreshed: {:?} (bookmarks: {:?})",
+        routing_table, bookmarks
+    );
     let servers = routing_table.resolve();
     let url = NeoUrl::parse(config.uri.as_str())?;
     // Convert neo4j scheme to bolt scheme to create connection pools.
@@ -105,17 +109,21 @@ async fn refresh_routing_table(
 pub(crate) fn start_background_updater(
     config: &Config,
     registry: Arc<ConnectionRegistry>,
-    provider: Arc<Box<dyn RoutingTableProvider>>,
+    provider: Arc<dyn RoutingTableProvider>,
 ) -> Sender<RegistryCommand> {
     let config_clone = config.clone();
     let (tx, mut rx) = mpsc::channel(1);
-
+    let bookmarks = Mutex::new(vec![]);
     // This thread is in charge of refreshing the routing table periodically
     tokio::spawn(async move {
-        let mut ttl =
-            refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone())
-                .await
-                .expect("Failed to get routing table. Exiting...");
+        let mut ttl = refresh_routing_table(
+            config_clone.clone(),
+            registry.clone(),
+            provider.clone(),
+            bookmarks.lock().await.as_slice(),
+        )
+        .await
+        .expect("Failed to get routing table. Exiting...");
         debug!("Starting background updater with TTL: {}", ttl);
         let mut interval = tokio::time::interval(Duration::from_secs(ttl));
         interval.tick().await; // first tick is immediate
@@ -123,7 +131,7 @@ pub(crate) fn start_background_updater(
             tokio::select! {
                 // Trigger periodic updates
                 _ = interval.tick() => {
-                    ttl = match refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone()).await {
+                    ttl = match refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.lock().await.as_slice()).await {
                         Ok(ttl) => ttl,
                         Err(e) => {
                             debug!("Failed to refresh routing table: {}", e);
@@ -135,8 +143,9 @@ pub(crate) fn start_background_updater(
                 // Handle forced updates
                 cmd = rx.recv() => {
                     match cmd {
-                        Some(RegistryCommand::Refresh) => {
-                            ttl = match refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone()).await {
+                        Some(RegistryCommand::Refresh(new_bookmarks)) => {
+                            *bookmarks.lock().await = new_bookmarks;
+                            ttl = match refresh_routing_table(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.lock().await.as_slice()).await {
                                 Ok(ttl) => ttl,
                                 Err(e) => {
                                     debug!("Failed to refresh routing table: {}", e);
@@ -201,6 +210,7 @@ mod tests {
         fn fetch_routing_table(
             &self,
             _: &Config,
+            _bookmarks: &[String],
         ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
             let routing_table = self.routing_table.clone();
             Box::pin(async move { Ok(routing_table) })
@@ -256,9 +266,8 @@ mod tests {
         let ttl = refresh_routing_table(
             config.clone(),
             registry.clone(),
-            Arc::new(Box::new(TestRoutingTableProvider::new(
-                cluster_routing_table,
-            ))),
+            Arc::new(TestRoutingTableProvider::new(cluster_routing_table)),
+            &[],
         )
         .await
         .unwrap();

@@ -1,9 +1,10 @@
-use std::{fmt, time::Duration};
-
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::bookmarks::Bookmark;
 use serde::{
     de::{self, Visitor},
     Deserialize,
 };
+use std::{fmt, time::Duration};
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 type MapKey = String;
@@ -190,6 +191,13 @@ impl ResultSummary {
 
     pub(crate) fn set_t_first(&mut self, t_first: i64) {
         self.t_first = u64::try_from(t_first).ok();
+    }
+}
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+impl Bookmark for ResultSummary {
+    fn get_bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
     }
 }
 
