@@ -14,6 +14,7 @@ mod duration;
 mod element;
 mod error;
 mod kind;
+mod map;
 mod node;
 mod path;
 mod point;
