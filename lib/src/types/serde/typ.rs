@@ -4,6 +4,7 @@ use crate::{
             date_time::BoltDateTimeVisitor,
             duration::BoltDurationVisitor,
             element::ElementDataDeserializer,
+            map::BoltMapDeserializer,
             node::BoltNodeVisitor,
             path::BoltPathVisitor,
             point::{BoltPointDeserializer, BoltPointVisitor},
@@ -55,7 +56,7 @@ impl BoltMap {
     where
         T: Deserialize<'this>,
     {
-        T::deserialize(MapDeserializer::new(self.value.iter()))
+        T::deserialize(BoltMapDeserializer::new(self))
     }
 }
 
@@ -694,7 +695,12 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.unexpected(visitor)
+        match self.value {
+            BoltType::String(_) => self.deserialize_str(visitor),
+            BoltType::Integer(_) => self.deserialize_u64(visitor),
+            BoltType::Bytes(_) => self.deserialize_bytes(visitor),
+            _ => self.unexpected(visitor),
+        }
     }
 
     fn is_human_readable(&self) -> bool {
