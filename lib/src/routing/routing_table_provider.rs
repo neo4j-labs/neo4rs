@@ -1,6 +1,6 @@
 use crate::connection::{Connection, ConnectionInfo};
 use crate::routing::{RouteBuilder, RoutingTable};
-use crate::{Config, Error};
+use crate::{Config, Database, Error};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -9,6 +9,7 @@ pub(crate) trait RoutingTableProvider: Send + Sync {
         &self,
         config: &Config,
         bookmarks: &[String],
+        db: Option<Database>,
     ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>>;
 }
 
@@ -19,6 +20,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
         &self,
         config: &Config,
         bookmarks: &[String],
+        db: Option<Database>,
     ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
         let config = config.clone();
         let bookmarks = bookmarks.to_vec();
@@ -31,7 +33,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
             )?;
             let mut connection = Connection::new(&info).await?;
             let mut builder = RouteBuilder::new(info.init.routing, bookmarks);
-            if let Some(db) = config.db.clone() {
+            if let Some(db) = db.clone() {
                 builder = builder.with_db(db);
             }
             connection.route(builder.build(connection.version())).await

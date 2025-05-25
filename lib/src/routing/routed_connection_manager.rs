@@ -1,10 +1,11 @@
 use crate::pool::ManagedConnection;
 use crate::routing::connection_registry::{
-    start_background_updater, BoltServer, ConnectionRegistry, RegistryCommand,
+    start_background_updater, BoltServer, ConnectionRegistry, Registry, RegistryCommand,
 };
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::RoundRobinStrategy;
+use crate::Database;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{Config, Error, Operation};
 use backon::ExponentialBuilder;
@@ -39,22 +40,40 @@ impl RoutedConnectionManager {
     pub(crate) async fn get(
         &self,
         operation: Option<Operation>,
+        db: Option<Database>,
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
+        if db.is_some() {
+            let registry = self
+                .connection_registry
+                .get_or_create_registry(db.clone().unwrap());
+            self.inner_get(db, op, &registry).await
+        } else {
+            self.inner_get(db, op, &self.connection_registry.default_registry)
+                .await
+        }
+    }
+
+    async fn inner_get(
+        &self,
+        db: Option<Database>,
+        op: Operation,
+        registry: &Registry,
+    ) -> Result<ManagedConnection, Error> {
         loop {
             // we loop here until we get a connection. If the routing table is empty, we force a refresh
-            if self.connection_registry.connections.is_empty() {
+            if registry.is_empty() {
                 // the first time we need to wait until we get the routing table
                 tokio::time::sleep(Duration::from_millis(10)).await;
                 continue;
             }
 
             while let Some(server) = match op {
-                Operation::Write => self.select_writer(),
-                _ => self.select_reader(),
+                Operation::Write => self.select_writer(db.clone()),
+                _ => self.select_reader(db.clone()),
             } {
                 debug!("requesting connection for server: {:?}", server);
-                if let Some(pool) = self.connection_registry.get_pool(&server) {
+                if let Some(pool) = self.connection_registry.get_pool(&server, db.clone()) {
                     match pool.get().await {
                         Ok(connection) => return Ok(connection),
                         Err(e) => {
@@ -62,7 +81,8 @@ impl RoutedConnectionManager {
                                 "Failed to get connection from pool for server `{}`: {}",
                                 server.address, e
                             );
-                            self.connection_registry.mark_unavailable(&server);
+                            self.connection_registry
+                                .mark_unavailable(&server, db.clone());
                             continue;
                         }
                     }
@@ -101,14 +121,14 @@ impl RoutedConnectionManager {
         self.backoff
     }
 
-    fn select_reader(&self) -> Option<BoltServer> {
+    fn select_reader(&self, db: Option<Database>) -> Option<BoltServer> {
         self.load_balancing_strategy
-            .select_reader(&self.connection_registry.servers())
+            .select_reader(&self.connection_registry.servers(db))
     }
 
-    fn select_writer(&self) -> Option<BoltServer> {
+    fn select_writer(&self, db: Option<Database>) -> Option<BoltServer> {
         self.load_balancing_strategy
-            .select_writer(&self.connection_registry.servers())
+            .select_writer(&self.connection_registry.servers(db))
     }
 
     #[allow(dead_code)]
