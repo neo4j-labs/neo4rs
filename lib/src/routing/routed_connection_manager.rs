@@ -47,18 +47,18 @@ impl RoutedConnectionManager {
             let registry = self
                 .connection_registry
                 .get_or_create_registry(db.clone().unwrap());
-            self.inner_get(db, op, &registry).await
+            self.inner_get(&registry, op, db).await
         } else {
-            self.inner_get(db, op, &self.connection_registry.default_registry)
+            self.inner_get(&self.connection_registry.default_registry, op, db)
                 .await
         }
     }
 
     async fn inner_get(
         &self,
-        db: Option<Database>,
-        op: Operation,
         registry: &Registry,
+        op: Operation,
+        db: Option<Database>,
     ) -> Result<ManagedConnection, Error> {
         loop {
             // we loop here until we get a connection. If the routing table is empty, we force a refresh

@@ -80,9 +80,9 @@ async fn refresh_routing_tables(
     let default_routing_table = refresh_routing_table(
         &config,
         provider.clone(),
+        &connection_registry.default_registry,
         bookmarks,
         None,
-        &connection_registry.default_registry,
     )
     .await?;
     ttls.push(default_routing_table.ttl);
@@ -94,9 +94,9 @@ async fn refresh_routing_tables(
         let routing_table = refresh_routing_table(
             &config,
             provider.clone(),
+            registry,
             bookmarks,
             Some(Database::from(db.as_str())),
-            registry,
         )
         .await?;
         ttls.push(routing_table.ttl)
@@ -113,9 +113,9 @@ async fn refresh_routing_tables(
 async fn refresh_routing_table(
     config: &Config,
     provider: Arc<dyn RoutingTableProvider>,
+    registry: &Registry,
     bookmarks: &[String],
     db: Option<Database>,
-    registry: &Registry,
 ) -> Result<RoutingTable, Error> {
     let routing_table = provider
         .fetch_routing_table(config, bookmarks, db.clone())
@@ -215,7 +215,7 @@ pub(crate) fn start_background_updater(
 }
 
 impl ConnectionRegistry {
-    /// Retrieve the pool for a specific server.
+    /// Retrieve the pool for a specific server and database.
     pub fn get_pool(&self, server: &BoltServer, db: Option<Database>) -> Option<ConnectionPool> {
         if db.is_some() {
             let pair = self.get_or_create_registry(db.unwrap());
@@ -225,6 +225,7 @@ impl ConnectionRegistry {
         }
     }
 
+    /// Mark a server as available for a specific database.
     pub fn mark_unavailable(&self, server: &BoltServer, db: Option<Database>) {
         if let Some(database) = db.as_ref() {
             if let Some(registry) = self.connection_map.get(&database.to_string()) {
@@ -235,6 +236,7 @@ impl ConnectionRegistry {
         }
     }
 
+    /// Get all available Bolt servers for a specific database or the default database if none is provided.
     pub fn servers(&self, db: Option<Database>) -> Vec<BoltServer> {
         if let Some(database) = db.as_ref() {
             if let Some(registry) = self.connection_map.get(&database.to_string()) {
