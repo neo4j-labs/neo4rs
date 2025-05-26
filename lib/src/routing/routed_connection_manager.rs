@@ -48,9 +48,10 @@ impl RoutedConnectionManager {
         if registry.is_empty()
             && self
                 .channel
-                .send(RegistryCommand::RefreshAll(
+                .send(RegistryCommand::RefreshSingleTable((
+                    db.clone(),
                     self.bookmarks.lock().await.clone(),
-                ))
+                )))
                 .await
                 .is_err()
         {
