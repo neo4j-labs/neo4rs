@@ -45,19 +45,18 @@ impl RoutedConnectionManager {
         let op = operation.unwrap_or(Operation::Write);
         let registry = self.connection_registry.get_or_create_registry(db.clone());
         // If the registry is empty, we need to refresh the routing table
-        if registry.is_empty()
-            && self
+        if registry.is_empty() {
+            debug!("Routing table is empty, refreshing");
+            if let Err(error) = self
                 .channel
                 .send(RegistryCommand::RefreshSingleTable(db.clone()))
                 .await
-                .is_err()
-        {
-            error!("Failed to send refresh command to registry channel");
-            return Err(Error::RoutingTableRefreshFailed(
-                "Failed to send refresh command to registry channel".to_string(),
-            ));
+            {
+                error!("Failed to send refresh command to registry channel");
+                return Err(Error::RoutingTableRefreshFailed(error.to_string()));
+            }
         }
-        self.inner_get(&registry, op, db).await
+        self.inner_get(registry.value(), op, db).await
     }
 
     async fn inner_get(
@@ -69,6 +68,7 @@ impl RoutedConnectionManager {
         loop {
             // we loop here until we get a connection. If the routing table is empty, we force a refresh
             if registry.is_empty() {
+                debug!("Routing table is empty, waiting...");
                 // the first time we need to wait until we get the routing table
                 tokio::time::sleep(Duration::from_millis(10)).await;
                 continue;

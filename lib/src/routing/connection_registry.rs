@@ -195,13 +195,18 @@ pub(crate) fn start_background_updater(
                         Some(RegistryCommand::RefreshSingleTable(db)) => {
                             let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
                             if let Some(db_registry) = registry.connection_map.get(db_name.as_str()) {
-                                match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.as_slice(), db).await {
-                                    Ok(_) => debug!("Successfully refreshed routing table for new database {}", db_name),
+                                ttl = match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.as_slice(), db).await {
+                                    Ok(table) => {
+                                        debug!("Successfully refreshed routing table for new database {}", db_name);
+                                        table.ttl
+                                    }
                                     Err(e) => {
                                         debug!("Failed to refresh routing table: {}", e);
+                                        ttl
                                     }
                                 };
-                            }
+                            };
+                            interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                         }
                         Some(RegistryCommand::Stop) | None => {
                             debug!("Stopping background updater");
@@ -247,6 +252,7 @@ impl ConnectionRegistry {
     pub(crate) fn get_or_create_registry(&self, db: Option<Database>) -> Ref<String, Registry> {
         let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
         if !self.connection_map.contains_key(db_name.as_str()) {
+            debug!("Creating new registry for database: {}", db_name);
             self.connection_map.insert(db_name.clone(), Registry::new());
         }
         let registry = self.connection_map.get(db_name.as_str()).unwrap();
