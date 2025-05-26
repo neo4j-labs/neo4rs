@@ -46,24 +46,22 @@ pub type RegistryMap = DashMap<String, Registry>;
 
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
-    /// The default registry for the default database key.
-    pub(crate) default_registry: Registry,
     /// A map of connection registries, where each registry corresponds to a specific database.
     pub(crate) connection_map: RegistryMap,
 }
 
 #[allow(dead_code)]
 pub(crate) enum RegistryCommand {
-    Refresh(Vec<String>),
+    RefreshAll(Vec<String>),
+    RefreshSingleTable((Option<Database>, Vec<String>)),
     Stop,
 }
 
 impl Default for ConnectionRegistry {
     fn default() -> Self {
-        ConnectionRegistry {
-            default_registry: Registry::new(),
-            connection_map: RegistryMap::new(),
-        }
+        let connection_map = RegistryMap::new();
+        connection_map.insert("".to_string(), Registry::new()); // insert a default registry for the default database
+        ConnectionRegistry { connection_map }
     }
 }
 
@@ -76,25 +74,14 @@ async fn refresh_routing_tables(
     debug!("Routing tables are expired or empty, refreshing...");
     let mut ttls = vec![];
 
-    // Refresh the routing table for the default database and all other databases in the registry.
-    let default_routing_table = refresh_routing_table(
-        &config,
-        provider.clone(),
-        &connection_registry.default_registry,
-        bookmarks,
-        None,
-    )
-    .await?;
-    ttls.push(default_routing_table.ttl);
-
     for kv in connection_registry.connection_map.iter() {
         let db = kv.key();
         let registry: &Registry = kv.value();
 
         let routing_table = refresh_routing_table(
             &config,
-            provider.clone(),
             registry,
+            provider.clone(),
             bookmarks,
             Some(Database::from(db.as_str())),
         )
@@ -112,8 +99,8 @@ async fn refresh_routing_tables(
 
 async fn refresh_routing_table(
     config: &Config,
-    provider: Arc<dyn RoutingTableProvider>,
     registry: &Registry,
+    provider: Arc<dyn RoutingTableProvider>,
     bookmarks: &[String],
     db: Option<Database>,
 ) -> Result<RoutingTable, Error> {
@@ -194,7 +181,7 @@ pub(crate) fn start_background_updater(
                 // Handle forced updates
                 cmd = rx.recv() => {
                     match cmd {
-                        Some(RegistryCommand::Refresh(new_bookmarks)) => {
+                        Some(RegistryCommand::RefreshAll(new_bookmarks)) => {
                             *bookmarks.lock().await = new_bookmarks;
                             ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.lock().await.as_slice()).await {
                                 Ok(ttl) => ttl,
@@ -204,6 +191,18 @@ pub(crate) fn start_background_updater(
                                 }
                             };
                             interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
+                        }
+                        Some(RegistryCommand::RefreshSingleTable((db, new_bookmarks))) => {
+                            *bookmarks.lock().await = new_bookmarks;
+                            let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
+                            if let Some(db_registry) = registry.connection_map.get(db_name.as_str()) {
+                                match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.lock().await.as_slice(), db).await {
+                                    Ok(_) => debug!("Successfully refreshed routing table for new database {}", db_name),
+                                    Err(e) => {
+                                        debug!("Failed to refresh routing table: {}", e);
+                                    }
+                                };
+                            }
                         }
                         Some(RegistryCommand::Stop) | None => {
                             debug!("Stopping background updater");
@@ -222,45 +221,32 @@ pub(crate) fn start_background_updater(
 impl ConnectionRegistry {
     /// Retrieve the pool for a specific server and database.
     pub fn get_pool(&self, server: &BoltServer, db: Option<Database>) -> Option<ConnectionPool> {
-        if db.is_some() {
-            let pair = self.get_or_create_registry(db.unwrap());
-            pair.get(server).map(|entry| entry.clone())
-        } else {
-            self.default_registry.get(server).map(|entry| entry.clone())
-        }
+        let pair = self.get_or_create_registry(db);
+        pair.get(server).map(|entry| entry.clone())
     }
 
     /// Mark a server as available for a specific database.
     pub fn mark_unavailable(&self, server: &BoltServer, db: Option<Database>) {
-        if let Some(database) = db.as_ref() {
-            if let Some(registry) = self.connection_map.get(&database.to_string()) {
-                registry.remove(server);
-            }
-        } else {
-            self.default_registry.remove(server);
+        let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
+        if let Some(registry) = self.connection_map.get(db_name.as_str()) {
+            registry.remove(server);
         }
     }
 
     /// Get all available Bolt servers for a specific database or the default database if none is provided.
     pub fn servers(&self, db: Option<Database>) -> Vec<BoltServer> {
-        if let Some(database) = db.as_ref() {
-            if let Some(registry) = self.connection_map.get(&database.to_string()) {
-                registry.iter().map(|entry| entry.key().clone()).collect()
-            } else {
-                vec![]
-            }
+        let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
+        if let Some(registry) = self.connection_map.get(db_name.as_str()) {
+            registry.iter().map(|entry| entry.key().clone()).collect()
         } else {
-            self.default_registry
-                .iter()
-                .map(|entry| entry.key().clone())
-                .collect()
+            vec![]
         }
     }
 
     /// Get or create a registry for a specific database.
     /// Panics if the database name is not found in the connection map.
-    pub(crate) fn get_or_create_registry(&self, db: Database) -> Ref<String, Registry> {
-        let db_name = db.as_ref().to_string();
+    pub(crate) fn get_or_create_registry(&self, db: Option<Database>) -> Ref<String, Registry> {
+        let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
         if !self.connection_map.contains_key(db_name.as_str()) {
             self.connection_map.insert(db_name.clone(), Registry::new());
         }
@@ -363,7 +349,7 @@ mod tests {
             tls_config: ConnectionTLSConfig::None,
         };
         let con_registry = Arc::new(ConnectionRegistry::default());
-        let registry = &con_registry.default_registry;
+        let registry = &con_registry.get_or_create_registry(None);
         let ttl = refresh_routing_tables(
             config.clone(),
             con_registry.clone(),
@@ -466,7 +452,7 @@ mod tests {
         };
         let con_registry = Arc::new(ConnectionRegistry::default());
         // get registry for db1 amd refresh routing table
-        let registry = con_registry.get_or_create_registry("db1".into());
+        let registry = con_registry.get_or_create_registry(Some("db1".into()));
         let provider = Arc::new(TestRoutingTableProvider::new(&[
             cluster_routing_table_1,
             cluster_routing_table_2,
@@ -479,7 +465,7 @@ mod tests {
         assert_eq!(registry.len(), 5); // 2 readers, 2 writers, 1 router
 
         // get registry for db1 amd refresh routing table
-        let registry2 = con_registry.get_or_create_registry("db2".into());
+        let registry2 = con_registry.get_or_create_registry(Some("db2".into()));
         let ttl =
             refresh_routing_tables(config.clone(), con_registry.clone(), provider.clone(), &[])
                 .await
@@ -501,7 +487,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),
-            writers2[1].addresses[0]
+            writers2[0].addresses[0]
         );
     }
 }

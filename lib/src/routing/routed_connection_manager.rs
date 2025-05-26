@@ -43,30 +43,23 @@ impl RoutedConnectionManager {
         db: Option<Database>,
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
-        if db.is_some() {
-            let registry = self
-                .connection_registry
-                .get_or_create_registry(db.clone().unwrap());
-            // If the registry is empty, we need to refresh the routing table
-            if registry.is_empty()
-                && self
-                    .channel
-                    .send(RegistryCommand::Refresh(
-                        self.bookmarks.lock().await.clone(),
-                    ))
-                    .await
-                    .is_err()
-            {
-                error!("Failed to send refresh command to registry channel");
-                return Err(Error::RoutingTableRefreshFailed(
-                    "Failed to send refresh command to registry channel".to_string(),
-                ));
-            }
-            self.inner_get(&registry, op, db).await
-        } else {
-            self.inner_get(&self.connection_registry.default_registry, op, db)
+        let registry = self.connection_registry.get_or_create_registry(db.clone());
+        // If the registry is empty, we need to refresh the routing table
+        if registry.is_empty()
+            && self
+                .channel
+                .send(RegistryCommand::RefreshAll(
+                    self.bookmarks.lock().await.clone(),
+                ))
                 .await
+                .is_err()
+        {
+            error!("Failed to send refresh command to registry channel");
+            return Err(Error::RoutingTableRefreshFailed(
+                "Failed to send refresh command to registry channel".to_string(),
+            ));
         }
+        self.inner_get(&registry, op, db).await
     }
 
     async fn inner_get(
@@ -115,7 +108,7 @@ impl RoutedConnectionManager {
             }
             debug!("Routing table is empty for requested {op} operation, forcing refresh");
             self.channel
-                .send(RegistryCommand::Refresh(
+                .send(RegistryCommand::RefreshAll(
                     self.bookmarks.lock().await.clone(),
                 ))
                 .await

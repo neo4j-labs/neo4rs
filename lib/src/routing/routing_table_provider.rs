@@ -34,7 +34,9 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
             let mut connection = Connection::new(&info).await?;
             let mut builder = RouteBuilder::new(info.init.routing, bookmarks);
             if let Some(db) = db.clone() {
-                builder = builder.with_db(db);
+                if !db.is_empty() {
+                    builder = builder.with_db(db);
+                }
             }
             connection.route(builder.build(connection.version())).await
         })
