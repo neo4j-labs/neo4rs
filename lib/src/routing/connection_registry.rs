@@ -107,7 +107,7 @@ async fn refresh_routing_tables(
             "No servers available in the routing table".to_string(),
         ));
     }
-    Ok(*ttls.iter().max().unwrap())
+    Ok(*ttls.iter().min().unwrap())
 }
 
 async fn refresh_routing_table(
@@ -160,6 +160,11 @@ pub(crate) fn start_background_updater(
     let config_clone = config.clone();
     let (tx, mut rx) = mpsc::channel(1);
     let bookmarks = Mutex::new(vec![]);
+    if let Some(db) = config.db.clone() {
+        registry
+            .connection_map
+            .insert(db.as_ref().to_string(), Registry::new());
+    }
     // This thread is in charge of refreshing the routing table periodically
     tokio::spawn(async move {
         let mut ttl = refresh_routing_tables(
@@ -479,7 +484,7 @@ mod tests {
             refresh_routing_tables(config.clone(), con_registry.clone(), provider.clone(), &[])
                 .await
                 .unwrap();
-        assert_eq!(ttl, 300); // must be the max of both
+        assert_eq!(ttl, 200); // must be the min of both
         assert_eq!(registry2.len(), 5); // 2 readers, 2 writers, 1 router
 
         let strategy = RoundRobinStrategy::default();

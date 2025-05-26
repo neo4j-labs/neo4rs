@@ -47,6 +47,21 @@ impl RoutedConnectionManager {
             let registry = self
                 .connection_registry
                 .get_or_create_registry(db.clone().unwrap());
+            // If the registry is empty, we need to refresh the routing table
+            if registry.is_empty()
+                && self
+                    .channel
+                    .send(RegistryCommand::Refresh(
+                        self.bookmarks.lock().await.clone(),
+                    ))
+                    .await
+                    .is_err()
+            {
+                error!("Failed to send refresh command to registry channel");
+                return Err(Error::RoutingTableRefreshFailed(
+                    "Failed to send refresh command to registry channel".to_string(),
+                ));
+            }
             self.inner_get(&registry, op, db).await
         } else {
             self.inner_get(&self.connection_registry.default_registry, op, db)
