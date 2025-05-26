@@ -8,8 +8,8 @@ use dashmap::DashMap;
 use log::debug;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, Mutex};
 
 /// Represents a Bolt server, with its address, port and role.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -53,7 +53,7 @@ pub(crate) struct ConnectionRegistry {
 #[allow(dead_code)]
 pub(crate) enum RegistryCommand {
     RefreshAll(Vec<String>),
-    RefreshSingleTable((Option<Database>, Vec<String>)),
+    RefreshSingleTable(Option<Database>),
     Stop,
 }
 
@@ -146,7 +146,6 @@ pub(crate) fn start_background_updater(
 ) -> Sender<RegistryCommand> {
     let config_clone = config.clone();
     let (tx, mut rx) = mpsc::channel(1);
-    let bookmarks = Mutex::new(vec![]);
     if let Some(db) = config.db.clone() {
         registry
             .connection_map
@@ -154,11 +153,12 @@ pub(crate) fn start_background_updater(
     }
     // This thread is in charge of refreshing the routing table periodically
     tokio::spawn(async move {
+        let mut bookmarks = vec![];
         let mut ttl = refresh_routing_tables(
             config_clone.clone(),
             registry.clone(),
             provider.clone(),
-            bookmarks.lock().await.as_slice(),
+            bookmarks.as_slice(),
         )
         .await
         .expect("Failed to get routing table. Exiting...");
@@ -169,7 +169,7 @@ pub(crate) fn start_background_updater(
             tokio::select! {
                 // Trigger periodic updates
                 _ = interval.tick() => {
-                    ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.lock().await.as_slice()).await {
+                    ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.as_slice()).await {
                         Ok(ttl) => ttl,
                         Err(e) => {
                             debug!("Failed to refresh routing table: {}", e);
@@ -182,8 +182,8 @@ pub(crate) fn start_background_updater(
                 cmd = rx.recv() => {
                     match cmd {
                         Some(RegistryCommand::RefreshAll(new_bookmarks)) => {
-                            *bookmarks.lock().await = new_bookmarks;
-                            ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.lock().await.as_slice()).await {
+                            bookmarks = new_bookmarks;
+                            ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.as_slice()).await {
                                 Ok(ttl) => ttl,
                                 Err(e) => {
                                     debug!("Failed to refresh routing table: {}", e);
@@ -192,11 +192,10 @@ pub(crate) fn start_background_updater(
                             };
                             interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                         }
-                        Some(RegistryCommand::RefreshSingleTable((db, new_bookmarks))) => {
-                            *bookmarks.lock().await = new_bookmarks;
+                        Some(RegistryCommand::RefreshSingleTable(db)) => {
                             let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
                             if let Some(db_registry) = registry.connection_map.get(db_name.as_str()) {
-                                match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.lock().await.as_slice(), db).await {
+                                match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.as_slice(), db).await {
                                     Ok(_) => debug!("Successfully refreshed routing table for new database {}", db_name),
                                     Err(e) => {
                                         debug!("Failed to refresh routing table: {}", e);
