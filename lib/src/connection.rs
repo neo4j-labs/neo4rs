@@ -448,19 +448,18 @@ impl ConnectionInfo {
         tls_config: &ConnectionTLSConfig,
     ) -> Result<(TlsConnector, ServerName<'static>)> {
         let mut root_cert_store = RootCertStore::empty();
-        match rustls_native_certs::load_native_certs() {
-            Ok(certs) => {
-                root_cert_store.add_parsable_certificates(certs);
-            }
-            Err(e) => {
-                warn!("Failed to load native certificates: {e}");
-            }
-        }
 
         let builder = ClientConfig::builder();
         let config = match tls_config {
             ConnectionTLSConfig::None => {
-                warn!("TLS config set to None but required from the URI. Using default config.");
+                match rustls_native_certs::load_native_certs() {
+                    Ok(certs) => {
+                        root_cert_store.add_parsable_certificates(certs);
+                    }
+                    Err(e) => {
+                        warn!("Failed to load native certificates: {e}");
+                    }
+                }
                 builder
                     .with_root_certificates(root_cert_store)
                     .with_no_client_auth()

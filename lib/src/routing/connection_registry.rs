@@ -3,7 +3,6 @@ use crate::pool::{create_pool, ConnectionPool};
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::{RoutingTable, Server};
 use crate::{Config, Database, Error};
-use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use log::debug;
 use std::sync::Arc;
@@ -12,7 +11,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 
 /// Represents a Bolt server, with its address, port and role.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub(crate) struct BoltServer {
     pub(crate) address: String,
     pub(crate) port: u16,
@@ -32,36 +31,54 @@ impl BoltServer {
                         role: server.role.to_string(),
                     })
                     .unwrap_or_else(|_| panic!("Failed to parse address {}", address));
-                debug!("Resolved server: {:?}", bs);
                 bs
             })
             .collect()
     }
 }
 
+impl Eq for BoltServer {}
+
+impl PartialEq for BoltServer {
+    fn eq(&self, other: &Self) -> bool {
+        self.address == other.address && self.port == other.port
+    }
+}
+
+impl std::hash::Hash for BoltServer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.address.hash(state);
+        self.port.hash(state);
+    }
+}
+
 /// A registry of connection pools, indexed by the Bolt server they connect to.
 pub type Registry = DashMap<BoltServer, ConnectionPool>;
 /// A map of registries, indexed by the database name.
-pub type RegistryMap = DashMap<String, Registry>;
+pub type ServerMap = DashMap<String, Vec<BoltServer>>;
 
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
     /// A map of connection registries, where each registry corresponds to a specific database.
-    pub(crate) connection_map: RegistryMap,
+    connection_map: ServerMap,
+    registry: Registry,
 }
 
 #[allow(dead_code)]
 pub(crate) enum RegistryCommand {
     RefreshAll(Vec<String>),
-    RefreshSingleTable(Option<Database>),
+    RefreshSingleTable((Option<Database>, Vec<String>)),
     Stop,
 }
 
 impl Default for ConnectionRegistry {
     fn default() -> Self {
-        let connection_map = RegistryMap::new();
-        connection_map.insert("".to_string(), Registry::new()); // insert a default registry for the default database
-        ConnectionRegistry { connection_map }
+        let connection_map = ServerMap::new();
+        connection_map.insert("".to_string(), vec![]); // insert a default registry for the default database
+        ConnectionRegistry {
+            connection_map,
+            registry: Registry::new(),
+        }
     }
 }
 
@@ -71,22 +88,25 @@ async fn refresh_routing_tables(
     provider: Arc<dyn RoutingTableProvider>,
     bookmarks: &[String],
 ) -> Result<u64, Error> {
-    debug!("Routing tables are expired or empty, refreshing...");
+    debug!("Routing tables are expired, refreshing...");
     let mut ttls = vec![];
 
-    for kv in connection_registry.connection_map.iter() {
+    let map = connection_registry.connection_map.clone();
+    for kv in map.iter() {
         let db = kv.key();
-        let registry: &Registry = kv.value();
 
         let routing_table = refresh_routing_table(
             &config,
-            registry,
+            &connection_registry.registry,
             provider.clone(),
             bookmarks,
             Some(Database::from(db.as_str())),
         )
         .await?;
-        ttls.push(routing_table.ttl)
+        connection_registry
+            .connection_map
+            .insert(db.clone(), routing_table.resolve());
+        ttls.push(routing_table.ttl);
     }
 
     if ttls.is_empty() {
@@ -118,6 +138,7 @@ async fn refresh_routing_table(
 
     for server in servers.iter() {
         if registry.contains_key(server) {
+            debug!("Server already exists in the registry: {:?}", server);
             continue;
         }
         let uri = format!("{}://{}:{}", url.scheme(), server.address, server.port);
@@ -149,7 +170,7 @@ pub(crate) fn start_background_updater(
     if let Some(db) = config.db.clone() {
         registry
             .connection_map
-            .insert(db.as_ref().to_string(), Registry::new());
+            .insert(db.as_ref().to_string(), Vec::new());
     }
     // This thread is in charge of refreshing the routing table periodically
     tokio::spawn(async move {
@@ -176,7 +197,6 @@ pub(crate) fn start_background_updater(
                             ttl
                         }
                     };
-                    interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                 }
                 // Handle forced updates
                 cmd = rx.recv() => {
@@ -190,23 +210,27 @@ pub(crate) fn start_background_updater(
                                     ttl
                                 }
                             };
-                            interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                         }
-                        Some(RegistryCommand::RefreshSingleTable(db)) => {
+                        Some(RegistryCommand::RefreshSingleTable((db, new_bookmarks))) => {
                             let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
-                            if let Some(db_registry) = registry.connection_map.get(db_name.as_str()) {
-                                ttl = match refresh_routing_table(&config_clone, &db_registry, provider.clone(), bookmarks.as_slice(), db).await {
-                                    Ok(table) => {
-                                        debug!("Successfully refreshed routing table for new database {}", db_name);
-                                        table.ttl
+                            bookmarks = new_bookmarks;
+                            ttl = match refresh_routing_table(&config_clone, &registry.registry, provider.clone(), bookmarks.as_slice(), db).await {
+                                Ok(table) => {
+                                    if let Some(mut registry) = registry.connection_map.get_mut(db_name.as_str()) {
+                                        registry.value_mut().clear(); // clear the old entries
+                                        registry.value_mut().extend(table.resolve());
+                                    } else {
+                                        debug!("Creating new registry for database: {}", db_name);
+                                        registry.connection_map.insert(db_name.clone(), table.resolve());
                                     }
-                                    Err(e) => {
-                                        debug!("Failed to refresh routing table: {}", e);
-                                        ttl
-                                    }
-                                };
+                                    debug!("Successfully refreshed routing table for new database {}", db_name);
+                                    table.ttl
+                                }
+                                Err(e) => {
+                                    debug!("Failed to refresh routing table: {}", e);
+                                    ttl
+                                }
                             };
-                            interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
                         }
                         Some(RegistryCommand::Stop) | None => {
                             debug!("Stopping background updater");
@@ -216,6 +240,8 @@ pub(crate) fn start_background_updater(
                 }
             }
 
+            debug!("Resetting interval with TTL: {}", ttl);
+            interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
             interval.tick().await;
         }
     });
@@ -225,38 +251,45 @@ pub(crate) fn start_background_updater(
 impl ConnectionRegistry {
     /// Retrieve the pool for a specific server and database.
     pub fn get_pool(&self, server: &BoltServer, db: Option<Database>) -> Option<ConnectionPool> {
-        let pair = self.get_or_create_registry(db);
-        pair.get(server).map(|entry| entry.clone())
+        let pair = self.servers(db.clone());
+        pair.iter()
+            .find(|bs| *bs == server)
+            .and_then(|bs| self.registry.get(bs).map(|pool| pool.value().clone()))
     }
 
     /// Mark a server as available for a specific database.
     pub fn mark_unavailable(&self, server: &BoltServer, db: Option<Database>) {
         let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
-        if let Some(registry) = self.connection_map.get(db_name.as_str()) {
-            registry.remove(server);
+        if self.connection_map.contains_key(db_name.as_str()) {
+            if let Some(index) = self
+                .connection_map
+                .get(db_name.as_str())
+                .and_then(|vec| vec.iter().position(|s| s == server))
+            {
+                debug!("Marking server as available: {:?}", server);
+                self.connection_map
+                    .get_mut(db_name.as_str())
+                    .unwrap()
+                    .remove(index);
+            } else {
+                debug!("Server not found in the registry: {:?}", server);
+            }
         }
     }
 
     /// Get all available Bolt servers for a specific database or the default database if none is provided.
     pub fn servers(&self, db: Option<Database>) -> Vec<BoltServer> {
         let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
-        if let Some(registry) = self.connection_map.get(db_name.as_str()) {
-            registry.iter().map(|entry| entry.key().clone()).collect()
+        if self.connection_map.contains_key(db_name.as_str()) {
+            self.connection_map
+                .get(db_name.as_str())
+                .map(|entry| entry.value().clone())
+                .unwrap_or_default()
         } else {
+            debug!("Creating new registry for database: {}", db_name);
+            self.connection_map.insert(db_name.clone(), Vec::new());
             vec![]
         }
-    }
-
-    /// Get or create a registry for a specific database.
-    /// Panics if the database name is not found in the connection map.
-    pub(crate) fn get_or_create_registry(&self, db: Option<Database>) -> Ref<String, Registry> {
-        let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
-        if !self.connection_map.contains_key(db_name.as_str()) {
-            debug!("Creating new registry for database: {}", db_name);
-            self.connection_map.insert(db_name.clone(), Registry::new());
-        }
-        let registry = self.connection_map.get(db_name.as_str()).unwrap();
-        registry
     }
 }
 
@@ -354,7 +387,6 @@ mod tests {
             tls_config: ConnectionTLSConfig::None,
         };
         let con_registry = Arc::new(ConnectionRegistry::default());
-        let registry = &con_registry.get_or_create_registry(None);
         let ttl = refresh_routing_tables(
             config.clone(),
             con_registry.clone(),
@@ -364,9 +396,11 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(ttl, 300);
+        let registry = con_registry.servers(None);
         assert_eq!(registry.len(), 5);
         let strategy = RoundRobinStrategy::default();
         con_registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap(), None);
+        let registry = con_registry.servers(None);
         assert_eq!(registry.len(), 4);
         let writer = strategy.select_writer(&con_registry.servers(None)).unwrap();
         assert_eq!(
@@ -375,6 +409,7 @@ mod tests {
         );
 
         con_registry.mark_unavailable(BoltServer::resolve(&writers[1]).first().unwrap(), None);
+        let registry = con_registry.servers(None);
         assert_eq!(registry.len(), 3);
         let writer = strategy.select_writer(&con_registry.servers(None));
         assert!(writer.is_none());
@@ -455,32 +490,32 @@ mod tests {
             fetch_size: 200,
             tls_config: ConnectionTLSConfig::None,
         };
-        let con_registry = Arc::new(ConnectionRegistry::default());
-        // get registry for db1 amd refresh routing table
-        let registry = con_registry.get_or_create_registry(Some("db1".into()));
+        let registry = Arc::new(ConnectionRegistry::default());
+        let _ = registry.servers(Some("db1".into())); // ensure db1 is initialized
+        let _ = registry.servers(Some("db2".into())); // ensure db2 is initialized
+                                                      // get registry for db1 amd refresh routing table
         let provider = Arc::new(TestRoutingTableProvider::new(&[
             cluster_routing_table_1,
             cluster_routing_table_2,
         ]));
-        let ttl =
-            refresh_routing_tables(config.clone(), con_registry.clone(), provider.clone(), &[])
-                .await
-                .unwrap();
-        assert_eq!(ttl, 300);
-        assert_eq!(registry.len(), 5); // 2 readers, 2 writers, 1 router
+        let ttl = refresh_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
+            .await
+            .unwrap();
+        let servers = registry.servers(Some("db1".into()));
+        assert_eq!(ttl, 200); // must be the min of both
+        assert_eq!(servers.len(), 5); // 2 readers, 2 writers, 1 router
 
         // get registry for db1 amd refresh routing table
-        let registry2 = con_registry.get_or_create_registry(Some("db2".into()));
-        let ttl =
-            refresh_routing_tables(config.clone(), con_registry.clone(), provider.clone(), &[])
-                .await
-                .unwrap();
+        let ttl = refresh_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
+            .await
+            .unwrap();
         assert_eq!(ttl, 200); // must be the min of both
-        assert_eq!(registry2.len(), 5); // 2 readers, 2 writers, 1 router
+        let servers2 = registry.servers(Some("db2".into()));
+        assert_eq!(servers2.len(), 5); // 2 readers, 2 writers, 1 router
 
         let strategy = RoundRobinStrategy::default();
         let writer = strategy
-            .select_writer(&con_registry.servers(Some("db1".into())))
+            .select_writer(&registry.servers(Some("db1".into())))
             .unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),
@@ -488,7 +523,7 @@ mod tests {
         );
 
         let writer = strategy
-            .select_writer(&con_registry.servers(Some("db2".into())))
+            .select_writer(&registry.servers(Some("db2".into())))
             .unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),

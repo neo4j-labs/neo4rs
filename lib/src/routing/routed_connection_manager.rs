@@ -1,6 +1,6 @@
 use crate::pool::ManagedConnection;
 use crate::routing::connection_registry::{
-    start_background_updater, BoltServer, ConnectionRegistry, Registry, RegistryCommand,
+    start_background_updater, BoltServer, ConnectionRegistry, RegistryCommand,
 };
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::routing::routing_table_provider::RoutingTableProvider;
@@ -43,36 +43,48 @@ impl RoutedConnectionManager {
         db: Option<Database>,
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
-        let registry = self.connection_registry.get_or_create_registry(db.clone());
+        let registry = self.connection_registry.servers(db.clone());
         // If the registry is empty, we need to refresh the routing table
         if registry.is_empty() {
             debug!("Routing table is empty, refreshing");
             if let Err(error) = self
                 .channel
-                .send(RegistryCommand::RefreshSingleTable(db.clone()))
+                .send(RegistryCommand::RefreshSingleTable((
+                    db.clone(),
+                    self.bookmarks.lock().await.clone(),
+                )))
                 .await
             {
                 error!("Failed to send refresh command to registry channel");
                 return Err(Error::RoutingTableRefreshFailed(error.to_string()));
             }
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        self.inner_get(registry.value(), op, db).await
-    }
 
-    async fn inner_get(
-        &self,
-        registry: &Registry,
-        op: Operation,
-        db: Option<Database>,
-    ) -> Result<ManagedConnection, Error> {
+        let mut attempts = 0;
         loop {
             // we loop here until we get a connection. If the routing table is empty, we force a refresh
-            if registry.is_empty() {
-                debug!("Routing table is empty, waiting...");
+            let servers = self.connection_registry.servers(db.clone());
+            if servers.is_empty() {
                 // the first time we need to wait until we get the routing table
                 tokio::time::sleep(Duration::from_millis(10)).await;
+                attempts += 1;
+                if attempts > 500 {
+                    // 5 seconds max wait time
+                    error!(
+                        "Failed to get a connection after 5 seconds, routing table is still empty"
+                    );
+                    return Err(Error::ServerUnavailableError(
+                        "Routing table is still empty after 5 seconds".to_string(),
+                    ));
+                }
                 continue;
             }
+
+            debug!(
+                "Routing table is now not empty, trying to get a connection for operation: {:?}",
+                op
+            );
 
             while let Some(server) = match op {
                 Operation::Write => self.select_writer(db.clone()),
@@ -106,9 +118,10 @@ impl RoutedConnectionManager {
             }
             debug!("Routing table is empty for requested {op} operation, forcing refresh");
             self.channel
-                .send(RegistryCommand::RefreshAll(
+                .send(RegistryCommand::RefreshSingleTable((
+                    db.clone(),
                     self.bookmarks.lock().await.clone(),
-                ))
+                )))
                 .await
                 .map_err(|e| {
                     error!("Failed to send refresh command to registry: {}", e);
