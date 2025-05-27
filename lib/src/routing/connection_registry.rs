@@ -258,11 +258,10 @@ pub(crate) fn start_background_updater(
 
 impl ConnectionRegistry {
     /// Retrieve the pool for a specific server and database.
-    pub fn get_pool(&self, server: &BoltServer, db: Option<Database>) -> Option<ConnectionPool> {
-        let pair = self.servers(db.clone());
-        pair.iter()
-            .find(|bs| *bs == server)
-            .and_then(|bs| self.pool_registry.get(bs).map(|pool| pool.value().clone()))
+    pub fn get_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
+        self.pool_registry
+            .get(server)
+            .map(|pool| pool.value().clone())
     }
 
     /// Mark a server as available for a specific database.

@@ -91,7 +91,7 @@ impl RoutedConnectionManager {
                 _ => self.select_reader(db.clone()),
             } {
                 debug!("requesting connection for server: {:?}", server);
-                if let Some(pool) = self.connection_registry.get_pool(&server, db.clone()) {
+                if let Some(pool) = self.connection_registry.get_pool(&server) {
                     match pool.get().await {
                         Ok(connection) => return Ok(connection),
                         Err(e) => {
