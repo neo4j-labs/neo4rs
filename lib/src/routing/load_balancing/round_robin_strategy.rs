@@ -1,32 +1,46 @@
-use crate::routing::connection_registry::BoltServer;
+use crate::routing::connection_registry::{BoltServer, ConnectionRegistry};
 use crate::routing::load_balancing::LoadBalancingStrategy;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
-#[derive(Default)]
 pub struct RoundRobinStrategy {
+    connection_registry: Arc<ConnectionRegistry>,
     reader_index: AtomicUsize,
     writer_index: AtomicUsize,
 }
 
 impl RoundRobinStrategy {
-    fn select(servers: &[BoltServer], index: &AtomicUsize) -> Option<BoltServer> {
+    pub fn new(connection_registry: Arc<ConnectionRegistry>) -> Self {
+        RoundRobinStrategy {
+            connection_registry,
+            reader_index: AtomicUsize::new(0),
+            writer_index: AtomicUsize::new(0),
+        }
+    }
+
+    fn select(all_servers: &[BoltServer], servers: &[BoltServer], index: &AtomicUsize) -> Option<BoltServer> {
         if servers.is_empty() {
             return None;
         }
 
-        let _ = index.compare_exchange(
-            0,
-            servers.len(),
-            std::sync::atomic::Ordering::Relaxed,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-        let i = index.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some(server) = servers.get(i - 1) {
-            Some(server.clone())
-        } else {
-            //reset index
-            index.store(servers.len(), std::sync::atomic::Ordering::Relaxed);
-            servers.last().cloned()
+        let mut used = vec![];
+        loop {
+            if used.len() >= all_servers.len() {
+                return None; // All servers have been used
+            }
+            let _ = index.compare_exchange(
+                0,
+                all_servers.len(),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
+            let i = index.fetch_sub(1, Ordering::Relaxed);
+            if let Some(server) = all_servers.get(i - 1) {
+                if servers.contains(server) {
+                    return Some(server.clone());
+                }
+                used.push(server.clone());
+            }
         }
     }
 }
@@ -38,7 +52,13 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "READ")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        Self::select(&readers, &self.reader_index)
+        let all_readers = self.connection_registry.all_servers()
+            .iter()
+            .filter(|s| s.role == "READ")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+
+        Self::select(&all_readers, &readers, &self.reader_index)
     }
 
     fn select_writer(&self, servers: &[BoltServer]) -> Option<BoltServer> {
@@ -47,7 +67,13 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "WRITE")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        Self::select(&writers, &self.writer_index)
+        let all_writers = self.connection_registry.all_servers()
+            .iter()
+            .filter(|s| s.role == "WRITE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+
+        Self::select(&all_writers, &writers, &self.writer_index)
     }
 }
 
@@ -59,54 +85,94 @@ mod tests {
     #[test]
     fn should_get_next_server() {
         let routers = vec![Server {
-            addresses: vec!["192.168.0.1:7688".to_string()],
-            role: "WRITE".to_string(),
+            addresses: vec!["server1:7687".to_string()],
+            role: "ROUTE".to_string(),
         }];
-        let readers = vec![Server {
-            addresses: vec![
-                "192.168.0.2:7687".to_string(),
-                "192.168.0.3:7687".to_string(),
-            ],
+        let readers1 = vec![Server {
+            addresses: vec!["server1:7687".to_string()],
+            role: "READ".to_string(),
+        }, Server {
+            addresses: vec!["server2:7687".to_string()],
             role: "READ".to_string(),
         }];
-        let writers = vec![Server {
-            addresses: vec!["192.168.0.4:7688".to_string()],
+        let writers1 = vec![Server {
+            addresses: vec!["server4:7687".to_string()],
+            role: "WRITE".to_string(),
+        }];
+        let readers2 = vec![Server {
+            addresses: vec!["server1:7687".to_string()],
+            role: "READ".to_string(),
+        }, Server {
+            addresses: vec!["server3:7687".to_string()],
+            role: "READ".to_string(),
+        }];
+
+        let writers2 = vec![Server {
+            addresses: vec!["server4:7687".to_string()],
             role: "WRITE".to_string(),
         }];
 
-        let cluster_routing_table = RoutingTable {
+        let routing_table_1 = RoutingTable {
             ttl: 300,
-            db: Some("neo4j".into()),
+            db: Some("db-1".into()),
             servers: routers
                 .clone()
                 .into_iter()
-                .chain(readers.clone())
-                .chain(writers.clone())
+                .chain(readers1.clone())
+                .chain(writers1.clone())
                 .collect(),
         };
-        let all_servers = cluster_routing_table.resolve();
-        assert_eq!(all_servers.len(), 4);
-        let strategy = RoundRobinStrategy::default();
+        let routing_table_2 = RoutingTable {
+            ttl: 300,
+            db: Some("db-2".into()),
+            servers: routers
+                .clone()
+                .into_iter()
+                .chain(readers2.clone())
+                .chain(writers2.clone())
+                .collect(),
+        };
 
-        let reader = strategy.select_reader(&all_servers).unwrap();
+        let registry = Arc::new(ConnectionRegistry::default());
+
+        let mut servers1 = routing_table_1.resolve();
+        servers1.retain(|s| s.role == "READ");
+        let mut servers2 = routing_table_2.resolve();
+        servers2.retain(|s| s.role == "READ");
+
+        let mut all_readers: Vec<BoltServer> = Vec::new();
+        for s in servers1.iter() {
+            if !all_readers.iter().any(|x| x == s) {
+                all_readers.push(s.clone());
+            }
+        }
+        for s in servers2.iter() {
+            if !all_readers.iter().any(|x| x == s) {
+                all_readers.push(s.clone());
+            }
+        }
+        all_readers.retain(|s| s.role == "READ");
+
+        assert_eq!(all_readers.len(), 3);
+        let strategy = RoundRobinStrategy::new(registry.clone());
+
+        // select a reader for db-1
+        let reader = RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
         assert_eq!(
-            format!("{}:{}", reader.address, reader.port),
-            readers[0].addresses[1]
+            reader.address,
+            "server2"
         );
-        let reader = strategy.select_reader(&all_servers).unwrap();
+        // select a reader for db-2
+        let reader = RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
         assert_eq!(
-            format!("{}:{}", reader.address, reader.port),
-            readers[0].addresses[0]
+            reader.address,
+            "server1"
         );
-        let reader = strategy.select_reader(&all_servers).unwrap();
+        // select another reader for db-1
+        let reader = RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
         assert_eq!(
-            format!("{}:{}", reader.address, reader.port),
-            readers[0].addresses[1]
-        );
-        let writer = strategy.select_writer(&all_servers).unwrap();
-        assert_eq!(
-            format!("{}:{}", writer.address, writer.port),
-            writers[0].addresses[0]
+            reader.address,
+            "server2"
         );
     }
 }

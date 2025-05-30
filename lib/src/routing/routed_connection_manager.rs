@@ -23,13 +23,15 @@ pub struct RoutedConnectionManager {
     channel: Sender<RegistryCommand>,
 }
 
+const ROUTING_TABLE_MAX_WAIT_TIME_MS: i32 = 5000;
+
 impl RoutedConnectionManager {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
         let backoff = crate::pool::backoff();
         let connection_registry = Arc::new(ConnectionRegistry::default());
         let channel = start_background_updater(config, connection_registry.clone(), provider);
         Ok(RoutedConnectionManager {
-            load_balancing_strategy: Arc::new(RoundRobinStrategy::default()),
+            load_balancing_strategy: Arc::new(RoundRobinStrategy::new(connection_registry.clone())),
             bookmarks: Arc::new(Mutex::new(vec![])),
             connection_registry,
             backoff,
@@ -68,15 +70,17 @@ impl RoutedConnectionManager {
             if servers.is_empty() {
                 // the first time we need to wait until we get the routing table
                 tokio::time::sleep(Duration::from_millis(10)).await;
-                attempts += 1;
-                if attempts > 500 {
-                    // 5 seconds max wait time
+                attempts += 10;
+                if attempts > ROUTING_TABLE_MAX_WAIT_TIME_MS {
+                    // 5 seconds max wait time by default
                     error!(
-                        "Failed to get a connection after 5 seconds, routing table is still empty"
+                        "Failed to get a connection after {} seconds, routing table is still empty",
+                        ROUTING_TABLE_MAX_WAIT_TIME_MS / 1000
                     );
-                    return Err(Error::ServerUnavailableError(
-                        "Routing table is still empty after 5 seconds".to_string(),
-                    ));
+                    return Err(Error::ServerUnavailableError(format!(
+                        "Routing table is still empty after {} seconds",
+                        ROUTING_TABLE_MAX_WAIT_TIME_MS / 1000
+                    )));
                 }
                 continue;
             }

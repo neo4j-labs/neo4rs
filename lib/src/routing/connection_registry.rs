@@ -5,13 +5,14 @@ use crate::routing::{RoutingTable, Server};
 use crate::{Config, Database, Error};
 use dashmap::DashMap;
 use log::debug;
+use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 
 /// Represents a Bolt server, with its address, port and role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct BoltServer {
     pub(crate) address: String,
     pub(crate) port: u16,
@@ -35,20 +36,9 @@ impl BoltServer {
             })
             .collect()
     }
-}
-
-impl Eq for BoltServer {}
-
-impl PartialEq for BoltServer {
-    fn eq(&self, other: &Self) -> bool {
+    
+    pub fn has_same_address(&self, other: &Self) -> bool {
         self.address == other.address && self.port == other.port
-    }
-}
-
-impl std::hash::Hash for BoltServer {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.address.hash(state);
-        self.port.hash(state);
     }
 }
 
@@ -138,6 +128,17 @@ async fn refresh_routing_tables(
             "No servers available in the routing table".to_string(),
         ));
     }
+
+    // purge the pool registry of servers that are no longer in the routing tables
+    let all_servers: Vec<BoltServer> = connection_registry
+        .databases
+        .iter()
+        .flat_map(|kv| kv.value().clone())
+        .collect();
+    connection_registry
+        .pool_registry
+        .retain(|server, _| all_servers.contains(server));
+
     Ok(*ttls.iter().min().unwrap())
 }
 
@@ -179,9 +180,9 @@ async fn refresh_routing_table(
             })?,
         );
     }
-    registry.retain(|k, _| servers.contains(k));
     debug!(
-        "Registry updated. New size is {} with TTL {}s",
+        "Registry updated for database {}. New size is {} with TTL {}s",
+        db.as_ref().map_or("default".to_string(), |d| d.to_string()),
         registry.len(),
         routing_table.ttl
     );
@@ -271,7 +272,7 @@ impl ConnectionRegistry {
             if let Some(index) = self
                 .databases
                 .get(db_name.as_str())
-                .and_then(|vec| vec.iter().position(|s| s == server))
+                .and_then(|vec| vec.iter().position(|s| server.has_same_address(s)))
             {
                 debug!("Marking server as available: {:?}", server);
                 self.databases
@@ -298,6 +299,13 @@ impl ConnectionRegistry {
             self.databases.insert(db_name.clone(), Vec::new());
             vec![]
         }
+    }
+
+    pub fn all_servers(&self) -> Vec<BoltServer> {
+        self.pool_registry
+            .iter()
+            .map(|kv| kv.key().clone())
+            .collect::<Vec<BoltServer>>()
     }
 
     fn get_db_name(&self, db: Option<Database>) -> String {
@@ -419,7 +427,7 @@ mod tests {
         let servers = registry.servers(None);
         assert_eq!(servers.len(), 5);
 
-        let strategy = RoundRobinStrategy::default();
+        let strategy = RoundRobinStrategy::new(registry.clone());
         registry.mark_unavailable(BoltServer::resolve(&writers[0]).first().unwrap(), None);
         let servers = registry.servers(None);
         assert_eq!(servers.len(), 4);
@@ -540,7 +548,7 @@ mod tests {
         assert_eq!(servers2.len(), 5); // 2 readers, 2 writers, 1 router
         assert_eq!(servers2.first().unwrap().address, "host5");
 
-        let strategy = RoundRobinStrategy::default();
+        let strategy = RoundRobinStrategy::new(registry.clone());
         let writer = strategy
             .select_writer(&registry.servers(Some("db1".into())))
             .unwrap();

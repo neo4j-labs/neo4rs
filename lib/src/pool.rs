@@ -68,7 +68,8 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         &config.tls_config,
     )?;
     info!(
-        "creating connection pool with max size {}",
+        "creating connection pool for node {} with max size {}",
+        config.uri,
         config.max_connections
     );
     Ok(ConnectionPool::builder(mgr)
