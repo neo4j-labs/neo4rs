@@ -108,19 +108,9 @@ impl RoutedConnectionManager {
                             continue;
                         }
                     }
-                } else {
-                    // We couldn't find a connection manager for the server, it was probably marked unavailable
-                    error!(
-                        "No connection manager available for router `{}` in the registry",
-                        server.address
-                    );
-                    return Err(Error::ServerUnavailableError(format!(
-                        "No connection manager available for router `{}` in the registry",
-                        server.address
-                    )));
                 }
             }
-            debug!("Routing table is empty for requested {op} operation, forcing refresh");
+            debug!("No connection for requested {op} operation, forcing refresh of the routing table for database `{}`", db.as_deref().unwrap_or("default"));
             self.channel
                 .send(RegistryCommand::RefreshSingleTable((
                     db.clone(),
@@ -135,7 +125,8 @@ impl RoutedConnectionManager {
                 })?;
             // table is not empty, but we couldn't get a connection, so we throw an error
             break Err(Error::ServerUnavailableError(format!(
-                "No server available for {op} operation"
+                "No server available for {op} operation on db `{}`",
+                db.as_deref().unwrap_or("default")
             )));
         }
     }

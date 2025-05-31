@@ -36,7 +36,7 @@ impl BoltServer {
             })
             .collect()
     }
-    
+
     pub fn has_same_address(&self, other: &Self) -> bool {
         self.address == other.address && self.port == other.port
     }

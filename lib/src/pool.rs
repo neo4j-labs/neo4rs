@@ -69,8 +69,7 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
     )?;
     info!(
         "creating connection pool for node {} with max size {}",
-        config.uri,
-        config.max_connections
+        config.uri, config.max_connections
     );
     Ok(ConnectionPool::builder(mgr)
         .max_size(config.max_connections)

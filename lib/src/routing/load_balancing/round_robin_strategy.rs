@@ -18,7 +18,11 @@ impl RoundRobinStrategy {
         }
     }
 
-    fn select(all_servers: &[BoltServer], servers: &[BoltServer], index: &AtomicUsize) -> Option<BoltServer> {
+    fn select(
+        all_servers: &[BoltServer],
+        servers: &[BoltServer],
+        index: &AtomicUsize,
+    ) -> Option<BoltServer> {
         if servers.is_empty() {
             return None;
         }
@@ -28,12 +32,8 @@ impl RoundRobinStrategy {
             if used.len() >= all_servers.len() {
                 return None; // All servers have been used
             }
-            let _ = index.compare_exchange(
-                0,
-                all_servers.len(),
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            );
+            let _ =
+                index.compare_exchange(0, all_servers.len(), Ordering::Relaxed, Ordering::Relaxed);
             let i = index.fetch_sub(1, Ordering::Relaxed);
             if let Some(server) = all_servers.get(i - 1) {
                 if servers.contains(server) {
@@ -52,7 +52,9 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "READ")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        let all_readers = self.connection_registry.all_servers()
+        let all_readers = self
+            .connection_registry
+            .all_servers()
             .iter()
             .filter(|s| s.role == "READ")
             .cloned()
@@ -67,7 +69,9 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "WRITE")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        let all_writers = self.connection_registry.all_servers()
+        let all_writers = self
+            .connection_registry
+            .all_servers()
             .iter()
             .filter(|s| s.role == "WRITE")
             .cloned()
@@ -88,24 +92,30 @@ mod tests {
             addresses: vec!["server1:7687".to_string()],
             role: "ROUTE".to_string(),
         }];
-        let readers1 = vec![Server {
-            addresses: vec!["server1:7687".to_string()],
-            role: "READ".to_string(),
-        }, Server {
-            addresses: vec!["server2:7687".to_string()],
-            role: "READ".to_string(),
-        }];
+        let readers1 = vec![
+            Server {
+                addresses: vec!["server1:7687".to_string()],
+                role: "READ".to_string(),
+            },
+            Server {
+                addresses: vec!["server2:7687".to_string()],
+                role: "READ".to_string(),
+            },
+        ];
         let writers1 = vec![Server {
             addresses: vec!["server4:7687".to_string()],
             role: "WRITE".to_string(),
         }];
-        let readers2 = vec![Server {
-            addresses: vec!["server1:7687".to_string()],
-            role: "READ".to_string(),
-        }, Server {
-            addresses: vec!["server3:7687".to_string()],
-            role: "READ".to_string(),
-        }];
+        let readers2 = vec![
+            Server {
+                addresses: vec!["server1:7687".to_string()],
+                role: "READ".to_string(),
+            },
+            Server {
+                addresses: vec!["server3:7687".to_string()],
+                role: "READ".to_string(),
+            },
+        ];
 
         let writers2 = vec![Server {
             addresses: vec!["server4:7687".to_string()],
@@ -157,22 +167,16 @@ mod tests {
         let strategy = RoundRobinStrategy::new(registry.clone());
 
         // select a reader for db-1
-        let reader = RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
-        assert_eq!(
-            reader.address,
-            "server2"
-        );
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server2");
         // select a reader for db-2
-        let reader = RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
-        assert_eq!(
-            reader.address,
-            "server1"
-        );
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server1");
         // select another reader for db-1
-        let reader = RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
-        assert_eq!(
-            reader.address,
-            "server2"
-        );
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server2");
     }
 }
