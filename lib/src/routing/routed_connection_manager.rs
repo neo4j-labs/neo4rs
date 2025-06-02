@@ -46,7 +46,7 @@ impl RoutedConnectionManager {
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
         let registry = self.connection_registry.servers(db.clone());
-        // If the registry is empty, we need to refresh the routing table
+        // If the registry is empty, we need to refresh the routing table immediately
         if registry.is_empty() {
             debug!("Routing table is empty, refreshing");
             if let Err(error) = self
@@ -72,7 +72,7 @@ impl RoutedConnectionManager {
                 tokio::time::sleep(Duration::from_millis(10)).await;
                 attempts += 10;
                 if attempts > ROUTING_TABLE_MAX_WAIT_TIME_MS {
-                    // 5 seconds max wait time by default
+                    // 5 seconds max wait time by default (we don't want to block forever)
                     error!(
                         "Failed to get a connection after {} seconds, routing table is still empty",
                         ROUTING_TABLE_MAX_WAIT_TIME_MS / 1000

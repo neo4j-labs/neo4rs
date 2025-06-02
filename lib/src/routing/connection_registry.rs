@@ -71,7 +71,7 @@ impl Default for ConnectionRegistry {
     }
 }
 
-async fn refresh_routing_tables(
+async fn refresh_all_routing_tables(
     config: Config,
     connection_registry: Arc<ConnectionRegistry>,
     provider: Arc<dyn RoutingTableProvider>,
@@ -200,7 +200,7 @@ pub(crate) fn start_background_updater(
     // This thread is in charge of refreshing the routing table periodically
     tokio::spawn(async move {
         let mut bookmarks = vec![];
-        let mut ttl = refresh_routing_tables(
+        let mut ttl = refresh_all_routing_tables(
             config_clone.clone(),
             registry.clone(),
             provider.clone(),
@@ -210,12 +210,14 @@ pub(crate) fn start_background_updater(
         .expect("Failed to get routing table. Exiting...");
         debug!("Starting background updater with TTL: {}", ttl);
         let mut interval = tokio::time::interval(Duration::from_secs(ttl));
+        let now = std::time::Instant::now();
         interval.tick().await; // first tick is immediate
         loop {
             tokio::select! {
                 // Trigger periodic updates
                 _ = interval.tick() => {
-                    ttl = match refresh_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.as_slice()).await {
+                    debug!("Refreshing all routing tables ({})", registry.databases.len());
+                    ttl = match refresh_all_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.as_slice()).await {
                         Ok(ttl) => ttl,
                         Err(e) => {
                             debug!("Failed to refresh routing table: {}", e);
@@ -228,16 +230,24 @@ pub(crate) fn start_background_updater(
                     match cmd {
                         Some(RegistryCommand::RefreshSingleTable((db, new_bookmarks))) => {
                             let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
+                            debug!("Forcing refresh of routing table for database: {}", db_name);
                             bookmarks = new_bookmarks;
                             ttl = match refresh_routing_table(&config_clone, &registry.pool_registry, provider.clone(), bookmarks.as_slice(), db).await {
                                 Ok(table) => {
                                     registry.databases.insert(db_name.clone(), table.resolve());
-                                    debug!("Successfully refreshed routing table for database {}", db_name);
-                                    table.ttl
+                                    // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
+                                    // we derive the TTL from the initial time. Example:
+                                    // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
+                                    // we want to set the TTL to 50 seconds, so that the next update will be in 50 seconds
+                                    ttl - (now.elapsed().as_secs() % table.ttl)
                                 }
                                 Err(e) => {
                                     debug!("Failed to refresh routing table: {}", e);
-                                    ttl
+                                    // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
+                                    // we derive the TTL from the initial time. Example:
+                                    // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
+                                    // we want to set the TTL to 50 seconds, so that the next update will be in 50 seconds
+                                    ttl - (now.elapsed().as_secs() % ttl)
                                 }
                             };
                         }
@@ -250,7 +260,8 @@ pub(crate) fn start_background_updater(
             }
 
             debug!("Resetting interval with TTL: {}", ttl);
-            interval = tokio::time::interval(Duration::from_secs(ttl)); // recreate interval with the new TTL
+            // recreate interval with the new TTL or the derived one in case of a forced update
+            interval = tokio::time::interval(Duration::from_secs(ttl));
             interval.tick().await;
         }
     });
@@ -295,8 +306,6 @@ impl ConnectionRegistry {
                 .map(|entry| entry.value().clone())
                 .unwrap_or_default()
         } else {
-            debug!("Creating new registry for database: {}", db_name);
-            self.databases.insert(db_name.clone(), Vec::new());
             vec![]
         }
     }
@@ -409,7 +418,7 @@ mod tests {
             tls_config: ConnectionTLSConfig::None,
         };
         let registry = Arc::new(ConnectionRegistry::default());
-        let ttl = refresh_routing_tables(
+        let ttl = refresh_all_routing_tables(
             config.clone(),
             registry.clone(),
             Arc::new(TestRoutingTableProvider::new(&[cluster_routing_table])),
@@ -525,7 +534,7 @@ mod tests {
             cluster_routing_table_1,
             cluster_routing_table_2,
         ]));
-        refresh_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
+        refresh_all_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
             .await
             .unwrap();
 
@@ -535,7 +544,7 @@ mod tests {
 
         let _ = registry.servers(Some("db1".into())); // ensure db1 is initialized
         let _ = registry.servers(Some("db2".into())); // ensure db2 is initialized
-        let ttl = refresh_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
+        let ttl = refresh_all_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
             .await
             .unwrap();
 
