@@ -68,8 +68,10 @@ impl BoltWireFormat for BoltInteger {
     }
 
     fn parse(_version: Version, input: &mut Bytes) -> Result<Self> {
-        let value: i64 = match input.get_u8() {
-            marker if (-16..=127).contains(&(marker as i8)) => marker as i64,
+        let marker = input.get_u8();
+        let value: i64 = match marker {
+            m if m >= 0xF0 => (m as i8) as i64,  // Handle negative numbers -16 to -1
+            m if m <= 0x7F => m as i64,  // Handle positive numbers 0 to 127
             INT_8 => input.get_i8() as i64,
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
@@ -119,6 +121,14 @@ mod tests {
 
     #[test]
     fn should_serialize_integer() {
+        let bolt_int = BoltInteger::new(-16);
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
+        assert_eq!(&b[..], &[0xF0]);
+
+        let bolt_int = BoltInteger::new(-1);
+        let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
+        assert_eq!(&b[..], &[0xFF]);
+
         let bolt_int = BoltInteger::new(42);
         let b: Bytes = bolt_int.into_bytes(Version::V4_1).unwrap();
         assert_eq!(&b[..], &[0x2A]);
@@ -145,6 +155,20 @@ mod tests {
 
     #[test]
     fn should_deserialize_integer() {
+        // Test marker bytes for -16 to -1 range
+        let mut b = Bytes::from_static(&[0xF0]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, -16);
+
+        let mut b = Bytes::from_static(&[0xF9]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, -7);
+
+        let mut b = Bytes::from_static(&[0xFF]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, -1);
+
+        // Test other ranges
         let mut b = Bytes::from_static(&[0x2A]);
         let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
         assert_eq!(bolt_int.value, 42);
@@ -164,5 +188,16 @@ mod tests {
         let mut b = Bytes::from_static(&[INT_64, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00]);
         let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
         assert_eq!(bolt_int.value, 2_147_483_648);
+    }
+
+    #[test]
+    fn should_round_trip_integer() {
+        // Test round-trip for -16 to -1 range
+        let original = BoltInteger::new(-7);
+        let bytes: Bytes = original.into_bytes(Version::V4_1).unwrap();
+        let mut bytes_clone = bytes.clone();
+        let parsed: BoltInteger = BoltInteger::parse(Version::V4_1, &mut bytes_clone).unwrap();
+        assert_eq!(parsed.value, -7);
+        assert_eq!(&bytes[..], &[0xF9]); // Verify the marker byte is correct
     }
 }
