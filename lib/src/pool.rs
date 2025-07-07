@@ -6,7 +6,7 @@ use crate::{
     connection::{Connection, ConnectionInfo},
     errors::{Error, Result},
 };
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
+use backon::ExponentialBuilder;
 use deadpool::managed::{Manager, Metrics, Object, Pool, RecycleResult};
 use log::{info, trace};
 
@@ -15,7 +15,7 @@ pub type ManagedConnection = Object<ConnectionManager>;
 
 pub struct ConnectionManager {
     info: ConnectionInfo,
-    backoff: ExponentialBackoff,
+    backoff: ExponentialBuilder,
 }
 
 impl ConnectionManager {
@@ -26,18 +26,23 @@ impl ConnectionManager {
         tls_config: &ConnectionTLSConfig,
     ) -> Result<Self> {
         let info = ConnectionInfo::new(uri, user, password, tls_config)?;
-        let backoff = ExponentialBackoffBuilder::new()
-            .with_initial_interval(Duration::from_millis(1))
-            .with_randomization_factor(0.42)
-            .with_multiplier(2.0)
-            .with_max_elapsed_time(Some(Duration::from_secs(60)))
-            .build();
+        let backoff = backoff();
         Ok(ConnectionManager { info, backoff })
     }
 
-    pub fn backoff(&self) -> ExponentialBackoff {
-        self.backoff.clone()
+    pub fn backoff(&self) -> ExponentialBuilder {
+        self.backoff
     }
+}
+
+pub(crate) fn backoff() -> ExponentialBuilder {
+    ExponentialBuilder::new()
+        .with_jitter()
+        .with_factor(2.0)
+        .without_max_times()
+        .with_min_delay(Duration::from_millis(1))
+        .with_max_delay(Duration::from_secs(10))
+        .with_total_delay(Some(Duration::from_secs(60)))
 }
 
 impl Manager for ConnectionManager {

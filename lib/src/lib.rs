@@ -497,6 +497,7 @@ mod messages;
 mod packstream;
 mod pool;
 mod query;
+mod retry;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 mod routing;
 mod row;
@@ -530,7 +531,7 @@ pub use crate::version::Version;
 pub(crate) use messages::Success;
 use std::fmt::Display;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operation {
     Read,
     Write,
