@@ -46,7 +46,7 @@ impl ConnectionPoolManager {
         }
     }
 
-    fn backoff(&self) -> ExponentialBuilder {
+    fn backoff(&self) -> Option<ExponentialBuilder> {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.backoff(),
@@ -233,13 +233,17 @@ impl Graph {
     ) -> Result<RunResult> {
         let query = query.into_retryable(db, operation, &self.pool, None);
 
-        let (query, result) = RetryableQuery::retry_run
-            .retry(self.pool.backoff())
-            .sleep(tokio::time::sleep)
-            .context(query)
-            .when(|e| matches!(e, Retry::Yes(_)))
-            .notify(Self::log_retry)
-            .await;
+        let (query, result) = if let Some(exponential_backoff) = self.pool.backoff() {
+            RetryableQuery::retry_run
+                .retry(exponential_backoff)
+                .sleep(tokio::time::sleep)
+                .context(query)
+                .when(|e| matches!(e, Retry::Yes(_)))
+                .notify(Self::log_retry)
+                .await
+        } else {
+            query.retry_run().await
+        };
 
         match result {
             Ok(result) => {
@@ -331,13 +335,17 @@ impl Graph {
     ) -> Result<DetachedRowStream> {
         let query = query.into_retryable(db, operation, &self.pool, Some(self.config.fetch_size));
 
-        let (query, result) = RetryableQuery::retry_execute
-            .retry(self.pool.backoff())
-            .sleep(tokio::time::sleep)
-            .context(query)
-            .when(|e| matches!(e, Retry::Yes(_)))
-            .notify(Self::log_retry)
-            .await;
+        let (_, result) = if let Some(exponential_backoff) = self.pool.backoff() {
+            RetryableQuery::retry_execute
+                .retry(exponential_backoff)
+                .sleep(tokio::time::sleep)
+                .context(query)
+                .when(|e| matches!(e, Retry::Yes(_)))
+                .notify(Self::log_retry)
+                .await
+        } else {
+            query.retry_execute().await
+        };
 
         result.map_err(Retry::into_inner)
     }
