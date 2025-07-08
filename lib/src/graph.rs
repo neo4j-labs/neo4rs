@@ -166,7 +166,7 @@ impl Graph {
         operation: Operation,
         bookmarks: &[String],
     ) -> Result<Txn> {
-        let connection = self.pool.get(Some(operation.clone())).await?;
+        let connection = self.pool.get(Some(operation)).await?;
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
             Txn::new(db, self.config.fetch_size, connection, operation, bookmarks).await
