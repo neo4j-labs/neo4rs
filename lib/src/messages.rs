@@ -237,7 +237,7 @@ impl BoltResponse {
             "unknown message ".to_owned(),
             |mut output, byte| {
                 use std::fmt::Write;
-                let _ = write!(output, "{:02X}", byte);
+                let _ = write!(output, "{byte:02X}");
                 output
             },
         )))
@@ -247,7 +247,7 @@ impl BoltResponse {
         match self {
             BoltResponse::Failure(failure) => Error::Neo4j(failure.into_error()),
             BoltResponse::Ignore(ignore) => Error::Neo4j(ignore.into_error()),
-            _ => Error::UnexpectedMessage(format!("unexpected response for {}: {:?}", msg, self)),
+            _ => Error::UnexpectedMessage(format!("unexpected response for {msg}: {self:?}")),
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::RoundRobinStrategy;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{Config, Error, Operation};
-use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
+use backon::ExponentialBuilder;
 use futures::lock::Mutex;
 use log::{debug, error};
 use std::{sync::Arc, time::Duration};
@@ -18,21 +18,13 @@ pub struct RoutedConnectionManager {
     load_balancing_strategy: Arc<dyn LoadBalancingStrategy>,
     connection_registry: Arc<ConnectionRegistry>,
     bookmarks: Arc<Mutex<Vec<String>>>,
-    backoff: Arc<ExponentialBackoff>,
+    backoff: ExponentialBuilder,
     channel: Sender<RegistryCommand>,
 }
 
 impl RoutedConnectionManager {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
-        let backoff = Arc::new(
-            ExponentialBackoffBuilder::new()
-                .with_initial_interval(Duration::from_millis(1))
-                .with_randomization_factor(0.42)
-                .with_multiplier(2.0)
-                .with_max_elapsed_time(Some(Duration::from_secs(60)))
-                .build(),
-        );
-
+        let backoff = crate::pool::backoff();
         let connection_registry = Arc::new(ConnectionRegistry::default());
         let channel = start_background_updater(config, connection_registry.clone(), provider);
         Ok(RoutedConnectionManager {
@@ -105,8 +97,8 @@ impl RoutedConnectionManager {
         }
     }
 
-    pub(crate) fn backoff(&self) -> ExponentialBackoff {
-        self.backoff.as_ref().clone()
+    pub(crate) fn backoff(&self) -> ExponentialBuilder {
+        self.backoff
     }
 
     fn select_reader(&self) -> Option<BoltServer> {

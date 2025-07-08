@@ -6,7 +6,7 @@ use xshell::{cmd, Shell};
 
 fn main() {
     if let Err(e) = try_main() {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         std::process::exit(-1);
     }
 }
@@ -65,8 +65,9 @@ fn update_msrv_lock() -> Result {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
     let pin_versions: &[(String, &str)] = &[
-        ("home".to_owned(), "0.5.9"),
+        ("idna_adapter".to_owned(), "1.2.0"),
         ("litemap".to_owned(), "0.7.4"),
+        ("home".to_owned(), "0.5.9"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
         ("zerofrom".to_owned(), "0.1.5"),
@@ -96,8 +97,9 @@ fn update_min_lock() -> Result {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
     let pin_versions: &[(String, &str)] = &[
-        ("home".to_owned(), "0.5.9"),
+        ("idna_adapter".to_owned(), "1.2.0"),
         ("litemap".to_owned(), "0.7.4"),
+        ("home".to_owned(), "0.5.9"),
         ("serde_repr".to_owned(), "0.1.5"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
@@ -126,8 +128,8 @@ fn pin_version(dry_run: bool, sh: &Shell, cargo: &str, krate: &str, version: &st
 
 fn latest_version(sh: &Shell, krate: &str) -> Result<String> {
     let index = match krate.len() {
-        1 => format!("https://index.crates.io/1/{}", krate),
-        2 => format!("https://index.crates.io/2/{}", krate),
+        1 => format!("https://index.crates.io/1/{krate}"),
+        2 => format!("https://index.crates.io/2/{krate}"),
         3 => format!("https://index.crates.io/3/{}/{}", &krate[..1], krate),
         _ => format!(
             "https://index.crates.io/{}/{}/{}",
@@ -158,7 +160,7 @@ fn task_env() -> Env {
     let workspace = env::var("WORKSPACE_ROOT");
 
     let (lockfile, ci_dir) = match workspace {
-        Ok(ws) => (format!("{}/Cargo.lock", ws), format!("{}/ci", ws)),
+        Ok(ws) => (format!("{ws}/Cargo.lock"), format!("{ws}/ci")),
         Err(_) => ("Cargo.lock".into(), "ci".into()),
     };
 
@@ -176,7 +178,7 @@ trait DryRun {
 impl DryRun for xshell::Cmd<'_> {
     fn run_if(&self, dry_run: bool) -> Result<()> {
         if dry_run {
-            eprintln!("DRY_RUN: {}", self);
+            eprintln!("DRY_RUN: {self}");
         } else {
             self.run()?;
         }

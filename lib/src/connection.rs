@@ -90,7 +90,7 @@ impl Connection {
         let mut response = [0, 0, 0, 0];
         stream.read_exact(&mut response).await?;
         let version = Version::parse(response)?;
-        info!("Connected to Neo4j with version {}", version);
+        info!("Connected to Neo4j with version {version}");
         Ok(version)
     }
 
@@ -293,10 +293,10 @@ impl Display for Routing {
             Routing::Yes(routing) => {
                 let routing = routing
                     .iter()
-                    .map(|(k, v)| format!("{}: \"{}\"", k, v))
+                    .map(|(k, v)| format!("{k}: \"{v}\""))
                     .collect::<Vec<_>>()
                     .join(", ");
-                write!(f, "{}", routing)
+                write!(f, "{routing}")
             }
         }
     }
@@ -503,7 +503,7 @@ impl NeoUrl {
             Ok(url) if url.has_host() => url,
             // missing scheme
             Ok(_) | Err(url::ParseError::RelativeUrlWithoutBase) => {
-                Url::parse(&format!("bolt://{}", uri))?
+                Url::parse(&format!("bolt://{uri}"))?
             }
             Err(err) => return Err(Error::UrlParseError(err)),
         };

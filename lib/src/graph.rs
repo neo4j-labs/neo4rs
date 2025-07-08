@@ -10,6 +10,8 @@ use {
 
 use crate::graph::ConnectionPoolManager::Direct;
 use crate::pool::ManagedConnection;
+use crate::query::RetryableQuery;
+use crate::retry::Retry;
 use crate::RunResult;
 use crate::{
     config::{Config, ConfigBuilder, Database, LiveConfig},
@@ -20,11 +22,11 @@ use crate::{
     txn::Txn,
     Operation,
 };
-use backoff::{Error, ExponentialBackoff};
+use backon::{ExponentialBuilder, RetryableWithContext};
 use std::time::Duration;
 
 #[derive(Clone)]
-enum ConnectionPoolManager {
+pub(crate) enum ConnectionPoolManager {
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     Routed(RoutedConnectionManager),
     Direct(ConnectionPool),
@@ -32,7 +34,7 @@ enum ConnectionPoolManager {
 
 impl ConnectionPoolManager {
     #[allow(unused_variables)]
-    async fn get(&self, operation: Option<Operation>) -> Result<ManagedConnection> {
+    pub(crate) async fn get(&self, operation: Option<Operation>) -> Result<ManagedConnection> {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.get(operation).await,
@@ -40,7 +42,7 @@ impl ConnectionPoolManager {
         }
     }
 
-    fn backoff(&self) -> ExponentialBackoff {
+    fn backoff(&self) -> ExponentialBuilder {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             Routed(manager) => manager.backoff(),
@@ -164,7 +166,7 @@ impl Graph {
         operation: Operation,
         bookmarks: &[String],
     ) -> Result<Txn> {
-        let connection = self.pool.get(Some(operation.clone())).await?;
+        let connection = self.pool.get(Some(operation)).await?;
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
             Txn::new(db, self.config.fetch_size, connection, operation, bookmarks).await
@@ -222,29 +224,18 @@ impl Graph {
     async fn impl_run_on(
         &self,
         db: Option<Database>,
-        q: Query,
+        query: Query,
         operation: Operation,
     ) -> Result<RunResult> {
-        let is_read = operation.is_read();
-        let result = backoff::future::retry_notify(
-            self.pool.backoff(),
-            || {
-                let pool = &self.pool;
-                let mut query = q.clone();
-                let operation = operation.clone();
-                if let Some(db) = db.as_deref() {
-                    query = query.extra("db", db);
-                }
-                query = query.extra("mode", if is_read { "r" } else { "w" });
-                async move {
-                    let mut connection =
-                        pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
-                    query.run_retryable(&mut connection).await
-                }
-            },
-            Self::log_retry,
-        )
-        .await;
+        let query = query.into_retryable(db, operation, &self.pool, None);
+
+        let (query, result) = RetryableQuery::retry_run
+            .retry(self.pool.backoff())
+            .sleep(tokio::time::sleep)
+            .context(query)
+            .when(|e| matches!(e, Retry::Yes(_)))
+            .notify(Self::log_retry)
+            .await;
 
         match result {
             Ok(result) => {
@@ -257,7 +248,7 @@ impl Graph {
                             }
                             Direct(_) => {}
                         }
-                    } else if is_read {
+                    } else if query.is_read() {
                         match &self.pool {
                             Routed(routed) => {
                                 debug!("No bookmark received after a read operation, discarding all bookmarks");
@@ -269,7 +260,7 @@ impl Graph {
                 }
                 Ok(result)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.into_inner()),
         }
     }
 
@@ -331,32 +322,23 @@ impl Graph {
     async fn impl_execute_on(
         &self,
         db: Option<Database>,
-        q: Query,
+        query: Query,
         operation: Operation,
     ) -> Result<DetachedRowStream> {
-        backoff::future::retry_notify(
-            self.pool.backoff(),
-            || {
-                let pool = &self.pool;
-                let mut query = q.clone();
-                let operation = operation.clone();
-                let fetch_size = self.config.fetch_size;
-                if let Some(db) = db.as_deref() {
-                    query = query.extra("db", db);
-                }
-                let operation = operation.clone();
-                query = query.param("mode", if operation.is_read() { "r" } else { "w" });
-                async move {
-                    let connection = pool.get(Some(operation)).await.map_err(Error::Permanent)?; // an error when retrieving a connection is considered permanent
-                    query.execute_retryable(fetch_size, connection).await
-                }
-            },
-            Self::log_retry,
-        )
-        .await
+        let query = query.into_retryable(db, operation, &self.pool, Some(self.config.fetch_size));
+
+        let (query, result) = RetryableQuery::retry_execute
+            .retry(self.pool.backoff())
+            .sleep(tokio::time::sleep)
+            .context(query)
+            .when(|e| matches!(e, Retry::Yes(_)))
+            .notify(Self::log_retry)
+            .await;
+
+        result.map_err(Retry::into_inner)
     }
 
-    fn log_retry(e: crate::Error, delay: Duration) {
+    fn log_retry(e: &Retry<crate::Error>, delay: Duration) {
         let level = match delay.as_millis() {
             0..=499 => log::Level::Debug,
             500..=4999 => log::Level::Info,
