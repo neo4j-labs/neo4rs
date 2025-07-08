@@ -1295,7 +1295,7 @@ dependencies = [
  "log",
  "nav-types",
  "neo4rs-macros",
- "paste",
+ "pastey",
  "pin-project-lite",
  "pretty_env_logger",
  "rustls",
@@ -1472,6 +1472,12 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pastey"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3a8cb46bdc156b1c90460339ae6bfd45ba0394e5effbaa640badb4987fdc261"
 
 [[package]]
 name = "percent-encoding"
