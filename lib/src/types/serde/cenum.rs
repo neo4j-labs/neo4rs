@@ -22,7 +22,7 @@ macro_rules! cenum {
                 )+
             ];
 
-            paste::paste! {
+            pastey::paste! {
                 #[allow(unused)]
                 pub const NAMES: &'static [&'static str] = &[
                     $(
@@ -40,7 +40,7 @@ macro_rules! cenum {
             }
 
             fn from_str(v: &str) -> Option<Self> {
-                paste::paste! {
+                pastey::paste! {
                     match v {
                         $(
                             stringify!([<$variants:snake:lower>]) => Some(<$name>::$variants),
@@ -52,7 +52,7 @@ macro_rules! cenum {
 
             #[allow(unused)]
             pub const fn name(self) -> &'static str {
-                paste::paste! {
+                pastey::paste! {
                     match self {
                         $(
                             Self::$variants => stringify!([<$variants:snake:lower>]),
@@ -152,7 +152,7 @@ macro_rules! cenum {
                         where
                             E: ::serde::de::Error,
                         {
-                            paste::paste! {
+                            pastey::paste! {
                                 match <$name>::from_str(v) {
                                     Some(kind) => Ok(kind),
                                     _ => Err(E::unknown_variant(v, &[
@@ -180,7 +180,7 @@ macro_rules! cenum {
         };
 
 
-        paste::paste! {
+        pastey::paste! {
             #[cfg(test)]
             mod [< $name:snake:lower _tests>] {
                 use super::*;
