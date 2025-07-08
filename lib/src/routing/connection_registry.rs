@@ -557,9 +557,10 @@ mod tests {
 
         let _ = registry.servers(Some("db1".into())); // ensure db1 is initialized
         let _ = registry.servers(Some("db2".into())); // ensure db2 is initialized
-        let ttl = refresh_all_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
-            .await
-            .unwrap();
+        let ttl =
+            refresh_all_routing_tables(config.clone(), registry.clone(), provider.clone(), &[])
+                .await
+                .unwrap();
 
         let servers = registry.servers(Some("db1".into()));
         assert_eq!(ttl, 200); // must be the min of both

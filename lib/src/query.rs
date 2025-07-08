@@ -117,6 +117,7 @@ impl Query {
             query,
             operation,
             fetch_size,
+            db,
         }
     }
 
@@ -233,6 +234,7 @@ pub(crate) struct RetryableQuery<'a> {
     query: Query,
     operation: Operation,
     fetch_size: Option<usize>,
+    db: Option<Database>,
 }
 
 impl<'a> RetryableQuery<'a> {
@@ -270,7 +272,10 @@ impl<'a> RetryableQuery<'a> {
 
     async fn connect(&self) -> QueryResult<ManagedConnection> {
         // an error when retrieving a connection is considered permanent
-        self.pool.get(Some(self.operation)).await.map_err(Retry::No)
+        self.pool
+            .get(Some(self.operation), self.db.clone())
+            .await
+            .map_err(Retry::No)
     }
 }
 
