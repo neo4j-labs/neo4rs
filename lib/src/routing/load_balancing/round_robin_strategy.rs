@@ -52,7 +52,7 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "READ")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        let all_readers = self
+        let mut all_readers = self
             .connection_registry
             .all_servers()
             .iter()
@@ -60,6 +60,8 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .cloned()
             .collect::<Vec<BoltServer>>();
 
+        // Sort all writers by address to ensure consistent ordering
+        all_readers.sort_by(|a, b| a.address.cmp(&b.address));
         Self::select(&all_readers, &readers, &self.reader_index)
     }
 
@@ -69,7 +71,7 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .filter(|s| s.role == "WRITE")
             .cloned()
             .collect::<Vec<BoltServer>>();
-        let all_writers = self
+        let mut all_writers = self
             .connection_registry
             .all_servers()
             .iter()
@@ -77,6 +79,8 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
             .cloned()
             .collect::<Vec<BoltServer>>();
 
+        // Sort all writers by address to ensure consistent ordering
+        all_writers.sort_by(|a, b| a.address.cmp(&b.address));
         Self::select(&all_writers, &writers, &self.writer_index)
     }
 }

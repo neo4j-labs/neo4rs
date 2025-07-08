@@ -306,6 +306,8 @@ impl ConnectionRegistry {
                 .map(|entry| entry.value().clone())
                 .unwrap_or_default()
         } else {
+            debug!("Creating new registry for database: {}", db_name);
+            self.databases.insert(db_name.clone(), Vec::new());
             vec![]
         }
     }
@@ -499,6 +501,16 @@ mod tests {
             addresses: vec!["host0:7687".to_string()],
             role: "ROUTE".to_string(),
         }];
+        let cluster_routing_table_default = RoutingTable {
+            ttl: 300,
+            db: Some("".into()),
+            servers: readers1
+                .clone()
+                .into_iter()
+                .chain(writers1.clone())
+                .chain(routers.clone())
+                .collect(),
+        };
         let cluster_routing_table_1 = RoutingTable {
             ttl: 300,
             db: Some("db1".into()),
@@ -531,6 +543,7 @@ mod tests {
         let registry = Arc::new(ConnectionRegistry::default());
         // get registry for db1 amd refresh routing table
         let provider = Arc::new(TestRoutingTableProvider::new(&[
+            cluster_routing_table_default,
             cluster_routing_table_1,
             cluster_routing_table_2,
         ]));
@@ -571,7 +584,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             format!("{}:{}", writer.address, writer.port),
-            writers2[0].addresses[0]
+            writers2[1].addresses[0]
         );
     }
 }
