@@ -7,11 +7,11 @@ pub enum Retry<E> {
 }
 
 impl<E> Retry<E> {
-    pub fn retry(e: E) -> Retry<E> {
+    pub fn yes(e: E) -> Retry<E> {
         Retry::Yes(e)
     }
 
-    pub fn no_retry(e: E) -> Retry<E> {
+    pub fn no(e: E) -> Retry<E> {
         Retry::No(e)
     }
 

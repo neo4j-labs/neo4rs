@@ -222,9 +222,9 @@ fn wrap_error<T>(resp: impl IntoError, req: &'static str) -> QueryResult<T> {
     };
 
     if can_retry {
-        Err(Retry::retry(error))
+        Err(Retry::yes(error))
     } else {
-        Err(Retry::no_retry(error))
+        Err(Retry::no(error))
     }
 }
 
