@@ -236,6 +236,7 @@ pub(crate) struct RetryableQuery<'a> {
 }
 
 impl<'a> RetryableQuery<'a> {
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     pub(crate) fn is_read(&self) -> bool {
         self.operation.is_read()
     }
