@@ -167,7 +167,7 @@ impl BoltType {
             input if BoltRelation::can_parse(version, input) => {
                 BoltType::Relation(BoltRelation::parse(version, input)?)
             }
-            _ => return Err(Error::UnknownType(format!("{:#04X?}", input))),
+            _ => return Err(Error::UnknownType(format!("{input:#04X?}"))),
         };
         Ok(bolt_type)
     }

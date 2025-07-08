@@ -104,8 +104,7 @@ impl BoltWireFormat for BoltList {
             LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
-                    "invalid list marker {}",
-                    marker
+                    "invalid list marker {marker}"
                 )))
             }
         };

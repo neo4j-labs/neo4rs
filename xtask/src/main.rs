@@ -6,7 +6,7 @@ use xshell::{cmd, Shell};
 
 fn main() {
     if let Err(e) = try_main() {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         std::process::exit(-1);
     }
 }
@@ -128,8 +128,8 @@ fn pin_version(dry_run: bool, sh: &Shell, cargo: &str, krate: &str, version: &st
 
 fn latest_version(sh: &Shell, krate: &str) -> Result<String> {
     let index = match krate.len() {
-        1 => format!("https://index.crates.io/1/{}", krate),
-        2 => format!("https://index.crates.io/2/{}", krate),
+        1 => format!("https://index.crates.io/1/{krate}"),
+        2 => format!("https://index.crates.io/2/{krate}"),
         3 => format!("https://index.crates.io/3/{}/{}", &krate[..1], krate),
         _ => format!(
             "https://index.crates.io/{}/{}/{}",
@@ -160,7 +160,7 @@ fn task_env() -> Env {
     let workspace = env::var("WORKSPACE_ROOT");
 
     let (lockfile, ci_dir) = match workspace {
-        Ok(ws) => (format!("{}/Cargo.lock", ws), format!("{}/ci", ws)),
+        Ok(ws) => (format!("{ws}/Cargo.lock"), format!("{ws}/ci")),
         Err(_) => ("Cargo.lock".into(), "ci".into()),
     };
 
@@ -178,7 +178,7 @@ trait DryRun {
 impl DryRun for xshell::Cmd<'_> {
     fn run_if(&self, dry_run: bool) -> Result<()> {
         if dry_run {
-            eprintln!("DRY_RUN: {}", self);
+            eprintln!("DRY_RUN: {self}");
         } else {
             self.run()?;
         }

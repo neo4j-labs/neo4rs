@@ -56,7 +56,7 @@ impl From<&BoltTime> for (NaiveTime, FixedOffset) {
         .to_chrono();
 
         let offset = FixedOffset::east_opt(value.tz_offset_seconds.value as i32)
-            .unwrap_or_else(|| panic!("invald timezone offset {}", value.tz_offset_seconds.value));
+            .unwrap_or_else(|| panic!("invalid timezone offset {}", value.tz_offset_seconds.value));
 
         (time, offset)
     }
@@ -74,10 +74,7 @@ impl From<&BoltLocalTime> for NaiveTime {
         let seconds = (nanos / 1_000_000_000) as u32;
         let nanoseconds = (nanos % 1_000_000_000) as u32;
         NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds).unwrap_or_else(|| {
-            panic!(
-                "invalid number of seconds {} and nanoseconds {}",
-                seconds, nanoseconds
-            )
+            panic!("invalid number of seconds {seconds} and nanoseconds {nanoseconds}")
         })
     }
 }
