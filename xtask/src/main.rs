@@ -65,8 +65,9 @@ fn update_msrv_lock() -> Result {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
     let pin_versions: &[(String, &str)] = &[
-        ("home".to_owned(), "0.5.9"),
+        ("idna_adapter".to_owned(), "1.2.0"),
         ("litemap".to_owned(), "0.7.4"),
+        ("home".to_owned(), "0.5.9"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
         ("zerofrom".to_owned(), "0.1.5"),
