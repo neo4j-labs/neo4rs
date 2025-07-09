@@ -4,7 +4,7 @@ use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::{RoutingTable, Server};
 use crate::{Config, Database, Error};
 use dashmap::DashMap;
-use log::debug;
+use log::{debug, error};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -242,7 +242,7 @@ pub(crate) fn start_background_updater(
                                     ttl - (now.elapsed().as_secs() % table.ttl)
                                 }
                                 Err(e) => {
-                                    debug!("Failed to refresh routing table: {}", e);
+                                    error!("Failed to refresh routing table: {}", e);
                                     // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
                                     // we derive the TTL from the initial time. Example:
                                     // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
