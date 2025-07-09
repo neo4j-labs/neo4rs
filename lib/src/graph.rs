@@ -34,10 +34,14 @@ pub(crate) enum ConnectionPoolManager {
 
 impl ConnectionPoolManager {
     #[allow(unused_variables)]
-    pub(crate) async fn get(&self, operation: Option<Operation>) -> Result<ManagedConnection> {
+    pub(crate) async fn get(
+        &self,
+        operation: Option<Operation>,
+        db: Option<Database>,
+    ) -> Result<ManagedConnection> {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            Routed(manager) => manager.get(operation).await,
+            Routed(manager) => manager.get(operation, db).await,
             Direct(pool) => pool.get().await.map_err(crate::Error::from),
         }
     }
@@ -166,7 +170,7 @@ impl Graph {
         operation: Operation,
         bookmarks: &[String],
     ) -> Result<Txn> {
-        let connection = self.pool.get(Some(operation)).await?;
+        let connection = self.pool.get(Some(operation), db.clone()).await?;
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
             Txn::new(db, self.config.fetch_size, connection, operation, bookmarks).await

@@ -5,6 +5,7 @@ use crate::routing::connection_registry::{
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::RoundRobinStrategy;
+use crate::Database;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{Config, Error, Operation};
 use backon::ExponentialBuilder;
@@ -22,13 +23,15 @@ pub struct RoutedConnectionManager {
     channel: Sender<RegistryCommand>,
 }
 
+const ROUTING_TABLE_MAX_WAIT_TIME_MS: i32 = 5000;
+
 impl RoutedConnectionManager {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
         let backoff = crate::pool::backoff();
         let connection_registry = Arc::new(ConnectionRegistry::default());
         let channel = start_background_updater(config, connection_registry.clone(), provider);
         Ok(RoutedConnectionManager {
-            load_balancing_strategy: Arc::new(RoundRobinStrategy::default()),
+            load_balancing_strategy: Arc::new(RoundRobinStrategy::new(connection_registry.clone())),
             bookmarks: Arc::new(Mutex::new(vec![])),
             connection_registry,
             backoff,
@@ -39,19 +42,57 @@ impl RoutedConnectionManager {
     pub(crate) async fn get(
         &self,
         operation: Option<Operation>,
+        db: Option<Database>,
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
+        let registry = self.connection_registry.servers(db.clone());
+        // If the registry is empty, we need to refresh the routing table immediately
+        if registry.is_empty() {
+            debug!("Routing table is empty, refreshing");
+            if let Err(error) = self
+                .channel
+                .send(RegistryCommand::RefreshSingleTable((
+                    db.clone(),
+                    self.bookmarks.lock().await.clone(),
+                )))
+                .await
+            {
+                error!("Failed to send refresh command to registry channel");
+                return Err(Error::RoutingTableRefreshFailed(error.to_string()));
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        let mut attempts = 0;
         loop {
             // we loop here until we get a connection. If the routing table is empty, we force a refresh
-            if self.connection_registry.connections.is_empty() {
+            let servers = self.connection_registry.servers(db.clone());
+            if servers.is_empty() {
                 // the first time we need to wait until we get the routing table
                 tokio::time::sleep(Duration::from_millis(10)).await;
+                attempts += 10;
+                if attempts > ROUTING_TABLE_MAX_WAIT_TIME_MS {
+                    // 5 seconds max wait time by default (we don't want to block forever)
+                    error!(
+                        "Failed to get a connection after {} seconds, routing table is still empty",
+                        ROUTING_TABLE_MAX_WAIT_TIME_MS / 1000
+                    );
+                    return Err(Error::ServerUnavailableError(format!(
+                        "Routing table is still empty after {} seconds",
+                        ROUTING_TABLE_MAX_WAIT_TIME_MS / 1000
+                    )));
+                }
                 continue;
             }
 
+            debug!(
+                "Routing table is now not empty, trying to get a connection for operation: {:?}",
+                op
+            );
+
             while let Some(server) = match op {
-                Operation::Write => self.select_writer(),
-                _ => self.select_reader(),
+                Operation::Write => self.select_writer(db.clone()),
+                _ => self.select_reader(db.clone()),
             } {
                 debug!("requesting connection for server: {:?}", server);
                 if let Some(pool) = self.connection_registry.get_pool(&server) {
@@ -62,27 +103,19 @@ impl RoutedConnectionManager {
                                 "Failed to get connection from pool for server `{}`: {}",
                                 server.address, e
                             );
-                            self.connection_registry.mark_unavailable(&server);
+                            self.connection_registry
+                                .mark_unavailable(&server, db.clone());
                             continue;
                         }
                     }
-                } else {
-                    // We couldn't find a connection manager for the server, it was probably marked unavailable
-                    error!(
-                        "No connection manager available for router `{}` in the registry",
-                        server.address
-                    );
-                    return Err(Error::ServerUnavailableError(format!(
-                        "No connection manager available for router `{}` in the registry",
-                        server.address
-                    )));
                 }
             }
-            debug!("Routing table is empty for requested {op} operation, forcing refresh");
+            debug!("No connection for requested {op} operation, forcing refresh of the routing table for database `{}`", db.as_deref().unwrap_or("default"));
             self.channel
-                .send(RegistryCommand::Refresh(
+                .send(RegistryCommand::RefreshSingleTable((
+                    db.clone(),
                     self.bookmarks.lock().await.clone(),
-                ))
+                )))
                 .await
                 .map_err(|e| {
                     error!("Failed to send refresh command to registry: {}", e);
@@ -92,7 +125,8 @@ impl RoutedConnectionManager {
                 })?;
             // table is not empty, but we couldn't get a connection, so we throw an error
             break Err(Error::ServerUnavailableError(format!(
-                "No server available for {op} operation"
+                "No server available for {op} operation on db `{}`",
+                db.as_deref().unwrap_or("default")
             )));
         }
     }
@@ -101,14 +135,14 @@ impl RoutedConnectionManager {
         self.backoff
     }
 
-    fn select_reader(&self) -> Option<BoltServer> {
+    fn select_reader(&self, db: Option<Database>) -> Option<BoltServer> {
         self.load_balancing_strategy
-            .select_reader(&self.connection_registry.servers())
+            .select_reader(&self.connection_registry.servers(db))
     }
 
-    fn select_writer(&self) -> Option<BoltServer> {
+    fn select_writer(&self, db: Option<Database>) -> Option<BoltServer> {
         self.load_balancing_strategy
-            .select_writer(&self.connection_registry.servers())
+            .select_writer(&self.connection_registry.servers(db))
     }
 
     #[allow(dead_code)]
