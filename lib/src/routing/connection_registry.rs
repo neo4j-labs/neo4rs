@@ -176,6 +176,7 @@ async fn refresh_routing_table(
             server.clone(),
             create_pool(&Config {
                 uri,
+                backoff: None,
                 ..config.clone()
             })?,
         );

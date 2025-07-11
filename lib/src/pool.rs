@@ -31,7 +31,7 @@ impl ConnectionManager {
     }
 
     pub fn backoff(&self) -> Option<ExponentialBuilder> {
-        self.backoff.clone()
+        self.backoff
     }
 }
 

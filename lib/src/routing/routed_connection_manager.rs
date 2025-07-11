@@ -1,4 +1,3 @@
-use crate::config::BackoffConfig;
 use crate::pool::ManagedConnection;
 use crate::routing::connection_registry::{
     start_background_updater, BoltServer, ConnectionRegistry, RegistryCommand,
@@ -28,6 +27,9 @@ const ROUTING_TABLE_MAX_WAIT_TIME_MS: i32 = 5000;
 
 impl RoutedConnectionManager {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
+        // backoff config should be set to None here, since the routing table updater will handle retries
+        // We could provide some configuration to "force" the retry mechanism in a clustered env,
+        // but for now we will turn it off
         let backoff = config
             .backoff
             .clone()
