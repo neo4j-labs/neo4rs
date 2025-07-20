@@ -509,7 +509,7 @@ mod types;
 mod version;
 
 pub use crate::auth::ClientCertificate;
-pub use crate::config::{Config, ConfigBuilder, Database};
+pub use crate::config::{BackoffConfig, BackoffConfigBuilder, Config, ConfigBuilder, Database};
 pub use crate::errors::{
     Error, Neo4jClientErrorKind, Neo4jError, Neo4jErrorKind, Neo4jSecurityErrorKind, Result,
 };
