@@ -85,8 +85,7 @@ impl BoltWireFormat for BoltMap {
             LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
-                    "invalid map marker {}",
-                    marker
+                    "invalid map marker {marker}"
                 )))
             }
         };

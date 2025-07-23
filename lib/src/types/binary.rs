@@ -44,8 +44,7 @@ impl BoltWireFormat for BoltBytes {
             LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
-                    "invalid bytes marker {}",
-                    marker
+                    "invalid bytes marker {marker}"
                 )))
             }
         };

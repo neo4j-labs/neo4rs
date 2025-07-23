@@ -73,8 +73,7 @@ impl BoltWireFormat for BoltString {
             LARGE => input.get_u32() as usize,
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
-                    "invalid string marker {}",
-                    marker
+                    "invalid string marker {marker}"
                 )))
             }
         };

@@ -89,7 +89,7 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
     {
         match i64::try_from(v) {
             Ok(v) => self.visit_i64(v),
-            Err(_) => Err(E::custom(format!("i128 out of range: {}", v))),
+            Err(_) => Err(E::custom(format!("i128 out of range: {v}"))),
         }
     }
 
@@ -99,7 +99,7 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
     {
         match i64::try_from(v) {
             Ok(v) => self.visit_i64(v),
-            Err(_) => Err(E::custom(format!("u64 out of range: {}", v))),
+            Err(_) => Err(E::custom(format!("u64 out of range: {v}"))),
         }
     }
 
@@ -109,7 +109,7 @@ impl<'de> Visitor<'de> for BoltTypeVisitor {
     {
         match i64::try_from(v) {
             Ok(v) => self.visit_i64(v),
-            Err(_) => Err(E::custom(format!("u128 out of range: {}", v))),
+            Err(_) => Err(E::custom(format!("u128 out of range: {v}"))),
         }
     }
 
@@ -462,7 +462,7 @@ impl<'de> Deserializer<'de> for BoltTypeDeserializer<'de> {
                         "Could not convert Neo4j LocalDateTime into chrono::NaiveDateTime",
                     )
                 })?;
-                let ldt = format!("{:?}", ldt);
+                let ldt = format!("{ldt:?}");
                 visitor.visit_string(ldt)
             }
             BoltType::DateTimeZoneId(dtz) => {

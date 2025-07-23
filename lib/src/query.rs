@@ -4,11 +4,13 @@ use std::cell::{Cell, RefCell};
 use crate::{bolt::Summary, summary::ResultSummary};
 use crate::{
     errors::Result,
+    graph::ConnectionPoolManager,
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
+    retry::Retry,
     stream::{DetachedRowStream, RowStream},
     types::{BoltList, BoltMap, BoltString, BoltType},
-    Error, Success,
+    Database, Error, Operation, Success,
 };
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -92,7 +94,31 @@ impl Query {
         let request = BoltRequest::run(&self.query, self.params, self.extra);
         Self::try_run(request, connection)
             .await
-            .map_err(unwrap_backoff)
+            .map_err(Retry::into_inner)
+    }
+
+    pub(crate) fn into_retryable(
+        self,
+        db: Option<Database>,
+        operation: Operation,
+        pool: &ConnectionPoolManager,
+        fetch_size: Option<usize>,
+    ) -> RetryableQuery<'_> {
+        let query = match db.as_deref() {
+            Some(db) => self.extra("db", db),
+            None => self,
+        };
+
+        let is_read = operation.is_read();
+        let query = query.extra("mode", if is_read { "r" } else { "w" });
+
+        RetryableQuery {
+            pool,
+            query,
+            operation,
+            fetch_size,
+            db,
+        }
     }
 
     pub(crate) async fn run_retryable(
@@ -122,7 +148,7 @@ impl Query {
         let run = BoltRequest::run(&self.query, self.params, self.extra);
         Self::try_execute(run, fetch_size, connection)
             .await
-            .map_err(unwrap_backoff)
+            .map_err(Retry::into_inner)
     }
 
     async fn try_run(
@@ -187,7 +213,7 @@ impl std::fmt::Debug for Query {
     }
 }
 
-type QueryResult<T> = Result<T, backoff::Error<Error>>;
+pub(crate) type QueryResult<T> = Result<T, Retry<Error>>;
 
 fn wrap_error<T>(resp: impl IntoError, req: &'static str) -> QueryResult<T> {
     let error = resp.into_error(req);
@@ -197,9 +223,59 @@ fn wrap_error<T>(resp: impl IntoError, req: &'static str) -> QueryResult<T> {
     };
 
     if can_retry {
-        Err(backoff::Error::transient(error))
+        Err(Retry::yes(error))
     } else {
-        Err(backoff::Error::permanent(error))
+        Err(Retry::no(error))
+    }
+}
+
+pub(crate) struct RetryableQuery<'a> {
+    pool: &'a ConnectionPoolManager,
+    query: Query,
+    operation: Operation,
+    fetch_size: Option<usize>,
+    db: Option<Database>,
+}
+
+impl<'a> RetryableQuery<'a> {
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub(crate) fn is_read(&self) -> bool {
+        self.operation.is_read()
+    }
+
+    pub(crate) async fn retry_run(self) -> (Self, QueryResult<RunResult>) {
+        let result = self.run().await;
+        (self, result)
+    }
+
+    async fn run(&self) -> QueryResult<RunResult> {
+        let mut connection = self.connect().await?;
+        self.query.run_retryable(&mut connection).await
+    }
+
+    pub(crate) async fn retry_execute(self) -> (Self, QueryResult<DetachedRowStream>) {
+        let result = self.execute().await;
+        (self, result)
+    }
+
+    async fn execute(&self) -> QueryResult<DetachedRowStream> {
+        debug_assert!(
+            self.fetch_size.is_some(),
+            "Calling execute requires a fetch_size"
+        );
+
+        let connection = self.connect().await?;
+        self.query
+            .execute_retryable(self.fetch_size.expect("fetch_size must be set"), connection)
+            .await
+    }
+
+    async fn connect(&self) -> QueryResult<ManagedConnection> {
+        // an error when retrieving a connection is considered permanent
+        self.pool
+            .get(Some(self.operation), self.db.clone())
+            .await
+            .map_err(Retry::No)
     }
 }
 
@@ -224,13 +300,6 @@ impl<R: std::fmt::Debug> IntoError for Result<Summary<R>> {
             Ok(resp) => resp.into_error(msg),
             Err(e) => e,
         }
-    }
-}
-
-fn unwrap_backoff(err: backoff::Error<Error>) -> Error {
-    match err {
-        backoff::Error::Permanent(e) => e,
-        backoff::Error::Transient { err, .. } => err,
     }
 }
 
@@ -272,7 +341,7 @@ impl<T: Into<BoltType>> std::fmt::Debug for QueryParameter<'_, T> {
 ///
 /// `query!` works similar to `format!`:
 ///   - The first argument is the query string with `{<name>}` placeholders
-///   - Following that is a list of `name = value` parmeters arguments
+///   - Following that is a list of `name = value` parameters arguments
 ///   - All placeholders in the query strings are replaced with query parameters
 ///
 /// The macro is a compiler-supported alternative to using the `params` method on `Query`.

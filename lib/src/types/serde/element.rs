@@ -181,7 +181,7 @@ impl<'de, T: ElementData<'de>> ElementDataDeserializer<'de, T> {
                 visitation.visit(IterDeserializer(ids.iter()), visitor)
             }
             _ => Err(DeError::invalid_type(
-                Unexpected::Other(&format!("struct `{}`", name)),
+                Unexpected::Other(&format!("struct `{name}`")),
                 &concat!(
                     "one of `Id`, `Labels`, `Type`, `StartNodeId`, ",
                     "`EndNodeId`, `Keys`, `Nodes`, `Relationships`, or `Indices`"
@@ -219,7 +219,7 @@ impl<'de, T: ElementData<'de>> Deserializer<'de> for ElementDataDeserializer<'de
         } else {
             Err(DeError::invalid_length(
                 len,
-                &format!("tuple struct {} with 1 element", name).as_str(),
+                &format!("tuple struct {name} with 1 element").as_str(),
             ))
         }
     }

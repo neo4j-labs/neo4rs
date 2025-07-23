@@ -77,7 +77,7 @@ pub enum DeError {
 
 fn property_missing_msg(field_name: &Option<&'static str>) -> String {
     match field_name {
-        Some(field_name) => format!("The property `{}`", field_name),
+        Some(field_name) => format!("The property `{field_name}`"),
         None => "A property".to_owned(),
     }
 }
