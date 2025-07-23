@@ -60,17 +60,13 @@ impl<'de> serde::Deserializer<'de> for BoltMapDeserializer<'de> {
             ));
         }
 
-        visitor.visit_enum(EnumDeserializer {
-            variant,
-            value: &value,
-        })
+        visitor.visit_enum(EnumDeserializer { variant, value })
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        drop(self);
         visitor.visit_unit()
     }
 
