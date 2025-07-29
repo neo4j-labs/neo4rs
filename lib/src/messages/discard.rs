@@ -56,7 +56,7 @@ mod tests {
         assert_eq!(&*marker_signature, &[0xB1, 0x2F]);
         let extra: BoltMap = BoltMap::parse(Version::V4_1, &mut bytes).unwrap();
 
-        assert_eq!(extra.get::<i64>("n").unwrap(), 255);
-        assert_eq!(extra.get::<i64>("qid").unwrap(), 255);
+        assert_eq!(extra.get::<i64>("n").unwrap(), -1);
+        assert_eq!(extra.get::<i64>("qid").unwrap(), -1);
     }
 }
