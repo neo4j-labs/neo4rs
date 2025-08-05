@@ -402,7 +402,7 @@ impl ConnectionInfo {
                 // do not apply validation if using a self-signed certificate,as the documentation suggests
                 let config = if !validation {
                     match tls_config {
-                        ConnectionTLSConfig::MutualTLS(_) => &tls_config,
+                        ConnectionTLSConfig::MutualTLS(_) => tls_config,
                         _ => &ConnectionTLSConfig::NoSSLValidation,
                     }
                 } else {
@@ -490,19 +490,19 @@ impl ConnectionInfo {
                 let keys = rustls_pemfile::private_key(&mut key_reader);
                 let keys = keys?.unwrap();
                 if mutual.cert_file.is_some() {
-                    let root_cert_file = File::open((&mutual).cert_file.as_ref().unwrap())?;
+                    let root_cert_file = File::open(mutual.cert_file.as_ref().unwrap())?;
                     let mut root_reader = BufReader::new(root_cert_file);
                     let root_certs = rustls_pemfile::certs(&mut root_reader).flatten();
                     root_cert_store.add_parsable_certificates(root_certs);
                     builder
                         .with_root_certificates(root_cert_store)
                         .with_client_auth_cert(cert_certs.collect(), keys)
-                        .map_err(|e| Error::ConnectionError)?
+                        .map_err(|_e| Error::ConnectionError)?
                 } else {
                     builder
                         .with_root_certificates(RootCertStore::empty())
                         .with_client_auth_cert(cert_certs.collect(), keys)
-                        .map_err(|e| Error::ConnectionError)?
+                        .map_err(|_e| Error::ConnectionError)?
                 }
             }
         };
