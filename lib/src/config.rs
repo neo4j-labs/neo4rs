@@ -1,4 +1,4 @@
-use crate::auth::{ClientCertificate, ConnectionTLSConfig};
+use crate::auth::{ClientCertificate, ConnectionTLSConfig, MutualTLS};
 use crate::errors::{Error, Result};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use serde::{Deserialize, Deserializer, Serialize};
@@ -156,6 +156,18 @@ impl ConfigBuilder {
     pub fn with_client_certificate(mut self, client_cert: impl AsRef<Path>) -> Self {
         self.tls_config =
             ConnectionTLSConfig::ClientCACertificate(ClientCertificate::new(client_cert));
+        self
+    }
+
+    //Used for bidirectional authentication
+    pub fn with_mutual_tls_validation(
+        mut self,
+        client_cert: Option<impl AsRef<Path>>,
+        ssl_cert: impl AsRef<Path>,
+        ssl_key: impl AsRef<Path>,
+    ) -> Self {
+        self.tls_config =
+            ConnectionTLSConfig::MutualTLS(MutualTLS::new(client_cert, ssl_cert, ssl_key));
         self
     }
 
