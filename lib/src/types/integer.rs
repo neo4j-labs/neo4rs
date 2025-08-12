@@ -69,7 +69,7 @@ impl BoltWireFormat for BoltInteger {
 
     fn parse(_version: Version, input: &mut Bytes) -> Result<Self> {
         let value: i64 = match input.get_u8() {
-            marker if (-16..=127).contains(&(marker as i8)) => marker as i64,
+            marker if (-16..=127).contains(&(marker as i8)) => (marker as i8) as i64,
             INT_8 => input.get_i8() as i64,
             INT_16 => input.get_i16() as i64,
             INT_32 => input.get_i32() as i64,
@@ -145,6 +145,18 @@ mod tests {
 
     #[test]
     fn should_deserialize_integer() {
+        let mut b = Bytes::from_static(&[0x00]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, 0);
+
+        let mut b = Bytes::from_static(&[0xF0]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, -16);
+
+        let mut b = Bytes::from_static(&[0x7F]);
+        let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
+        assert_eq!(bolt_int.value, 127);
+
         let mut b = Bytes::from_static(&[0x2A]);
         let bolt_int: BoltInteger = BoltInteger::parse(Version::V4_1, &mut b).unwrap();
         assert_eq!(bolt_int.value, 42);
