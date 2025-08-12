@@ -500,27 +500,25 @@ impl ConnectionInfo {
                         .with_root_certificates(root_cert_store)
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
-                } else {
-                    if mutual.validation {
-                        match rustls_native_certs::load_native_certs() {
-                            Ok(certs) => {
-                                root_cert_store.add_parsable_certificates(certs);
-                            }
-                            Err(e) => {
-                                warn!("Failed to load native certificates: {e}");
-                            }
+                } else if mutual.validation {
+                    match rustls_native_certs::load_native_certs() {
+                        Ok(certs) => {
+                            root_cert_store.add_parsable_certificates(certs);
                         }
-                        builder
-                            .with_root_certificates(root_cert_store)
-                            .with_client_auth_cert(cert_certs.collect(), keys)
-                            .map_err(|_e| Error::ConnectionError)?
-                    } else {
-                        builder
-                            .dangerous()
-                            .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
-                            .with_client_auth_cert(cert_certs.collect(), keys)
-                            .map_err(|_e| Error::ConnectionError)?
+                        Err(e) => {
+                            warn!("Failed to load native certificates: {e}");
+                        }
                     }
+                    builder
+                        .with_root_certificates(root_cert_store)
+                        .with_client_auth_cert(cert_certs.collect(), keys)
+                        .map_err(|_e| Error::ConnectionError)?
+                } else {
+                    builder
+                        .dangerous()
+                        .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
+                        .with_client_auth_cert(cert_certs.collect(), keys)
+                        .map_err(|_e| Error::ConnectionError)?
                 }
             }
         };
