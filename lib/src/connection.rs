@@ -403,14 +403,14 @@ impl ConnectionInfo {
                 let config = if !validation {
                     match tls_config {
                         ConnectionTLSConfig::MutualTLS(mtls) => {
-                            &ConnectionTLSConfig::MutualTLS(mtls.with_no_validation())
+                            ConnectionTLSConfig::MutualTLS(mtls.with_no_validation())
                         }
-                        _ => &ConnectionTLSConfig::NoSSLValidation,
+                        _ => ConnectionTLSConfig::NoSSLValidation,
                     }
                 } else {
-                    tls_config
+                    tls_config.clone()
                 };
-                Self::tls_connector(url.host(), config)
+                Self::tls_connector(url.host(), &config)
             })
             .transpose()?;
 
