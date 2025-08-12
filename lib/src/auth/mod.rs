@@ -23,6 +23,7 @@ impl ClientCertificate {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MutualTLS {
+    pub(crate) validation: bool,
     pub(crate) cert_file: Option<PathBuf>,
     pub(crate) client_cert: PathBuf,
     pub(crate) client_key: PathBuf,
@@ -35,9 +36,16 @@ impl MutualTLS {
         client_key: impl AsRef<Path>,
     ) -> Self {
         MutualTLS {
+            validation: true,
             cert_file: cert_file.map(|p| p.as_ref().to_path_buf()),
             client_cert: client_cert.as_ref().to_path_buf(),
             client_key: client_key.as_ref().to_path_buf(),
+        }
+    }
+    pub fn with_no_validation(&self) -> Self {
+        Self {
+            validation: false,
+            ..self.clone()
         }
     }
 }
