@@ -402,13 +402,15 @@ impl ConnectionInfo {
                 // do not apply validation if using a self-signed certificate,as the documentation suggests
                 let config = if !validation {
                     match tls_config {
-                        ConnectionTLSConfig::MutualTLS(_) => tls_config,
-                        _ => &ConnectionTLSConfig::NoSSLValidation,
+                        ConnectionTLSConfig::MutualTLS(mtls) => {
+                            ConnectionTLSConfig::MutualTLS(mtls.with_no_validation())
+                        }
+                        _ => ConnectionTLSConfig::NoSSLValidation,
                     }
                 } else {
-                    tls_config
+                    tls_config.clone()
                 };
-                Self::tls_connector(url.host(), config)
+                Self::tls_connector(url.host(), &config)
             })
             .transpose()?;
 
@@ -498,9 +500,23 @@ impl ConnectionInfo {
                         .with_root_certificates(root_cert_store)
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
+                } else if mutual.validation {
+                    match rustls_native_certs::load_native_certs() {
+                        Ok(certs) => {
+                            root_cert_store.add_parsable_certificates(certs);
+                        }
+                        Err(e) => {
+                            warn!("Failed to load native certificates: {e}");
+                        }
+                    }
+                    builder
+                        .with_root_certificates(root_cert_store)
+                        .with_client_auth_cert(cert_certs.collect(), keys)
+                        .map_err(|_e| Error::ConnectionError)?
                 } else {
                     builder
-                        .with_root_certificates(RootCertStore::empty())
+                        .dangerous()
+                        .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
                 }
