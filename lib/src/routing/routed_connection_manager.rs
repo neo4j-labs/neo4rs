@@ -19,7 +19,7 @@ pub struct RoutedConnectionManager {
     load_balancing_strategy: Arc<dyn LoadBalancingStrategy>,
     connection_registry: Arc<ConnectionRegistry>,
     bookmarks: Arc<Mutex<Vec<String>>>,
-    backoff: ExponentialBuilder,
+    backoff: Option<ExponentialBuilder>,
     channel: Sender<RegistryCommand>,
 }
 
@@ -27,7 +27,13 @@ const ROUTING_TABLE_MAX_WAIT_TIME_MS: i32 = 5000;
 
 impl RoutedConnectionManager {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Result<Self, Error> {
-        let backoff = crate::pool::backoff();
+        // backoff config should be set to None here, since the routing table updater will handle retries
+        // We could provide some configuration to "force" the retry mechanism in a clustered env,
+        // but for now we will turn it off
+        let backoff = config
+            .backoff
+            .clone()
+            .map(|config| config.to_exponential_builder());
         let connection_registry = Arc::new(ConnectionRegistry::default());
         let channel = start_background_updater(config, connection_registry.clone(), provider);
         Ok(RoutedConnectionManager {
@@ -131,7 +137,7 @@ impl RoutedConnectionManager {
         }
     }
 
-    pub(crate) fn backoff(&self) -> ExponentialBuilder {
+    pub(crate) fn backoff(&self) -> Option<ExponentialBuilder> {
         self.backoff
     }
 

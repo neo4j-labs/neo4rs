@@ -176,6 +176,7 @@ async fn refresh_routing_table(
             server.clone(),
             create_pool(&Config {
                 uri,
+                backoff: None,
                 ..config.clone()
             })?,
         );
@@ -418,6 +419,7 @@ mod tests {
             db: None,
             fetch_size: 200,
             tls_config: ConnectionTLSConfig::None,
+            backoff: None,
         };
         let registry = Arc::new(ConnectionRegistry::default());
         let ttl = refresh_all_routing_tables(
@@ -539,6 +541,7 @@ mod tests {
             db: None,
             fetch_size: 200,
             tls_config: ConnectionTLSConfig::None,
+            backoff: None,
         };
         let registry = Arc::new(ConnectionRegistry::default());
         // get registry for db1 amd refresh routing table

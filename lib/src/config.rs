@@ -1,5 +1,6 @@
 use crate::auth::{ClientCertificate, ConnectionTLSConfig, MutualTLS};
 use crate::errors::{Error, Result};
+use backon::ExponentialBuilder;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
@@ -67,6 +68,87 @@ pub struct LiveConfig {
     pub(crate) fetch_size: usize,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackoffConfig {
+    pub(crate) multiplier: Option<f32>,
+    pub(crate) min_delay_ms: Option<u64>,
+    pub(crate) max_delay_ms: Option<u64>,
+    pub(crate) total_delay_ms: Option<u64>,
+}
+
+impl Default for BackoffConfig {
+    fn default() -> Self {
+        BackoffConfig {
+            multiplier: Some(2.0),
+            min_delay_ms: Some(1),
+            max_delay_ms: Some(10000),
+            total_delay_ms: Some(60000),
+        }
+    }
+}
+
+impl BackoffConfig {
+    pub fn to_exponential_builder(&self) -> ExponentialBuilder {
+        ExponentialBuilder::new()
+            .with_jitter()
+            .with_factor(self.multiplier.unwrap_or(2.0))
+            .without_max_times()
+            .with_min_delay(std::time::Duration::from_millis(
+                self.min_delay_ms.unwrap_or(1),
+            ))
+            .with_max_delay(std::time::Duration::from_millis(
+                self.max_delay_ms.unwrap_or(10_000),
+            ))
+            .with_total_delay(Some(std::time::Duration::from_millis(
+                self.total_delay_ms.unwrap_or(60_000),
+            )))
+    }
+}
+
+#[derive(Default)]
+pub struct BackoffConfigBuilder {
+    multiplier: Option<f32>,
+    min_delay_ms: Option<u64>,
+    max_delay_ms: Option<u64>,
+    total_delay_ms: Option<u64>,
+}
+
+#[allow(dead_code)]
+impl BackoffConfigBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_multiplier(mut self, multiplier: f32) -> Self {
+        self.multiplier = Some(multiplier);
+        self
+    }
+
+    pub fn with_min_delay_ms(mut self, min_delay_ms: u64) -> Self {
+        self.min_delay_ms = Some(min_delay_ms);
+        self
+    }
+
+    pub fn with_max_delay_ms(mut self, max_delay_ms: u64) -> Self {
+        self.max_delay_ms = Some(max_delay_ms);
+        self
+    }
+
+    pub fn with_total_delay_ms(mut self, max_total_delay_ms: Option<u64>) -> Self {
+        self.total_delay_ms = max_total_delay_ms;
+        self
+    }
+
+    pub fn build(self) -> BackoffConfig {
+        BackoffConfig {
+            multiplier: self.multiplier,
+            min_delay_ms: self.min_delay_ms,
+            max_delay_ms: self.max_delay_ms,
+            total_delay_ms: self.total_delay_ms,
+        }
+    }
+}
+
 /// The configuration used to connect to the database, see [`crate::Graph::connect`].
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -77,6 +159,7 @@ pub struct Config {
     pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
     pub(crate) tls_config: ConnectionTLSConfig,
+    pub(crate) backoff: Option<BackoffConfig>,
 }
 
 impl Config {
@@ -97,6 +180,7 @@ pub struct ConfigBuilder {
     fetch_size: usize,
     max_connections: usize,
     tls_config: ConnectionTLSConfig,
+    backoff_config: Option<BackoffConfig>,
 }
 
 impl ConfigBuilder {
@@ -178,6 +262,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn with_backoff(mut self, backoff: Option<BackoffConfig>) -> Self {
+        self.backoff_config = backoff;
+        self
+    }
+
     pub fn build(self) -> Result<Config> {
         if let (Some(uri), Some(user), Some(password)) = (self.uri, self.user, self.password) {
             Ok(Config {
@@ -188,6 +277,7 @@ impl ConfigBuilder {
                 max_connections: self.max_connections,
                 db: self.db,
                 tls_config: self.tls_config,
+                backoff: self.backoff_config,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -205,6 +295,7 @@ impl Default for ConfigBuilder {
             max_connections: DEFAULT_MAX_CONNECTIONS,
             fetch_size: DEFAULT_FETCH_SIZE,
             tls_config: ConnectionTLSConfig::None,
+            backoff_config: Some(BackoffConfig::default()),
         }
     }
 }
@@ -222,6 +313,7 @@ mod tests {
             .db("some_db")
             .fetch_size(10)
             .max_connections(5)
+            .with_backoff(None)
             .build()
             .unwrap();
         assert_eq!(config.uri, "127.0.0.1:7687");
@@ -231,6 +323,7 @@ mod tests {
         assert_eq!(config.fetch_size, 10);
         assert_eq!(config.max_connections, 5);
         assert_eq!(config.tls_config, ConnectionTLSConfig::None);
+        assert_eq!(config.backoff, None);
     }
 
     #[test]
@@ -248,6 +341,8 @@ mod tests {
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
         assert_eq!(config.tls_config, ConnectionTLSConfig::None);
+        assert!(config.backoff.is_some());
+        assert_eq!(config.backoff.as_ref().unwrap(), &BackoffConfig::default());
     }
 
     #[test]
@@ -257,6 +352,9 @@ mod tests {
             .user("some_user")
             .password("some_password")
             .skip_ssl_validation()
+            .with_backoff(Some(
+                BackoffConfigBuilder::new().with_multiplier(2.0).build(),
+            ))
             .build()
             .unwrap();
         assert_eq!(config.uri, "127.0.0.1:7687");
@@ -266,6 +364,8 @@ mod tests {
         assert_eq!(config.fetch_size, 200);
         assert_eq!(config.max_connections, 16);
         assert_eq!(config.tls_config, ConnectionTLSConfig::NoSSLValidation);
+        assert!(config.backoff.is_some());
+        assert_eq!(config.backoff.as_ref().unwrap().multiplier.unwrap(), 2.0);
     }
 
     #[test]
