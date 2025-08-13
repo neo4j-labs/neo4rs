@@ -155,7 +155,7 @@ struct Env {
 }
 
 fn task_env() -> Env {
-    let dry_run = env::var("DRY_RUN").is_ok();
+    let dry_run = env::var_os("DRY_RUN").is_some_and(|env| env == "1" || env == "true");
 
     let workspace = env::var("WORKSPACE_ROOT");
 
