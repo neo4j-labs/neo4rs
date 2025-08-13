@@ -2,3 +2,4 @@
 Cargo.lock
 container-license-acceptance.txt
 Session.vim
+!.github
