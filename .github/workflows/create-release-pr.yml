@@ -69,10 +69,11 @@ jobs:
         with:
           tool: cargo-release
 
-      - uses: cargo-bins/release-pr@main
+      - uses: cargo-bins/release-pr@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate || 'neo4rs' }}
+          pr-title: "Set <%= crates.length === 1 ? crates[0].name : '' %> version to <%= version.actual %>"
           check-semver: true
           base-branch: main
