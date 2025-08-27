@@ -192,6 +192,13 @@ impl Graph {
     /// Use [`Graph::run`] for cases where you just want a write operation
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    pub async fn run(&self, q: impl Into<Query>) -> Result<ResultSummary> {
+        self.impl_run_on(self.config.db.clone(), q.into(), Operation::Write)
+            .await
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub async fn run(&self, q: impl Into<Query>) -> Result<RunResult> {
         self.impl_run_on(self.config.db.clone(), q.into(), Operation::Write)
             .await
