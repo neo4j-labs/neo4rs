@@ -165,12 +165,21 @@ async fn refresh_routing_table(
     let servers = routing_table.resolve();
     let url = NeoUrl::parse(config.uri.as_str())?;
 
+    // Convert neo4j scheme to bolt scheme to create connection pools.
+    // We need to use the bolt scheme since we don't want new connections to be routed.
+    let scheme = match url.scheme() {
+        "neo4j" => "bolt",
+        "neo4j+s" => "bolt+s",
+        "neo4j+ssc" => "bolt+ssc",
+        _ => panic!("Unsupported URL scheme: {}", url.scheme()),
+    };
+
     for server in servers.iter() {
         if registry.contains_key(server) {
             debug!("Server already exists in the registry: {:?}", server);
             continue;
         }
-        let uri = format!("{}://{}:{}", url.scheme(), server.address, server.port);
+        let uri = format!("{}://{}:{}", scheme, server.address, server.port);
         debug!("Creating pool for server: {}", uri);
         registry.insert(
             server.clone(),
