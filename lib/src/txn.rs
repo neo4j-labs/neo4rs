@@ -7,6 +7,7 @@ use {
     log::debug,
 };
 
+use crate::config::ImpersonateUser;
 use crate::{
     config::Database, errors::Result, pool::ManagedConnection, query::Query, stream::RowStream,
     Operation, RunResult,
@@ -21,6 +22,7 @@ pub struct Txn {
     fetch_size: usize,
     connection: ManagedConnection,
     operation: Operation,
+    imp_user: Option<ImpersonateUser>,
     #[allow(dead_code)]
     bookmark: Option<String>,
 }
@@ -32,6 +34,7 @@ impl Txn {
         fetch_size: usize,
         mut connection: ManagedConnection,
         operation: Operation,
+        imp_user: Option<ImpersonateUser>,
     ) -> Result<Self> {
         let begin = BoltRequest::begin(db.as_deref());
         match connection.send_recv(begin).await? {
@@ -41,6 +44,7 @@ impl Txn {
                 connection,
                 operation,
                 bookmark: None,
+                imp_user,
             }),
             msg => Err(msg.into_error("BEGIN")),
         }
@@ -52,6 +56,7 @@ impl Txn {
         fetch_size: usize,
         mut connection: ManagedConnection,
         operation: Operation,
+        imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
     ) -> Result<Self> {
         debug!("Starting transaction with bookmarks: {:?}", bookmarks);
@@ -65,6 +70,7 @@ impl Txn {
                 connection,
                 operation,
                 bookmark: None,
+                imp_user,
             }),
             Summary::Ignored => Err(crate::errors::Error::Ignored("Failed to start transaction")),
             Summary::Failure(failure) => Err(failure.into_error()),
@@ -80,7 +86,8 @@ impl Txn {
     ) -> Result<crate::summary::Counters> {
         let mut counters = crate::summary::Counters::default();
         for query in queries {
-            let summary = self.run(query.into()).await?;
+            let q = query.into().imp_user(self.imp_user.clone());
+            let summary = self.run(q).await?;
             counters += summary.stats();
             self.save_bookmark_state(&summary);
         }
@@ -94,7 +101,8 @@ impl Txn {
         queries: impl IntoIterator<Item = Q>,
     ) -> Result<()> {
         for query in queries {
-            self.run(query.into()).await?;
+            let q = query.into().imp_user(self.imp_user.clone());
+            self.run(q).await?;
         }
         Ok(())
     }

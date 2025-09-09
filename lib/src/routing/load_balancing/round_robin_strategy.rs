@@ -88,7 +88,26 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::ConnectionTLSConfig;
+    use crate::config::ImpersonateUser;
+    use crate::routing::routing_table_provider::RoutingTableProvider;
     use crate::routing::{RoutingTable, Server};
+    use crate::{Config, Database, Error};
+    use std::future::Future;
+    use std::pin::Pin;
+
+    struct TestRoutingTableProvider;
+
+    impl RoutingTableProvider for TestRoutingTableProvider {
+        fn fetch_routing_table(
+            &self,
+            _bookmarks: &[String],
+            db: Option<Database>,
+            _imp_user: Option<ImpersonateUser>,
+        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+            unimplemented!()
+        }
+    }
 
     #[test]
     fn should_get_next_server() {
@@ -147,7 +166,20 @@ mod tests {
                 .collect(),
         };
 
-        let registry = Arc::new(ConnectionRegistry::default());
+        let config = Config {
+            uri: "neo4j://localhost:7687".to_string(),
+            user: "user".to_string(),
+            password: "password".to_string(),
+            max_connections: 10,
+            db: None,
+            fetch_size: 200,
+            tls_config: ConnectionTLSConfig::None,
+            imp_user: None,
+        };
+        let registry = Arc::new(ConnectionRegistry::new(
+            &config,
+            Arc::new(TestRoutingTableProvider),
+        ));
 
         let mut servers1 = routing_table_1.resolve();
         servers1.retain(|s| s.role == "READ");
