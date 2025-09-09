@@ -3,7 +3,6 @@ use crate::pool::{create_pool, ConnectionPool};
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::{RoutingTable, Server};
 use crate::{Config, Database, Error};
-use dashmap::DashMap;
 use log::{debug, error};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
@@ -43,9 +42,9 @@ impl BoltServer {
 }
 
 /// A registry of connection pools, indexed by the Bolt server they connect to.
-pub type PoolRegistry = DashMap<BoltServer, ConnectionPool>;
+pub type PoolRegistry = scc::HashMap<BoltServer, ConnectionPool>;
 /// A map of registries, indexed by the database name.
-pub type DatabaseServerMap = DashMap<String, Vec<BoltServer>>;
+pub type DatabaseServerMap = scc::HashMap<String, Vec<BoltServer>>;
 
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
@@ -85,7 +84,8 @@ async fn refresh_all_routing_tables(
         if let Some(db) = config.db.clone() {
             connection_registry
                 .databases
-                .insert(db.as_ref().to_string(), Vec::new());
+                .upsert_async(db.as_ref().to_string(), Vec::new())
+                .await;
         } else {
             let routing_table = refresh_routing_table(
                 &config,
@@ -100,15 +100,15 @@ async fn refresh_all_routing_tables(
             *rw = Some(default_db_name.clone());
             connection_registry
                 .databases
-                .insert(default_db_name, routing_table.resolve());
+                .upsert_sync(default_db_name, routing_table.resolve());
             return Ok(routing_table.ttl);
         }
     }
 
     let map = connection_registry.databases.clone();
-    for kv in map.iter() {
-        let db = kv.key();
-
+    let mut iter = map.begin_async().await;
+    while let Some(entry) = iter {
+        let db = entry.key();
         let routing_table = refresh_routing_table(
             &config,
             &connection_registry.pool_registry,
@@ -119,10 +119,10 @@ async fn refresh_all_routing_tables(
         .await?;
         connection_registry
             .databases
-            .insert(db.clone(), routing_table.resolve());
+            .upsert_sync(db.clone(), routing_table.resolve());
         ttls.push(routing_table.ttl);
+        iter = entry.next_async().await;
     }
-
     if ttls.is_empty() {
         return Err(Error::RoutingTableRefreshFailed(
             "No servers available in the routing table".to_string(),
@@ -130,14 +130,14 @@ async fn refresh_all_routing_tables(
     }
 
     // purge the pool registry of servers that are no longer in the routing tables
-    let all_servers: Vec<BoltServer> = connection_registry
-        .databases
-        .iter()
-        .flat_map(|kv| kv.value().clone())
-        .collect();
+    let mut all_servers: Vec<BoltServer> = vec![];
+    connection_registry.databases.iter_sync(|_, v| {
+        v.iter().for_each(|x| all_servers.push(x.clone()));
+        true
+    });
     connection_registry
         .pool_registry
-        .retain(|server, _| all_servers.contains(server));
+        .retain_sync(|server, _| all_servers.contains(server));
 
     Ok(*ttls.iter().min().unwrap())
 }
@@ -175,13 +175,13 @@ async fn refresh_routing_table(
     };
 
     for server in servers.iter() {
-        if registry.contains_key(server) {
+        if registry.contains_sync(server) {
             debug!("Server already exists in the registry: {:?}", server);
             continue;
         }
         let uri = format!("{}://{}:{}", scheme, server.address, server.port);
         debug!("Creating pool for server: {}", uri);
-        registry.insert(
+        registry.upsert_sync(
             server.clone(),
             create_pool(&Config {
                 uri,
@@ -243,7 +243,7 @@ pub(crate) fn start_background_updater(
                             bookmarks = new_bookmarks;
                             ttl = match refresh_routing_table(&config_clone, &registry.pool_registry, provider.clone(), bookmarks.as_slice(), db).await {
                                 Ok(table) => {
-                                    registry.databases.insert(db_name.clone(), table.resolve());
+                                    registry.databases.upsert_sync(db_name.clone(), table.resolve());
                                     // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
                                     // we derive the TTL from the initial time. Example:
                                     // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
@@ -281,25 +281,26 @@ impl ConnectionRegistry {
     /// Retrieve the pool for a specific server and database.
     pub fn get_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
         self.pool_registry
-            .get(server)
-            .map(|pool| pool.value().clone())
+            .get_sync(server)
+            .map(|pool| pool.get().clone())
     }
 
     /// Mark a server as available for a specific database.
     pub fn mark_unavailable(&self, server: &BoltServer, db: Option<Database>) {
         let db_name = self.get_db_name(db);
-        if self.databases.contains_key(db_name.as_str()) {
+        if self.databases.contains_sync(db_name.as_str()) {
             if let Some(index) = self
                 .databases
-                .get(db_name.as_str())
+                .get_sync(db_name.as_str())
                 .and_then(|vec| vec.iter().position(|s| server.has_same_address(s)))
             {
                 debug!("Marking server as available: {:?}", server);
                 self.databases
-                    .get_mut(db_name.as_str())
+                    .get_sync(db_name.as_str())
                     .unwrap()
+                    .get_mut()
                     .remove(index);
-                self.pool_registry.remove(server);
+                self.pool_registry.remove_sync(server);
             } else {
                 debug!("Server not found in the registry: {:?}", server);
             }
@@ -309,23 +310,27 @@ impl ConnectionRegistry {
     /// Get all available Bolt servers for a specific database or the default database if none is provided.
     pub fn servers(&self, db: Option<Database>) -> Vec<BoltServer> {
         let db_name = self.get_db_name(db);
-        if self.databases.contains_key(db_name.as_str()) {
+        if self.databases.contains_sync(db_name.as_str()) {
             self.databases
-                .get(db_name.as_str())
-                .map(|entry| entry.value().clone())
+                .get_sync(db_name.as_str())
+                .map(|entry| entry.get().clone())
                 .unwrap_or_default()
         } else {
-            debug!("Creating new registry for database: {}", db_name);
-            self.databases.insert(db_name.clone(), Vec::new());
+            debug!("Creating new registry for database: {db_name}");
+            self.databases
+                .insert_sync(db_name.clone(), Vec::new())
+                .unwrap();
             vec![]
         }
     }
 
     pub fn all_servers(&self) -> Vec<BoltServer> {
-        self.pool_registry
-            .iter()
-            .map(|kv| kv.key().clone())
-            .collect::<Vec<BoltServer>>()
+        let mut all_servers: Vec<BoltServer> = vec![];
+        self.pool_registry.iter_sync(|k, _| {
+            all_servers.push(k.clone());
+            true
+        });
+        all_servers
     }
 
     fn get_db_name(&self, db: Option<Database>) -> String {
@@ -442,7 +447,7 @@ mod tests {
             registry.default_db_name.read().unwrap().clone().unwrap(),
             "neo4j"
         );
-        assert!(registry.databases.contains_key("neo4j"));
+        assert!(registry.databases.contains_sync("neo4j"));
 
         let servers = registry.servers(None);
         assert_eq!(servers.len(), 5);
