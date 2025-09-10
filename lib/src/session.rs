@@ -11,6 +11,12 @@ pub struct SessionConfig {
     bookmarks: Vec<String>,
 }
 
+impl SessionConfig {
+    pub fn builder() -> SessionConfigBuilder {
+        SessionConfigBuilder::default()
+    }
+}
+
 #[derive(Default)]
 pub struct SessionConfigBuilder {
     db: Option<Database>,
@@ -60,9 +66,6 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-    pub fn builder() -> SessionConfigBuilder {
-        SessionConfigBuilder::default()
-    }
 
     pub(crate) fn new(config: SessionConfig, graph: &'a Graph) -> Session<'a> {
         Self {
