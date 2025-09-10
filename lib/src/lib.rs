@@ -511,6 +511,9 @@ mod version;
 mod session;
 mod utils;
 
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+pub use session::{Session, SessionConfig, SessionConfigBuilder};
+
 pub use crate::auth::ClientCertificate;
 pub use crate::config::{Config, ConfigBuilder, Database};
 pub use crate::errors::{

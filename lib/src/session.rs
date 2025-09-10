@@ -60,6 +60,10 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
+    pub fn builder() -> SessionConfigBuilder {
+        SessionConfigBuilder::default()
+    }
+
     pub(crate) fn new(config: SessionConfig, graph: &'a Graph) -> Session<'a> {
         Self {
             db: config.db,
