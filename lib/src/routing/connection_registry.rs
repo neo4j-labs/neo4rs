@@ -2,109 +2,12 @@ use crate::config::ImpersonateUser;
 use crate::connection::NeoUrl;
 use crate::pool::{create_pool, ConnectionPool};
 use crate::routing::routing_table_provider::RoutingTableProvider;
-use crate::routing::{RoutingTable, Server};
+use crate::routing::types::{BoltServer, DatabaseServerMap, DatabaseTable, PoolRegistry};
+use crate::routing::RoutingTable;
 use crate::utils::ConcurrentHashMap;
 use crate::{Config, Database, Error};
 use log::{debug, error};
-use std::fmt::Debug;
-use std::hash::Hash;
 use std::sync::Arc;
-use std::time::Duration;
-
-/// Represents a Bolt server, with its address, port and role.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct BoltServer {
-    pub(crate) address: String,
-    pub(crate) port: u16,
-    pub(crate) role: String,
-}
-
-impl BoltServer {
-    pub(crate) fn resolve(server: &Server) -> Vec<Self> {
-        server
-            .addresses
-            .iter()
-            .map(|address| {
-                let bs = NeoUrl::parse(address)
-                    .map(|addr| BoltServer {
-                        address: addr.host().to_string(),
-                        port: addr.port(),
-                        role: server.role.to_string(),
-                    })
-                    .unwrap_or_else(|_| panic!("Failed to parse address {address}"));
-                bs
-            })
-            .collect()
-    }
-
-    pub fn has_same_address(&self, other: &Self) -> bool {
-        self.address == other.address && self.port == other.port
-    }
-}
-
-/// Represents a table of Bolt servers for a specific database, along with the last update time and TTL.
-/// This is used to manage the routing table for a specific database.
-#[derive(Debug, Clone)]
-struct DatabaseTable {
-    servers: Vec<BoltServer>,
-    last_updated: std::time::Instant,
-    ttl: Duration,
-}
-
-impl Default for DatabaseTable {
-    fn default() -> Self {
-        DatabaseTable {
-            servers: Vec::new(),
-            last_updated: std::time::Instant::now(),
-            ttl: Duration::from_secs(0),
-        }
-    }
-}
-
-impl From<RoutingTable> for DatabaseTable {
-    fn from(table: RoutingTable) -> Self {
-        Self::from(&table)
-    }
-}
-
-impl From<&RoutingTable> for DatabaseTable {
-    fn from(table: &RoutingTable) -> Self {
-        DatabaseTable {
-            servers: table.resolve(),
-            last_updated: std::time::Instant::now(),
-            ttl: Duration::from_secs(table.ttl),
-        }
-    }
-}
-
-impl DatabaseTable {
-    fn is_expired(&self) -> bool {
-        self.last_updated.elapsed() >= self.ttl
-    }
-
-    fn resolve(&self) -> Vec<BoltServer> {
-        self.servers.clone()
-    }
-
-    fn mark_server_unavailable(&mut self, server: &BoltServer) -> bool {
-        if let Some(index) = self
-            .servers
-            .iter()
-            .position(|s| server.has_same_address(s))
-        {
-            self.servers.remove(index);
-            true
-        } else {
-            debug!("Server not found in the database table: {server:?}");
-            false
-        }
-    }
-}
-
-/// A registry of connection pools, indexed by the Bolt server they connect to.
-type PoolRegistry = ConcurrentHashMap<BoltServer, ConnectionPool>;
-/// A map of registries, indexed by the database name.
-type DatabaseServerMap = ConcurrentHashMap<String, DatabaseTable>;
 
 #[derive(Clone)]
 pub(crate) struct ConnectionRegistry {
@@ -115,98 +18,8 @@ pub(crate) struct ConnectionRegistry {
     provider: Arc<dyn RoutingTableProvider>,
 }
 
-#[allow(dead_code)]
-pub(crate) enum RegistryCommand {
-    RefreshSingleTable((Option<Database>, Vec<String>, Option<ImpersonateUser>)),
-    Stop,
-}
-
-// pub(crate) fn start_background_updater(
-//     config: &Config,
-//     registry: Arc<ConnectionRegistry>,
-//     provider: Arc<dyn RoutingTableProvider>,
-// ) -> Sender<RegistryCommand> {
-//     let config_clone = config.clone();
-//     let (tx, mut rx) = mpsc::channel(1);
-//
-//     // This thread is in charge of refreshing the routing table periodically
-//     tokio::spawn(async move {
-//         let mut bookmarks = vec![];
-//         let mut ttl = registry
-//             .refresh_all_routing_tables(
-//                 config_clone.clone(),
-//                 registry.clone(),
-//                 provider.clone(),
-//                 bookmarks.as_slice(),
-//             )
-//             .await
-//             .expect("Failed to get routing table. Exiting...");
-//         debug!("Starting background updater with TTL: {ttl}");
-//         let mut interval = tokio::time::interval(Duration::from_secs(ttl));
-//         let now = std::time::Instant::now();
-//         interval.tick().await; // first tick is immediate
-//         loop {
-//             tokio::select! {
-//                 // Trigger periodic updates
-//                 _ = interval.tick() => {
-//                     debug!("Refreshing all routing tables ({})", registry.databases.len());
-//                     ttl = match refresh_all_routing_tables(config_clone.clone(), registry.clone(), provider.clone(), bookmarks.as_slice()).await {
-//                         Ok(ttl) => ttl,
-//                         Err(e) => {
-//                             debug!("Failed to refresh routing table: {e}");
-//                             ttl
-//                         }
-//                     };
-//                 }
-//                 // Handle forced updates
-//                 cmd = rx.recv() => {
-//                     match cmd {
-//                         Some(RegistryCommand::RefreshSingleTable((db, new_bookmarks, imp_user))) => {
-//                             let db_name = db.as_ref().map(|d| d.to_string()).unwrap_or_default();
-//                             debug!("Forcing refresh of routing table for database: {db_name}");
-//                             bookmarks = new_bookmarks;
-//                             ttl = match refresh_routing_table(&config_clone, &registry.pool_registry, provider.clone(), bookmarks.as_slice(), db, imp_user).await {
-//                                 Ok(table) => {
-//                                     registry.databases.upsert_sync(db_name.clone(), table.resolve());
-//                                     // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
-//                                     // we derive the TTL from the initial time. Example:
-//                                     // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
-//                                     // we want to set the TTL to 50 seconds, so that the next update will be in 50 seconds
-//                                     ttl - (now.elapsed().as_secs() % table.ttl)
-//                                 }
-//                                 Err(e) => {
-//                                     error!("Failed to refresh routing table: {e}");
-//                                     // we don't want to lose the initial TTL synchronization: if the forced update is triggered,
-//                                     // we derive the TTL from the initial time. Example:
-//                                     // if the TTL is 60 seconds and the forced update is triggered after 10 seconds,
-//                                     // we want to set the TTL to 50 seconds, so that the next update will be in 50 seconds
-//                                     ttl - (now.elapsed().as_secs() % ttl)
-//                                 }
-//                             };
-//                         }
-//                         Some(RegistryCommand::Stop) | None => {
-//                             debug!("Stopping background updater");
-//                             break;
-//                         }
-//                     }
-//                 }
-//             }
-//
-//             debug!("Resetting interval with TTL: {ttl}");
-//             // recreate interval with the new TTL or the derived one in case of a forced update
-//             interval = tokio::time::interval(Duration::from_secs(ttl));
-//             interval.tick().await;
-//         }
-//     });
-//     tx
-// }
-
 impl ConnectionRegistry {
-
-    pub fn new(
-        config: &Config,
-        provider: Arc<dyn RoutingTableProvider>,
-    ) -> Self {
+    pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Self {
         ConnectionRegistry {
             config: config.clone(),
             databases: ConcurrentHashMap::new(),
@@ -217,7 +30,7 @@ impl ConnectionRegistry {
 
     /// Retrieve the pool for a specific server and database.
     pub(crate) fn get_server_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
-        self.pool_registry.get(server).map(|pool| pool.clone())
+        self.pool_registry.get(server)
     }
 
     /// Mark a server as available for a specific database.
@@ -235,12 +48,20 @@ impl ConnectionRegistry {
     }
 
     /// Get all available Bolt servers for a specific database or the default database if none is provided.
-    pub async fn servers(&self, db: Option<Database>, imp_user: Option<ImpersonateUser>, bookmarks: &[String]) -> Vec<BoltServer> {
+    pub async fn servers(
+        &self,
+        db: Option<Database>,
+        imp_user: Option<ImpersonateUser>,
+        bookmarks: &[String],
+    ) -> Vec<BoltServer> {
         if let Some(db_name) = db.as_ref().map(|d| d.to_string()) {
             if let Some(table) = self.databases.get(&db_name) {
                 if table.is_expired() {
                     debug!("Routing table for database {db_name} is expired");
-                    match self.fetch_routing_table(db.clone(), imp_user.clone(), bookmarks).await {
+                    match self
+                        .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                        .await
+                    {
                         Ok(new_table) => {
                             let database_table: DatabaseTable = new_table.into();
                             let servers = database_table.resolve();
@@ -248,7 +69,7 @@ impl ConnectionRegistry {
                             servers
                         }
                         Err(e) => {
-                            error!("Failed to refresh routing table for database {}: {}", db_name, e);
+                            error!("Failed to refresh routing table for database {db_name}: {e}");
                             vec![] // ??
                         }
                     }
@@ -256,21 +77,27 @@ impl ConnectionRegistry {
                     table.resolve()
                 }
             } else {
-                match self.fetch_routing_table(db.clone(), imp_user.clone(), bookmarks).await {
+                match self
+                    .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                    .await
+                {
                     Ok(new_table) => {
                         let database_table: DatabaseTable = new_table.into();
                         let servers = database_table.resolve();
-                        debug!("Routing table for database {} refreshed", db_name);
+                        debug!("Routing table for database {db_name} refreshed");
                         servers
                     }
                     Err(e) => {
-                        error!("Failed to refresh routing table for database {}: {}", db_name, e);
+                        error!("Failed to refresh routing table for database {db_name}: {e}");
                         vec![] // ??
                     }
                 }
             }
         } else {
-            match self.fetch_routing_table(db.clone(), imp_user.clone(), bookmarks).await {
+            match self
+                .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                .await
+            {
                 Ok(new_table) => {
                     let db = new_table.db.clone();
                     let database_table: DatabaseTable = new_table.into();
@@ -280,7 +107,7 @@ impl ConnectionRegistry {
                     servers
                 }
                 Err(e) => {
-                    error!("Failed to refresh routing table for database default: {}", e);
+                    error!("Failed to refresh routing table for database default: {e}");
                     vec![] // ??
                 }
             }
@@ -319,7 +146,7 @@ impl ConnectionRegistry {
                 })?,
             );
         }
-        let db_name= routing_table
+        let db_name = routing_table
             .db
             .as_ref()
             .map_or("".to_string(), |d| d.to_string());
@@ -348,7 +175,11 @@ impl ConnectionRegistry {
         Ok(table)
     }
 
-    pub async fn get_default_db(&self, imp_user: Option<ImpersonateUser>, bookmarks: &[String]) -> Result<Option<Database>, Error> {
+    pub async fn get_default_db(
+        &self,
+        imp_user: Option<ImpersonateUser>,
+        bookmarks: &[String],
+    ) -> Result<Option<Database>, Error> {
         let routing_table = self.fetch_routing_table(None, imp_user, bookmarks).await?;
         Ok(routing_table.db)
     }
@@ -449,7 +280,9 @@ mod tests {
         };
         let registry = Arc::new(ConnectionRegistry::new(
             &config,
-            Arc::new(TestRoutingTableProvider::new(&[cluster_routing_table.clone()])),
+            Arc::new(TestRoutingTableProvider::new(&[
+                cluster_routing_table.clone()
+            ])),
         ));
     }
 

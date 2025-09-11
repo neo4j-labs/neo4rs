@@ -130,19 +130,19 @@ mod tests {
     #[test]
     fn test_basic_operations() {
         let map = ConcurrentHashMap::new();
-        
+
         // Test insert e get
         assert_eq!(map.insert("key1".to_string(), 42), None);
         assert_eq!(map.get(&"key1".to_string()), Some(42));
-        
+
         // Test update
         assert_eq!(map.insert("key1".to_string(), 84), Some(42));
         assert_eq!(map.get(&"key1".to_string()), Some(84));
-        
+
         // Test contains_key
         assert!(map.contains_key(&"key1".to_string()));
         assert!(!map.contains_key(&"key2".to_string()));
-        
+
         // Test remove
         assert_eq!(map.remove(&"key1".to_string()), Some(84));
         assert_eq!(map.get(&"key1".to_string()), None);
@@ -152,7 +152,7 @@ mod tests {
     fn test_concurrent_access() {
         let map = ConcurrentHashMap::new();
         let map_clone = map.clone();
-        
+
         // Thread writer
         let writer = thread::spawn(move || {
             for i in 0..100 {
@@ -160,7 +160,7 @@ mod tests {
                 thread::sleep(Duration::from_millis(1));
             }
         });
-        
+
         // Thread readers
         let mut readers = vec![];
         for _ in 0..3 {
@@ -173,12 +173,12 @@ mod tests {
             });
             readers.push(reader);
         }
-        
+
         writer.join().unwrap();
         for reader in readers {
             reader.join().unwrap();
         }
-        
+
         assert_eq!(map.len(), 100);
     }
 }

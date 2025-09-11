@@ -66,7 +66,6 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-
     pub(crate) fn new(config: SessionConfig, graph: &'a Graph) -> Session<'a> {
         Self {
             db: config.db,
@@ -115,8 +114,8 @@ impl<'a> Session<'a> {
     async fn update_db_name(&mut self) -> Result<(), Error> {
         if self.db.is_none()
             && self
-            .should_fetch_default_db
-            .fetch_or(false, Ordering::Relaxed)
+                .should_fetch_default_db
+                .fetch_or(false, Ordering::Relaxed)
         {
             let db = self
                 .driver

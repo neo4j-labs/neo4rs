@@ -112,7 +112,6 @@ impl Deref for ImpersonateUser {
     }
 }
 
-
 /// The configuration that is used once a connection is alive.
 #[derive(Debug, Clone)]
 pub struct LiveConfig {

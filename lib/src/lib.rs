@@ -501,15 +501,15 @@ mod retry;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 mod routing;
 mod row;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+mod session;
 mod stream;
 #[cfg(feature = "unstable-result-summary")]
 pub mod summary;
 mod txn;
 mod types;
-mod version;
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-mod session;
 mod utils;
+mod version;
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub use session::{Session, SessionConfig, SessionConfigBuilder};

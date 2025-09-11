@@ -294,7 +294,12 @@ impl<'a> RetryableQuery<'a> {
     async fn connect(&self) -> QueryResult<ManagedConnection> {
         // an error when retrieving a connection is considered permanent
         self.pool
-            .get(Some(self.operation), self.db.clone(), self.imp_user.clone(), &self.bookmarks)
+            .get(
+                Some(self.operation),
+                self.db.clone(),
+                self.imp_user.clone(),
+                &self.bookmarks,
+            )
             .await
             .map_err(Retry::No)
     }

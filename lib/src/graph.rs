@@ -134,8 +134,13 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn(&self) -> Result<Txn> {
-        self.impl_start_txn_on(self.config.db.clone(), Operation::Write, self.config.imp_user.clone(), &[])
-            .await
+        self.impl_start_txn_on(
+            self.config.db.clone(),
+            Operation::Write,
+            self.config.imp_user.clone(),
+            &[],
+        )
+        .await
     }
 
     /// Starts a new transaction on the configured database specifying the desired operation.
@@ -164,8 +169,13 @@ impl Graph {
     ///
     /// Transactions will not be automatically retried on any failure.
     pub async fn start_txn_on(&self, db: impl Into<Database>) -> Result<Txn> {
-        self.impl_start_txn_on(Some(db.into()), Operation::Write, self.config.imp_user.clone(), &[])
-            .await
+        self.impl_start_txn_on(
+            Some(db.into()),
+            Operation::Write,
+            self.config.imp_user.clone(),
+            &[],
+        )
+        .await
     }
 
     #[allow(unused_variables)]
@@ -176,10 +186,21 @@ impl Graph {
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
     ) -> Result<Txn> {
-        let connection = self.pool.get(Some(operation), db.clone(), imp_user.clone(), bookmarks).await?;
+        let connection = self
+            .pool
+            .get(Some(operation), db.clone(), imp_user.clone(), bookmarks)
+            .await?;
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
-            Txn::new(db, self.config.fetch_size, connection, operation, imp_user, bookmarks).await
+            Txn::new(
+                db,
+                self.config.fetch_size,
+                connection,
+                operation,
+                imp_user,
+                bookmarks,
+            )
+            .await
         }
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
@@ -199,8 +220,13 @@ impl Graph {
     ///
     /// use [`Graph::execute`] when you are interested in the result stream
     pub async fn run(&self, q: impl Into<Query>) -> Result<RunResult> {
-        self.impl_run_on(self.config.db.clone(), self.config.imp_user.clone(), &[], q.into())
-            .await
+        self.impl_run_on(
+            self.config.db.clone(),
+            self.config.imp_user.clone(),
+            &[],
+            q.into(),
+        )
+        .await
     }
 
     /// Runs a query on the provided database using a connection from the connection pool.
@@ -220,7 +246,8 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<ResultSummary> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into()).await
+        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into())
+            .await
     }
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
@@ -237,7 +264,14 @@ impl Graph {
         bookmarks: &[String],
         query: Query,
     ) -> Result<RunResult> {
-        let query = query.into_retryable(db, imp_user, Operation::Write, &self.pool, Some(self.config.fetch_size), bookmarks);
+        let query = query.into_retryable(
+            db,
+            imp_user,
+            Operation::Write,
+            &self.pool,
+            Some(self.config.fetch_size),
+            bookmarks,
+        );
 
         let (query, result) = RetryableQuery::retry_run
             .retry(self.pool.backoff())
@@ -281,8 +315,13 @@ impl Graph {
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
-        self.impl_execute_on(self.config.db.clone(), self.config.imp_user.clone(), &[], q.into())
-            .await
+        self.impl_execute_on(
+            self.config.db.clone(),
+            self.config.imp_user.clone(),
+            &[],
+            q.into(),
+        )
+        .await
     }
 
     /// Executes a query READ on the configured database and returns a [`DetachedRowStream`]
@@ -292,8 +331,13 @@ impl Graph {
     /// This includes errors during a leader election or when the transaction resources on the server (memory, handles, ...) are exhausted.
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute_read(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
-        self.impl_execute_on(self.config.db.clone(), self.config.imp_user.clone(), &[], q.into())
-            .await
+        self.impl_execute_on(
+            self.config.db.clone(),
+            self.config.imp_user.clone(),
+            &[],
+            q.into(),
+        )
+        .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -323,8 +367,13 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), self.config.imp_user.clone(), vec![], q.into())
-            .await
+        self.impl_execute_on(
+            Some(db.into()),
+            self.config.imp_user.clone(),
+            vec![],
+            q.into(),
+        )
+        .await
     }
 
     #[allow(unused_variables)]
@@ -335,7 +384,14 @@ impl Graph {
         bookmarks: &[String],
         query: Query,
     ) -> Result<DetachedRowStream> {
-        let query = query.into_retryable(db, imp_user, Operation::Read, &self.pool, Some(self.config.fetch_size), bookmarks);
+        let query = query.into_retryable(
+            db,
+            imp_user,
+            Operation::Read,
+            &self.pool,
+            Some(self.config.fetch_size),
+            bookmarks,
+        );
 
         let (query, result) = RetryableQuery::retry_execute
             .retry(self.pool.backoff())
@@ -363,18 +419,21 @@ impl Graph {
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub async fn get_default_db(&self, imp_user: Option<ImpersonateUser>, bookmarks: &[String]) -> Result<Option<Database>, Error> {
+    pub async fn get_default_db(
+        &self,
+        imp_user: Option<ImpersonateUser>,
+        bookmarks: &[String],
+    ) -> Result<Option<Database>, Error> {
         match &self.pool {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             ConnectionPoolManager::Routed(routed) => {
                 routed.get_default_db(imp_user.clone(), bookmarks).await
             }
-            ConnectionPoolManager::Direct(_) => {
-                self.config.db.clone().map_or(
-                    Ok(Some("".into())),
-                    |db| Ok(Some(db.into())),
-                )
-            }
+            ConnectionPoolManager::Direct(_) => self
+                .config
+                .db
+                .clone()
+                .map_or(Ok(Some("".into())), |db| Ok(Some(db.into()))),
         }
     }
 }

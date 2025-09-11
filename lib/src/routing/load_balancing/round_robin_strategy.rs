@@ -1,5 +1,6 @@
-use crate::routing::connection_registry::{BoltServer, ConnectionRegistry};
+use crate::routing::connection_registry::ConnectionRegistry;
 use crate::routing::load_balancing::LoadBalancingStrategy;
+use crate::routing::types::BoltServer;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

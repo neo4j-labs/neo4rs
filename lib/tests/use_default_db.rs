@@ -26,9 +26,7 @@ async fn use_default_db() {
     let graph = neo4j.graph();
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    let query_stream = graph
-        .execute_on("system", "SHOW DEFAULT DATABASE")
-        .await;
+    let query_stream = graph.execute_on("system", "SHOW DEFAULT DATABASE").await;
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     let query_stream = graph.execute_on("system", "SHOW DEFAULT DATABASE").await;
@@ -68,7 +66,7 @@ async fn use_default_db() {
             query!(
                 "MATCH (n:Node {{uuid: {uuid}}}) RETURN count(n) AS result",
                 uuid = id.to_string()
-            )
+            ),
         )
         .await;
 

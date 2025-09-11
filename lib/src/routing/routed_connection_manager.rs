@@ -1,8 +1,9 @@
 use crate::config::ImpersonateUser;
 use crate::pool::ManagedConnection;
-use crate::routing::connection_registry::{BoltServer, ConnectionRegistry};
+use crate::routing::connection_registry::ConnectionRegistry;
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::routing::routing_table_provider::RoutingTableProvider;
+use crate::routing::types::BoltServer;
 use crate::routing::RoundRobinStrategy;
 use crate::Database;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -90,8 +91,14 @@ impl RoutedConnectionManager {
         }
     }
 
-    pub async fn get_default_db(&self, imp_user: Option<ImpersonateUser>, bookmarks: &[String]) -> Result<Option<Database>, Error> {
-        self.connection_registry.get_default_db(imp_user, bookmarks).await
+    pub async fn get_default_db(
+        &self,
+        imp_user: Option<ImpersonateUser>,
+        bookmarks: &[String],
+    ) -> Result<Option<Database>, Error> {
+        self.connection_registry
+            .get_default_db(imp_user, bookmarks)
+            .await
     }
 
     pub(crate) fn backoff(&self) -> ExponentialBuilder {
