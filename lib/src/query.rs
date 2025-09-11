@@ -259,11 +259,6 @@ pub(crate) struct RetryableQuery<'a> {
 }
 
 impl<'a> RetryableQuery<'a> {
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub(crate) fn is_read(&self) -> bool {
-        self.operation.is_read()
-    }
-
     pub(crate) async fn retry_run(self) -> (Self, QueryResult<RunResult>) {
         let result = self.run().await;
         (self, result)

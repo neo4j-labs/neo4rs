@@ -1,7 +1,6 @@
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
     crate::connection::{ConnectionInfo, Routing},
-    crate::graph::ConnectionPoolManager::Routed,
     crate::routing::{ClusterRoutingTableProvider, RoutedConnectionManager},
     crate::summary::ResultSummary,
     log::debug,
@@ -9,12 +8,19 @@ use {
 };
 
 use crate::config::ImpersonateUser;
-use crate::graph::ConnectionPoolManager::Direct;
 use crate::pool::ManagedConnection;
 use crate::query::RetryableQuery;
 use crate::retry::Retry;
 use crate::RunResult;
-use crate::{config::{Config, ConfigBuilder, Database, LiveConfig}, errors::Result, pool::{create_pool, ConnectionPool}, query::Query, stream::DetachedRowStream, txn::Txn, Operation};
+use crate::{
+    config::{Config, ConfigBuilder, Database, LiveConfig},
+    errors::Result,
+    pool::{create_pool, ConnectionPool},
+    query::Query,
+    stream::DetachedRowStream,
+    txn::Txn,
+    Operation,
+};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
     session::{Session, SessionConfig},
@@ -41,16 +47,18 @@ impl ConnectionPoolManager {
     ) -> Result<ManagedConnection> {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            Routed(manager) => manager.get(operation, db, imp_user, bookmarks).await,
-            Direct(pool) => pool.get().await.map_err(crate::Error::from),
+            ConnectionPoolManager::Routed(manager) => {
+                manager.get(operation, db, imp_user, bookmarks).await
+            }
+            ConnectionPoolManager::Direct(pool) => pool.get().await.map_err(crate::Error::from),
         }
     }
 
     fn backoff(&self) -> ExponentialBuilder {
         match self {
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            Routed(manager) => manager.backoff(),
-            Direct(pool) => pool.manager().backoff(),
+            ConnectionPoolManager::Routed(manager) => manager.backoff(),
+            ConnectionPoolManager::Direct(pool) => pool.manager().backoff(),
         }
     }
 }
@@ -84,7 +92,7 @@ impl Graph {
             )?;
             if matches!(info.init.routing, Routing::Yes(_)) {
                 debug!("Routing enabled, creating a routed connection manager");
-                let pool = Routed(RoutedConnectionManager::new(
+                let pool = ConnectionPoolManager::Routed(RoutedConnectionManager::new(
                     &config,
                     Arc::new(ClusterRoutingTableProvider::new(config.clone())),
                 )?);
@@ -93,7 +101,7 @@ impl Graph {
                     pool,
                 })
             } else {
-                let pool = Direct(create_pool(&config)?);
+                let pool = ConnectionPoolManager::Direct(create_pool(&config)?);
                 Ok(Graph {
                     config: config.into_live_config(),
                     pool,
@@ -102,7 +110,7 @@ impl Graph {
         }
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
-            let pool = Direct(create_pool(&config)?);
+            let pool = ConnectionPoolManager::Direct(create_pool(&config)?);
             Ok(Graph {
                 config: config.into_live_config(),
                 pool,
@@ -194,7 +202,7 @@ impl Graph {
         {
             Txn::new(
                 db,
-                fetch_size.or(Some(self.config.fetch_size)).unwrap(),
+                fetch_size.unwrap_or(self.config.fetch_size),
                 connection,
                 operation,
                 imp_user,
@@ -247,14 +255,26 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<ResultSummary> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
-            .await
+        self.impl_run_on(
+            Some(db.into()),
+            self.config.imp_user.clone(),
+            &[],
+            Some(self.config.fetch_size),
+            q.into(),
+        )
+        .await
     }
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub async fn run_on(&self, db: impl Into<Database>, q: impl Into<Query>) -> Result<()> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
-            .await
+        self.impl_run_on(
+            Some(db.into()),
+            self.config.imp_user.clone(),
+            &[],
+            Some(self.config.fetch_size),
+            q.into(),
+        )
+        .await
     }
 
     #[allow(unused_variables)]
@@ -284,33 +304,12 @@ impl Graph {
             .await;
 
         match result {
-            Ok(result) => {
-                #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-                {
-                    if let Some(bookmark) = result.bookmark.as_deref() {
-                        match &self.pool {
-                            Routed(routed) => {
-                                routed.add_bookmark(bookmark).await;
-                            }
-                            Direct(_) => {}
-                        }
-                    } else if query.is_read() {
-                        match &self.pool {
-                            Routed(routed) => {
-                                debug!("No bookmark received after a read operation, discarding all bookmarks");
-                                routed.clear_bookmarks().await;
-                            }
-                            Direct(_) => {}
-                        }
-                    }
-                }
-                Ok(result)
-            }
+            Ok(result) => Ok(result),
             Err(e) => Err(e.into_inner()),
         }
     }
 
-    /// Executes a READ query on the configured database and returns a [`DetachedRowStream`]
+    /// Executes a READ|WRITE query on the configured database and returns a [`DetachedRowStream`]
     ///
     /// This operation retires the query on certain failures.
     /// All errors with the `Transient` error class as well as a few other error classes are considered retryable.
@@ -318,6 +317,7 @@ impl Graph {
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
         self.impl_execute_on(
+            Operation::Write,
             self.config.db.clone(),
             self.config.imp_user.clone(),
             &[],
@@ -335,6 +335,7 @@ impl Graph {
     /// Retries happen with an exponential backoff until a retry delay exceeds 60s, at which point the query fails with the last error as it would without any retry.
     pub async fn execute_read(&self, q: impl Into<Query>) -> Result<DetachedRowStream> {
         self.impl_execute_on(
+            Operation::Read,
             self.config.db.clone(),
             self.config.imp_user.clone(),
             &[],
@@ -353,11 +354,19 @@ impl Graph {
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     pub async fn execute_on(
         &self,
+        operation: Operation,
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
-            .await
+        self.impl_execute_on(
+            operation,
+            Some(db.into()),
+            self.config.imp_user.clone(),
+            &[],
+            Some(self.config.fetch_size),
+            q.into(),
+        )
+        .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -372,6 +381,7 @@ impl Graph {
         q: impl Into<Query>,
     ) -> Result<DetachedRowStream> {
         self.impl_execute_on(
+            Operation::Write,
             Some(db.into()),
             self.config.imp_user.clone(),
             &[],
@@ -384,6 +394,7 @@ impl Graph {
     #[allow(unused_variables)]
     pub(crate) async fn impl_execute_on(
         &self,
+        operation: Operation,
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
@@ -393,7 +404,7 @@ impl Graph {
         let query = query.into_retryable(
             db,
             imp_user,
-            Operation::Read,
+            operation,
             &self.pool,
             fetch_size.or(Some(self.config.fetch_size)),
             bookmarks,
@@ -439,7 +450,7 @@ impl Graph {
                 .config
                 .db
                 .clone()
-                .map_or(Ok(Some("".into())), |db| Ok(Some(db.into()))),
+                .map_or(Ok(Some("".into())), |db| Ok(Some(db))),
         }
     }
 }

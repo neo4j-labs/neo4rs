@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use neo4rs::query;
+use neo4rs::{query, Operation};
 
 mod container;
 
@@ -26,7 +26,9 @@ async fn use_default_db() {
     let graph = neo4j.graph();
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    let query_stream = graph.execute_on("system", "SHOW DEFAULT DATABASE").await;
+    let query_stream = graph
+        .execute_on(Operation::Read, "system", "SHOW DEFAULT DATABASE")
+        .await;
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     let query_stream = graph.execute_on("system", "SHOW DEFAULT DATABASE").await;
@@ -62,6 +64,7 @@ async fn use_default_db() {
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     let query_stream = graph
         .execute_on(
+            Operation::Read,
             dbname.as_str(),
             query!(
                 "MATCH (n:Node {{uuid: {uuid}}}) RETURN count(n) AS result",

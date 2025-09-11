@@ -515,7 +515,7 @@ mod version;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub use {
     session::{Session, SessionConfig, SessionConfigBuilder},
-    utils::ConcurrentHashMap
+    utils::ConcurrentHashMap,
 };
 
 pub use crate::auth::ClientCertificate;

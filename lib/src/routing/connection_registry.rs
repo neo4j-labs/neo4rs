@@ -42,18 +42,19 @@ impl ConnectionRegistry {
 
     /// Retrieve the pool for a specific server and database.
     pub(crate) fn get_server_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
-        self.pool_registry.get(&server.to_neo_url(self.scheme.as_str()))
+        self.pool_registry
+            .get(&server.to_neo_url(self.scheme.as_str()))
     }
 
     /// Mark a server as available for a specific database.
-    pub(crate) fn mark_unavailable(&self, server: &BoltServer, db: Option<Database>) {
-        let db_name = db.map_or(String::new(), |d| d.to_string());
-        if self.databases.contains_key(&db_name) {
+    pub(crate) fn mark_unavailable(&self, server: &BoltServer) {
+        for db_name in self.databases.keys() {
             debug!("Marking server as available: {server:?}");
             let mut table = self.databases.get(&db_name).unwrap();
             if table.mark_server_unavailable(server) {
                 self.databases.insert(db_name, table);
-                self.pool_registry.remove(&server.to_neo_url(self.scheme.as_str()));
+                self.pool_registry
+                    .remove(&server.to_neo_url(self.scheme.as_str()));
             } else {
                 debug!("Server not found in the registry: {server:?}");
             }
@@ -128,7 +129,11 @@ impl ConnectionRegistry {
     }
 
     pub fn all_servers(&self) -> Vec<BoltServer> {
-        self.databases.values().iter().flat_map(|dt| dt.resolve()).collect()
+        self.databases
+            .values()
+            .iter()
+            .flat_map(|dt| dt.resolve())
+            .collect()
     }
 
     pub fn update(&self, config: &Config, routing_table: &RoutingTable) -> Result<(), Error> {
@@ -298,10 +303,10 @@ mod tests {
         assert_eq!(servers.len(), 5);
         assert_eq!(registry.pool_registry.keys().len(), 3);
         registry.mark_unavailable(&BoltServer {
-            address:"host1".to_string(),
+            address: "host1".to_string(),
             port: 7687,
             role: "WRITE".to_string(),
-        }, db.clone());
+        });
         let servers = registry.servers(db, None, &[]).await;
         assert_eq!(servers.len(), 3);
         assert_eq!(registry.pool_registry.keys().len(), 2);
@@ -393,7 +398,7 @@ mod tests {
             ])),
         ));
 
-        let db = None;
+        let db = Some(Database::from(""));
         let db1 = Some(Database::from("db1"));
         let db2 = Some(Database::from("db2"));
 
@@ -406,13 +411,13 @@ mod tests {
         let servers = registry.servers(db2.clone(), None, &[]).await;
         assert_eq!(servers.len(), 5);
 
-        assert_eq!(registry.pool_registry.keys().len(), 7);
+        assert_eq!(registry.pool_registry.keys().len(), 9);
 
         registry.mark_unavailable(&BoltServer {
-            address:"host1".to_string(),
+            address: "host1".to_string(),
             port: 7687,
-            role: "WRITE".to_string(),
-        }, db.clone());
+            role: "READ".to_string(),
+        });
 
         let servers = registry.servers(db, None, &[]).await;
         assert_eq!(servers.len(), 4);
@@ -420,6 +425,6 @@ mod tests {
         assert_eq!(servers.len(), 4);
         let servers = registry.servers(db2, None, &[]).await;
         assert_eq!(servers.len(), 5);
-        assert_eq!(registry.pool_registry.keys().len(), 6);
+        assert_eq!(registry.pool_registry.keys().len(), 8);
     }
 }

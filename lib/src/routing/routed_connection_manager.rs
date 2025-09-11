@@ -9,7 +9,6 @@ use crate::Database;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{Config, Error, Operation};
 use backon::ExponentialBuilder;
-use futures::lock::Mutex;
 use log::{debug, error};
 use std::sync::Arc;
 
@@ -17,7 +16,6 @@ use std::sync::Arc;
 pub struct RoutedConnectionManager {
     load_balancing_strategy: Arc<dyn LoadBalancingStrategy>,
     connection_registry: Arc<ConnectionRegistry>,
-    bookmarks: Arc<Mutex<Vec<String>>>,
     backoff: ExponentialBuilder,
 }
 
@@ -27,7 +25,6 @@ impl RoutedConnectionManager {
         let connection_registry = Arc::new(ConnectionRegistry::new(config, provider));
         Ok(RoutedConnectionManager {
             load_balancing_strategy: Arc::new(RoundRobinStrategy::new(connection_registry.clone())),
-            bookmarks: Arc::new(Mutex::new(vec![])),
             connection_registry,
             backoff,
         })
@@ -78,8 +75,7 @@ impl RoutedConnectionManager {
                     Ok(conn) => return Ok(conn),
                     Err(e) => {
                         error!("Failed to get connection from pool for server {selected_server:?}: {e}");
-                        self.connection_registry
-                            .mark_unavailable(&selected_server, db.clone());
+                        self.connection_registry.mark_unavailable(&selected_server);
                         continue; // Try selecting another server
                     }
                 }
@@ -112,18 +108,5 @@ impl RoutedConnectionManager {
 
     fn select_writer(&self, servers: &[BoltServer]) -> Option<BoltServer> {
         self.load_balancing_strategy.select_writer(servers)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn add_bookmark(&self, bookmark: &str) {
-        let mut guard = self.bookmarks.lock().await;
-        if !guard.contains(&bookmark.to_string()) {
-            guard.push(bookmark.to_string());
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn clear_bookmarks(&self) {
-        self.bookmarks.lock().await.clear();
     }
 }

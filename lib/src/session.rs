@@ -1,8 +1,8 @@
 use crate::config::ImpersonateUser;
 use crate::summary::Counters;
 use crate::{Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult};
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Default)]
 pub struct SessionConfig {
@@ -93,7 +93,7 @@ impl<'a> Session<'a> {
         {
             Ok(result) => {
                 if let Some(bookmark) = result.bookmark.as_ref() {
-                    self.bookmarks.push(bookmark.clone());
+                    self.bookmarks = vec![bookmark.clone()];
                 }
                 Ok(result)
             }
@@ -101,10 +101,14 @@ impl<'a> Session<'a> {
         }
     }
 
-    pub async fn execute(&mut self, query: impl Into<Query>) -> crate::Result<DetachedRowStream> {
+    pub async fn execute_read(
+        &mut self,
+        query: impl Into<Query>,
+    ) -> crate::Result<DetachedRowStream> {
         self.update_db_name().await?;
         self.driver
             .impl_execute_on(
+                Operation::Read,
                 self.db.clone(),
                 self.imp_user.clone(),
                 &self.bookmarks,
@@ -114,24 +118,75 @@ impl<'a> Session<'a> {
             .await
     }
 
-    pub async fn write_transaction(&mut self, queries: Vec<impl Into<Query>>) -> crate::Result<Counters> {
+    pub async fn execute_write(
+        &mut self,
+        query: impl Into<Query>,
+    ) -> crate::Result<DetachedRowStream> {
         self.update_db_name().await?;
-        let mut txn = self.driver.impl_start_txn_on(self.db.clone(), Operation::Write, self.imp_user.clone(), &self.bookmarks, self.fetch_size).await?;
-        txn.run_queries(queries).await
+        self.driver
+            .impl_execute_on(
+                Operation::Write,
+                self.db.clone(),
+                self.imp_user.clone(),
+                &self.bookmarks,
+                self.fetch_size,
+                query.into(),
+            )
+            .await
+    }
+
+    pub async fn write_transaction(
+        &mut self,
+        queries: Vec<impl Into<Query>>,
+    ) -> crate::Result<Counters> {
+        self.update_db_name().await?;
+        let mut txn = self
+            .driver
+            .impl_start_txn_on(
+                self.db.clone(),
+                Operation::Write,
+                self.imp_user.clone(),
+                &self.bookmarks,
+                self.fetch_size,
+            )
+            .await?;
+        match txn.run_queries(queries).await {
+            Ok(counters) => match txn.commit().await {
+                Ok(Some(bookmark)) => {
+                    self.bookmarks = vec![bookmark.clone()];
+                    Ok(counters)
+                }
+                Ok(None) => Ok(counters),
+                Err(e) => Err(e),
+            },
+            Err(e) => {
+                txn.rollback().await?;
+                Err(e)
+            }
+        }
     }
 
     pub async fn read_transaction(&mut self, query: impl Into<Query>) -> crate::Result<RowStream> {
         self.update_db_name().await?;
-        let mut txn = self.driver.impl_start_txn_on(self.db.clone(), Operation::Read, self.imp_user.clone(), &self.bookmarks, self.fetch_size).await?;
+        let mut txn = self
+            .driver
+            .impl_start_txn_on(
+                self.db.clone(),
+                Operation::Read,
+                self.imp_user.clone(),
+                &self.bookmarks,
+                self.fetch_size,
+            )
+            .await?;
         txn.execute(query).await
     }
 
+    pub fn last_bookmark(&self) -> Option<String> {
+        self.bookmarks.last().cloned()
+    }
+
     async fn update_db_name(&mut self) -> Result<(), Error> {
-        if self.db.is_none()
-            && self
-                .should_fetch_default_db
-                .fetch_or(false, Ordering::Relaxed)
-        {
+        if self.db.is_none() && self.should_fetch_default_db.fetch_or(false, Relaxed) {
             let db = self
                 .driver
                 .get_default_db(self.imp_user.clone(), &self.bookmarks)

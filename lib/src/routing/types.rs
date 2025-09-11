@@ -6,7 +6,7 @@ use std::hash::Hash;
 use std::time::Duration;
 
 /// Represents a Bolt server, with its address, port and role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct BoltServer {
     pub(crate) address: String,
     pub(crate) port: u16,
@@ -38,22 +38,6 @@ impl BoltServer {
     pub(crate) fn to_neo_url(&self, scheme: &str) -> NeoUrl {
         NeoUrl::parse(&format!("{scheme}://{}:{}", self.address, self.port))
             .expect("Failed to parse BoltServer to NeoUrl")
-    }
-}
-
-impl PartialEq for BoltServer {
-    fn eq(&self, other: &Self) -> bool {
-        self.address == other.address && self.port == other.port && self.role == other.role
-    }
-}
-
-impl Eq for BoltServer {}
-
-impl Hash for BoltServer {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.address.hash(state);
-        self.port.hash(state);
-        self.role.hash(state);
     }
 }
 
