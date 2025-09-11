@@ -103,7 +103,7 @@ mod tests {
         fn fetch_routing_table(
             &self,
             _bookmarks: &[String],
-            db: Option<Database>,
+            _db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
         ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
             unimplemented!()

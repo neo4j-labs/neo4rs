@@ -198,6 +198,19 @@ mod tests {
     use std::future::Future;
     use std::pin::Pin;
 
+    fn make_config() -> Config {
+        Config {
+            uri: "neo4j://localhost:7687".to_string(),
+            user: "user".to_string(),
+            password: "password".to_string(),
+            max_connections: 10,
+            db: None,
+            fetch_size: 200,
+            tls_config: ConnectionTLSConfig::None,
+            imp_user: None,
+        }
+    }
+
     struct TestRoutingTableProvider {
         routing_tables: Vec<RoutingTable>,
     }
@@ -272,16 +285,7 @@ mod tests {
                 .chain(routers.clone())
                 .collect(),
         };
-        let config = Config {
-            uri: "neo4j://localhost:7687".to_string(),
-            user: "user".to_string(),
-            password: "password".to_string(),
-            max_connections: 10,
-            db: None,
-            fetch_size: 200,
-            tls_config: ConnectionTLSConfig::None,
-            imp_user: None,
-        };
+        let config = make_config();
         let registry = Arc::new(ConnectionRegistry::new(
             &config,
             Arc::new(TestRoutingTableProvider::new(&[
@@ -379,16 +383,7 @@ mod tests {
                 .chain(routers.clone())
                 .collect(),
         };
-        let config = Config {
-            uri: "neo4j://localhost:7687".to_string(),
-            user: "user".to_string(),
-            password: "password".to_string(),
-            max_connections: 10,
-            db: None,
-            fetch_size: 200,
-            tls_config: ConnectionTLSConfig::None,
-            imp_user: None,
-        };
+        let config = make_config();
         let registry = Arc::new(ConnectionRegistry::new(
             &config,
             Arc::new(TestRoutingTableProvider::new(&[
@@ -397,11 +392,34 @@ mod tests {
                 cluster_routing_table_2.clone(),
             ])),
         ));
-        // get registry for db1 amd refresh routing table
-        let provider = Arc::new(TestRoutingTableProvider::new(&[
-            cluster_routing_table_default,
-            cluster_routing_table_1,
-            cluster_routing_table_2,
-        ]));
+
+        let db = None;
+        let db1 = Some(Database::from("db1"));
+        let db2 = Some(Database::from("db2"));
+
+        let servers = registry.servers(None, None, &[]).await;
+        assert_eq!(servers.len(), 5);
+
+        let servers = registry.servers(db1.clone(), None, &[]).await;
+        assert_eq!(servers.len(), 5);
+
+        let servers = registry.servers(db2.clone(), None, &[]).await;
+        assert_eq!(servers.len(), 5);
+
+        assert_eq!(registry.pool_registry.keys().len(), 7);
+
+        registry.mark_unavailable(&BoltServer {
+            address:"host1".to_string(),
+            port: 7687,
+            role: "WRITE".to_string(),
+        }, db.clone());
+
+        let servers = registry.servers(db, None, &[]).await;
+        assert_eq!(servers.len(), 4);
+        let servers = registry.servers(db1, None, &[]).await;
+        assert_eq!(servers.len(), 4);
+        let servers = registry.servers(db2, None, &[]).await;
+        assert_eq!(servers.len(), 5);
+        assert_eq!(registry.pool_registry.keys().len(), 6);
     }
 }

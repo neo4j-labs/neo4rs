@@ -6,6 +6,7 @@ pub struct ConcurrentHashMap<K, V> {
     inner: Arc<RwLock<HashMap<K, V>>>,
 }
 
+#[allow(dead_code)]
 impl<K, V> ConcurrentHashMap<K, V>
 where
     K: Eq + Hash + Clone,

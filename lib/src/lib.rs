@@ -508,11 +508,15 @@ mod stream;
 pub mod summary;
 mod txn;
 mod types;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 mod utils;
 mod version;
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-pub use session::{Session, SessionConfig, SessionConfigBuilder};
+pub use {
+    session::{Session, SessionConfig, SessionConfigBuilder},
+    utils::ConcurrentHashMap
+};
 
 pub use crate::auth::ClientCertificate;
 pub use crate::config::{Config, ConfigBuilder, Database};
