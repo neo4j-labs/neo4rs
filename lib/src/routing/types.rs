@@ -39,7 +39,7 @@ impl BoltServer {
 
 impl PartialEq for BoltServer {
     fn eq(&self, other: &Self) -> bool {
-        self.has_same_address(other)
+        self.address == other.address && self.port == other.port && self.role == other.role
     }
 }
 
@@ -49,6 +49,7 @@ impl Hash for BoltServer {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.address.hash(state);
         self.port.hash(state);
+        self.role.hash(state);
     }
 }
 

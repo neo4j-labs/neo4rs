@@ -73,6 +73,7 @@ impl RoutedConnectionManager {
             };
 
             if let Some(pool) = self.connection_registry.get_server_pool(&selected_server) {
+                debug!("Pool status {:?}", pool.status());
                 match pool.get().await {
                     Ok(conn) => return Ok(conn),
                     Err(e) => {
