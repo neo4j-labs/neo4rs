@@ -220,6 +220,7 @@ impl Graph {
             self.config.db.clone(),
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
             q.into(),
         )
         .await
@@ -242,7 +243,7 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<ResultSummary> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into())
+        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
             .await
     }
 
@@ -258,6 +259,7 @@ impl Graph {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        fetch_size: Option<usize>,
         query: Query,
     ) -> Result<RunResult> {
         let query = query.into_retryable(
@@ -265,7 +267,7 @@ impl Graph {
             imp_user,
             Operation::Write,
             &self.pool,
-            Some(self.config.fetch_size),
+            fetch_size.or(Some(self.config.fetch_size)),
             bookmarks,
         );
 
@@ -315,6 +317,7 @@ impl Graph {
             self.config.db.clone(),
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
             q.into(),
         )
         .await
@@ -331,6 +334,7 @@ impl Graph {
             self.config.db.clone(),
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
             q.into(),
         )
         .await
@@ -348,7 +352,7 @@ impl Graph {
         db: impl Into<Database>,
         q: impl Into<Query>,
     ) -> Result<DetachedRowStream> {
-        self.impl_execute_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into())
+        self.impl_execute_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
             .await
     }
 
@@ -378,6 +382,7 @@ impl Graph {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        fetch_size: Option<usize>,
         query: Query,
     ) -> Result<DetachedRowStream> {
         let query = query.into_retryable(
@@ -385,7 +390,7 @@ impl Graph {
             imp_user,
             Operation::Read,
             &self.pool,
-            Some(self.config.fetch_size),
+            fetch_size.or(Some(self.config.fetch_size)),
             bookmarks,
         );
 

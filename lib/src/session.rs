@@ -85,6 +85,7 @@ impl<'a> Session<'a> {
                 self.db.clone(),
                 self.imp_user.clone(),
                 &self.bookmarks,
+                self.fetch_size,
                 query.into(),
             )
             .await
@@ -106,6 +107,7 @@ impl<'a> Session<'a> {
                 self.db.clone(),
                 self.imp_user.clone(),
                 &self.bookmarks,
+                self.fetch_size,
                 query.into(),
             )
             .await
