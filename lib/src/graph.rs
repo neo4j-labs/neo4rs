@@ -135,6 +135,7 @@ impl Graph {
             Operation::Write,
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
         )
         .await
     }
@@ -155,6 +156,7 @@ impl Graph {
             operation,
             self.config.imp_user.clone(),
             bookmarks.as_deref().unwrap_or_default(),
+            Some(self.config.fetch_size),
         )
         .await
     }
@@ -170,6 +172,7 @@ impl Graph {
             Operation::Write,
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
         )
         .await
     }
@@ -181,6 +184,7 @@ impl Graph {
         operation: Operation,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        fetch_size: Option<usize>,
     ) -> Result<Txn> {
         let connection = self
             .pool
@@ -190,7 +194,7 @@ impl Graph {
         {
             Txn::new(
                 db,
-                self.config.fetch_size,
+                fetch_size.or(Some(self.config.fetch_size)).unwrap(),
                 connection,
                 operation,
                 imp_user,
@@ -249,7 +253,7 @@ impl Graph {
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub async fn run_on(&self, db: impl Into<Database>, q: impl Into<Query>) -> Result<()> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into())
+        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], Some(self.config.fetch_size), q.into())
             .await
     }
 
@@ -371,6 +375,7 @@ impl Graph {
             Some(db.into()),
             self.config.imp_user.clone(),
             &[],
+            Some(self.config.fetch_size),
             q.into(),
         )
         .await

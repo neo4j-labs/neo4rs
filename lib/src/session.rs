@@ -1,5 +1,6 @@
 use crate::config::ImpersonateUser;
-use crate::{Database, DetachedRowStream, Error, Graph, Query, RunResult};
+use crate::summary::Counters;
+use crate::{Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult};
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -111,6 +112,18 @@ impl<'a> Session<'a> {
                 query.into(),
             )
             .await
+    }
+
+    pub async fn write_transaction(&mut self, queries: Vec<impl Into<Query>>) -> crate::Result<Counters> {
+        self.update_db_name().await?;
+        let mut txn = self.driver.impl_start_txn_on(self.db.clone(), Operation::Write, self.imp_user.clone(), &self.bookmarks, self.fetch_size).await?;
+        txn.run_queries(queries).await
+    }
+
+    pub async fn read_transaction(&mut self, query: impl Into<Query>) -> crate::Result<RowStream> {
+        self.update_db_name().await?;
+        let mut txn = self.driver.impl_start_txn_on(self.db.clone(), Operation::Read, self.imp_user.clone(), &self.bookmarks, self.fetch_size).await?;
+        txn.execute(query).await
     }
 
     async fn update_db_name(&mut self) -> Result<(), Error> {
