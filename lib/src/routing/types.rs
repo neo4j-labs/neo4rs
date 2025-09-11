@@ -2,7 +2,6 @@ use crate::connection::NeoUrl;
 use crate::pool::ConnectionPool;
 use crate::routing::{RoutingTable, Server};
 use crate::utils::ConcurrentHashMap;
-use log::debug;
 use std::hash::Hash;
 use std::time::Duration;
 
@@ -34,6 +33,11 @@ impl BoltServer {
 
     pub fn has_same_address(&self, other: &Self) -> bool {
         self.address == other.address && self.port == other.port
+    }
+
+    pub(crate) fn to_neo_url(&self, scheme: &str) -> NeoUrl {
+        NeoUrl::parse(&format!("{scheme}://{}:{}", self.address, self.port))
+            .expect("Failed to parse BoltServer to NeoUrl")
     }
 }
 
@@ -98,17 +102,13 @@ impl DatabaseTable {
     }
 
     pub(crate) fn mark_server_unavailable(&mut self, server: &BoltServer) -> bool {
-        if let Some(index) = self.servers.iter().position(|s| server.has_same_address(s)) {
-            self.servers.remove(index);
-            true
-        } else {
-            debug!("Server not found in the database table: {server:?}");
-            false
-        }
+        let size = self.servers.len();
+        self.servers.retain(|s| !server.has_same_address(s));
+        size != self.servers.len()
     }
 }
 
 /// A registry of connection pools, indexed by the Bolt server they connect to.
-pub(crate) type PoolRegistry = ConcurrentHashMap<BoltServer, ConnectionPool>;
+pub(crate) type PoolRegistry = ConcurrentHashMap<NeoUrl, ConnectionPool>;
 /// A map of registries, indexed by the database name.
 pub(crate) type DatabaseServerMap = ConcurrentHashMap<String, DatabaseTable>;

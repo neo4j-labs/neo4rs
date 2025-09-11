@@ -537,7 +537,7 @@ impl ConnectionInfo {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NeoUrl(Url);
 
 impl NeoUrl {

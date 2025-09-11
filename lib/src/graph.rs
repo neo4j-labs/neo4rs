@@ -13,17 +13,10 @@ use crate::graph::ConnectionPoolManager::Direct;
 use crate::pool::ManagedConnection;
 use crate::query::RetryableQuery;
 use crate::retry::Retry;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::session::{Session, SessionConfig};
-use crate::{
-    config::{Config, ConfigBuilder, Database, LiveConfig},
-    errors::Result,
-    pool::{create_pool, ConnectionPool},
-    query::Query,
-    stream::DetachedRowStream,
-    txn::Txn,
-    Operation,
-};
-use crate::{Error, RunResult};
+use crate::RunResult;
+use crate::{config::{Config, ConfigBuilder, Database, LiveConfig}, errors::Result, pool::{create_pool, ConnectionPool}, query::Query, stream::DetachedRowStream, txn::Txn, Error, Operation};
 use backon::{ExponentialBuilder, RetryableWithContext};
 use std::time::Duration;
 
@@ -252,7 +245,7 @@ impl Graph {
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     pub async fn run_on(&self, db: impl Into<Database>, q: impl Into<Query>) -> Result<()> {
-        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), q.into())
+        self.impl_run_on(Some(db.into()), self.config.imp_user.clone(), &[], q.into())
             .await
     }
 
@@ -370,7 +363,7 @@ impl Graph {
         self.impl_execute_on(
             Some(db.into()),
             self.config.imp_user.clone(),
-            vec![],
+            &[],
             q.into(),
         )
         .await

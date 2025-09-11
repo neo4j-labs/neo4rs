@@ -16,21 +16,33 @@ pub(crate) struct ConnectionRegistry {
     databases: DatabaseServerMap,
     pool_registry: PoolRegistry,
     provider: Arc<dyn RoutingTableProvider>,
+    scheme: String,
 }
 
 impl ConnectionRegistry {
     pub fn new(config: &Config, provider: Arc<dyn RoutingTableProvider>) -> Self {
+        let url = NeoUrl::parse(config.uri.as_str()).expect("Failed to parse BoltServer to NeoUrl");
+        // Convert neo4j scheme to bolt scheme to create connection pools.
+        // We need to use the bolt scheme since we don't want new connections to be routed.
+        let scheme = match url.scheme() {
+            "neo4j" => "bolt",
+            "neo4j+s" => "bolt+s",
+            "neo4j+ssc" => "bolt+ssc",
+            _ => panic!("Unsupported URL scheme: {}", url.scheme()),
+        };
+
         ConnectionRegistry {
             config: config.clone(),
             databases: ConcurrentHashMap::new(),
             pool_registry: ConcurrentHashMap::new(),
             provider,
+            scheme: scheme.to_string(),
         }
     }
 
     /// Retrieve the pool for a specific server and database.
     pub(crate) fn get_server_pool(&self, server: &BoltServer) -> Option<ConnectionPool> {
-        self.pool_registry.get(server)
+        self.pool_registry.get(&server.to_neo_url(self.scheme.as_str()))
     }
 
     /// Mark a server as available for a specific database.
@@ -40,7 +52,8 @@ impl ConnectionRegistry {
             debug!("Marking server as available: {server:?}");
             let mut table = self.databases.get(&db_name).unwrap();
             if table.mark_server_unavailable(server) {
-                self.pool_registry.remove(server);
+                self.databases.insert(db_name, table);
+                self.pool_registry.remove(&server.to_neo_url(self.scheme.as_str()));
             } else {
                 debug!("Server not found in the registry: {server:?}");
             }
@@ -115,31 +128,22 @@ impl ConnectionRegistry {
     }
 
     pub fn all_servers(&self) -> Vec<BoltServer> {
-        self.pool_registry.keys()
+        self.databases.values().iter().flat_map(|dt| dt.resolve()).collect()
     }
 
     pub fn update(&self, config: &Config, routing_table: &RoutingTable) -> Result<(), Error> {
         let servers = routing_table.resolve();
-        let url = NeoUrl::parse(config.uri.as_str())?;
-
-        // Convert neo4j scheme to bolt scheme to create connection pools.
-        // We need to use the bolt scheme since we don't want new connections to be routed.
-        let scheme = match url.scheme() {
-            "neo4j" => "bolt",
-            "neo4j+s" => "bolt+s",
-            "neo4j+ssc" => "bolt+ssc",
-            _ => panic!("Unsupported URL scheme: {}", url.scheme()),
-        };
 
         for server in servers.iter() {
-            if self.pool_registry.contains_key(server) {
+            let neo_url = server.to_neo_url(self.scheme.as_str());
+            if self.pool_registry.contains_key(&neo_url) {
                 debug!("Server already exists in the registry: {server:?}");
                 continue;
             }
-            let uri = format!("{scheme}://{}:{}", server.address, server.port);
+            let uri = format!("{}://{}:{}", self.scheme, server.address, server.port);
             debug!("Creating pool for server: {uri}");
             self.pool_registry.insert(
-                server.clone(),
+                neo_url,
                 create_pool(&Config {
                     uri,
                     ..config.clone()
@@ -246,11 +250,11 @@ mod tests {
         ];
         let writers = vec![
             Server {
-                addresses: vec!["host3:7687".to_string()],
+                addresses: vec!["host1:7687".to_string()],
                 role: "WRITE".to_string(),
             },
             Server {
-                addresses: vec!["host4:7688".to_string()],
+                addresses: vec!["host2:7688".to_string()],
                 role: "WRITE".to_string(),
             },
         ];
@@ -284,6 +288,19 @@ mod tests {
                 cluster_routing_table.clone()
             ])),
         ));
+
+        let db = Some(Database::from("neo4j"));
+        let servers = registry.servers(None, None, &[]).await;
+        assert_eq!(servers.len(), 5);
+        assert_eq!(registry.pool_registry.keys().len(), 3);
+        registry.mark_unavailable(&BoltServer {
+            address:"host1".to_string(),
+            port: 7687,
+            role: "WRITE".to_string(),
+        }, db.clone());
+        let servers = registry.servers(db, None, &[]).await;
+        assert_eq!(servers.len(), 3);
+        assert_eq!(registry.pool_registry.keys().len(), 2);
     }
 
     #[tokio::test]
