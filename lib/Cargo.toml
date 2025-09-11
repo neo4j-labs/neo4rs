@@ -13,7 +13,7 @@ documentation = "https://docs.rs/neo4rs"
 readme = "../README.md"
 keywords = ["neo4j", "driver", "bolt", "cypher", "tokio"]
 categories = ["database", "network-programming", "asynchronous"]
-rust-version = "1.75.0"
+rust-version = "1.81.0"
 
 [features]
 json = ["serde_json"]
@@ -45,7 +45,7 @@ rustls-pemfile = "2.1.2"
 serde = { version = "1.0.185", features = ["derive"] }    # TODO: eliminate derive
 serde_json = { version = "1.0.0", optional = true }
 thiserror = "1.0.7"
-time = { version = "=0.3.22", optional = true }
+time = { version = "0.3.22", optional = true }
 tokio = { version = "1.5.0", features = ["full"] }
 url = "2.0.0"
 
