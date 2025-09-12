@@ -84,7 +84,7 @@ impl ConnectionRegistry {
                         }
                         Err(e) => {
                             error!("Failed to refresh routing table for database {db_name}: {e}");
-                            vec![] // ??
+                            vec![]
                         }
                     }
                 } else {
@@ -103,7 +103,7 @@ impl ConnectionRegistry {
                     }
                     Err(e) => {
                         error!("Failed to refresh routing table for database {db_name}: {e}");
-                        vec![] // ??
+                        vec![]
                     }
                 }
             }
@@ -122,7 +122,7 @@ impl ConnectionRegistry {
                 }
                 Err(e) => {
                     error!("Failed to refresh routing table for database default: {e}");
-                    vec![] // ??
+                    vec![]
                 }
             }
         }

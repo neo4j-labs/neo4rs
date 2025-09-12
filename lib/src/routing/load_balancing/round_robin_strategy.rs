@@ -28,9 +28,9 @@ impl RoundRobinStrategy {
             return None;
         }
 
-        let mut used = vec![];
+        let mut used = 0;
         loop {
-            if used.len() >= all_servers.len() {
+            if used >= all_servers.len() {
                 return None; // All servers have been used
             }
             let _ =
@@ -40,7 +40,7 @@ impl RoundRobinStrategy {
                 if servers.contains(server) {
                     return Some(server.clone());
                 }
-                used.push(server.clone());
+                used += 1;
             }
         }
     }
