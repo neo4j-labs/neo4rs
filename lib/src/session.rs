@@ -3,6 +3,7 @@ use crate::summary::Counters;
 use crate::{Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct SessionConfig {
@@ -57,17 +58,19 @@ impl SessionConfigBuilder {
     }
 }
 
-pub struct Session<'a> {
+/// A session is a context for running queries and transactions against a Neo4j database.
+/// It maintains state such as the target database, impersonated user, fetch size, and bookmarks.
+pub struct Session {
     db: Option<Database>,
     imp_user: Option<ImpersonateUser>,
     fetch_size: Option<usize>,
     bookmarks: Vec<String>,
     should_fetch_default_db: AtomicBool,
-    driver: &'a Graph,
+    driver: Arc<Graph>,
 }
 
-impl<'a> Session<'a> {
-    pub(crate) fn new(config: SessionConfig, graph: &'a Graph) -> Session<'a> {
+impl Session {
+    pub(crate) fn new(config: SessionConfig, graph: Arc<Graph>) -> Session {
         Self {
             db: config.db,
             imp_user: config.imp_user,

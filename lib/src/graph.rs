@@ -431,8 +431,8 @@ impl Graph {
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub fn with_session(&self, config: Option<SessionConfig>) -> Session<'_> {
-        Session::new(config.unwrap_or_default(), self)
+    pub fn with_session(&self, config: Option<SessionConfig>) -> Session {
+        Session::new(config.unwrap_or_default(), Arc::new(self.clone()))
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]

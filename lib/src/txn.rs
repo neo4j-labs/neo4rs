@@ -23,7 +23,7 @@ pub struct Txn {
     connection: ManagedConnection,
     operation: Operation,
     imp_user: Option<ImpersonateUser>,
-    #[allow(dead_code)]
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     bookmark: Option<String>,
 }
 
@@ -43,7 +43,6 @@ impl Txn {
                 fetch_size,
                 connection,
                 operation,
-                bookmark: None,
                 imp_user,
             }),
             msg => Err(msg.into_error("BEGIN")),
