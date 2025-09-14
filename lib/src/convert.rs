@@ -425,6 +425,13 @@ impl<T: Into<BoltType>> From<Option<T>> for BoltType {
     }
 }
 
+#[cfg(feature = "uuid")]
+impl From<uuid::Uuid> for BoltType {
+    fn from(value: uuid::Uuid) -> Self {
+        Self::String(BoltString::from(value.to_string()))
+    }
+}
+
 #[cfg(feature = "json")]
 impl TryFrom<serde_json::Value> for BoltType {
     type Error = Error;
