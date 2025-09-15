@@ -229,7 +229,7 @@ mod tests {
             _bookmarks: &[String],
             db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
-        ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
+        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
             let vec = self.routing_tables.clone();
             if let Some(db) = db {
                 if let Some(table) = vec.iter().find(|t| t.db.as_ref() == Some(&db)) {
