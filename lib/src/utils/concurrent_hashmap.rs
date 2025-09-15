@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::{Arc, RwLock};
@@ -74,14 +75,14 @@ where
         F: FnOnce(&V) -> V,
     {
         let mut map = self.inner.write().unwrap();
-        match map.get(&key) {
-            Some(existing_value) => {
-                let new_value = update_fn(existing_value);
-                map.insert(key, new_value.clone());
+        match map.entry(key) {
+            Entry::Occupied(mut occupied) => {
+                let new_value = update_fn(occupied.get());
+                occupied.insert(new_value.clone());
                 new_value
             }
-            None => {
-                map.insert(key, value.clone());
+            Entry::Vacant(vacant) => {
+                vacant.insert(value.clone());
                 value
             }
         }
