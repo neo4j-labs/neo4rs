@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -30,7 +31,11 @@ where
         map.insert(key, value)
     }
 
-    pub fn get(&self, key: &K) -> Option<V> {
+    pub fn get<Q>(&self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         let map = self.inner.read().unwrap();
         map.get(key).cloned()
     }
