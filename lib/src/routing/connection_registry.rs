@@ -68,12 +68,12 @@ impl ConnectionRegistry {
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
     ) -> Vec<BoltServer> {
-        if let Some(db_name) = db.as_ref().map(|d| d.to_string()) {
-            if let Some(table) = self.databases.get(&db_name) {
+        if let Some(db_name) = db.as_deref() {
+            if let Some(table) = self.databases.get(db_name) {
                 if table.is_expired() {
                     debug!("Routing table for database {db_name} is expired");
                     match self
-                        .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                        .fetch_routing_table(db.clone(), imp_user, bookmarks)
                         .await
                     {
                         Ok(new_table) => {
@@ -92,7 +92,7 @@ impl ConnectionRegistry {
                 }
             } else {
                 match self
-                    .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                    .fetch_routing_table(db.clone(), imp_user, bookmarks)
                     .await
                 {
                     Ok(new_table) => {
@@ -109,16 +109,14 @@ impl ConnectionRegistry {
             }
         } else {
             match self
-                .fetch_routing_table(db.clone(), imp_user.clone(), bookmarks)
+                .fetch_routing_table(db.clone(), imp_user, bookmarks)
                 .await
             {
                 Ok(new_table) => {
-                    let db = new_table.db.clone();
-                    let database_table: DatabaseTable = new_table.into();
-                    let servers = database_table.resolve();
-                    let db_name = db.map_or(String::new(), |d| d.to_string());
+                    let db_name = new_table.db.as_deref().unwrap_or("");
                     debug!("Routing table for database {db_name} refreshed");
-                    servers
+                    let database_table: DatabaseTable = new_table.into();
+                    database_table.resolve()
                 }
                 Err(e) => {
                     error!("Failed to refresh routing table for database default: {e}");
@@ -155,10 +153,7 @@ impl ConnectionRegistry {
                 })?,
             );
         }
-        let db_name = routing_table
-            .db
-            .as_ref()
-            .map_or("".to_string(), |d| d.to_string());
+        let db_name = routing_table.db.as_deref().unwrap_or("");
         debug!(
             "Registry updated for database {}. New size is {} with TTL {}s",
             db_name,
@@ -166,7 +161,7 @@ impl ConnectionRegistry {
             routing_table.ttl
         );
         let database_table: DatabaseTable = routing_table.into();
-        self.databases.insert(db_name.clone(), database_table);
+        self.databases.insert(db_name.to_owned(), database_table);
         Ok(())
     }
 
@@ -234,7 +229,7 @@ mod tests {
             _bookmarks: &[String],
             db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
-        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+        ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
             let vec = self.routing_tables.clone();
             if let Some(db) = db {
                 if let Some(table) = vec.iter().find(|t| t.db.as_ref() == Some(&db)) {
@@ -293,9 +288,9 @@ mod tests {
         let config = make_config();
         let registry = Arc::new(ConnectionRegistry::new(
             &config,
-            Arc::new(TestRoutingTableProvider::new(&[
-                cluster_routing_table.clone()
-            ])),
+            Arc::new(TestRoutingTableProvider::new(std::slice::from_ref(
+                &cluster_routing_table,
+            ))),
         ));
 
         let db = Some(Database::from("neo4j"));
