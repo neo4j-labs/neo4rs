@@ -195,9 +195,7 @@ impl Session {
                 .get_default_db(self.imp_user.clone(), &self.bookmarks)
                 .await?;
             self.db = db;
-            self.should_fetch_default_db
-                .compare_exchange(true, false, Relaxed, Relaxed)
-                .unwrap();
+            self.should_fetch_default_db.store(false, Relaxed);
         }
         Ok(())
     }
