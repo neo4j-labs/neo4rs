@@ -1,15 +1,10 @@
 # Neo4rs [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
 
 [ci-badge]: https://github.com/neo4j-labs/neo4rs/actions/workflows/checks.yml/badge.svg
-
 [ci-url]: https://github.com/neo4j-labs/neo4rs
-
 [crates-badge]: https://img.shields.io/crates/v/neo4rs.svg?style=shield
-
 [crates-url]: https://crates.io/crates/neo4rs
-
 [docs-badge]: https://img.shields.io/badge/docs-latest-blue.svg?style=shield
-
 [docs-url]: https://docs.rs/neo4rs
 
 `neo4rs` is a driver for the [Neo4j](https://neo4j.com/) graph database, written in Rust.
@@ -17,45 +12,45 @@
 `neo4rs` implements the [bolt specification](https://neo4j.com/docs/bolt/current/bolt/message/#messages-summary-41)
 
 This driver is compatible with Neo4j version 5.x and 4.4.
-Only the latest 5.x version is supported, following
-the [Neo4j Version support policy](https://neo4j.com/developer/kb/neo4j-supported-versions/).
+Only the latest 5.x version is supported, following the [Neo4j Version support policy](https://neo4j.com/developer/kb/neo4j-supported-versions/).
 
 ## API Documentation: [![Docs.rs][docs-badge]][docs-url]
 
 ## [Getting Started](https://neo4j.com/docs/getting-started/languages-guides/community-drivers/#neo4j-rust)
 
+
 ## Example
 
 ```rust
     // concurrent queries
-let uri = "127.0.0.1:7687";
-let user = "neo4j";
-let pass = "neo";
-let graph = Graph::new( & uri, user, pass).unwrap();
-for _ in 1..=42 {
-let graph = graph.clone();
-tokio::spawn(async move {
-let mut result = graph.execute(
-query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
-).await.unwrap();
-while let Some(row) = result.next().await.unwrap() {
-let node: Node = row.get("p").unwrap();
-let name: String = node.get("name").unwrap();
-println ! ("{}", name);
-}
-});
-}
+    let uri = "127.0.0.1:7687";
+    let user = "neo4j";
+    let pass = "neo";
+    let graph = Graph::new(&uri, user, pass).unwrap();
+    for _ in 1..=42 {
+        let graph = graph.clone();
+        tokio::spawn(async move {
+            let mut result = graph.execute(
+               query("MATCH (p:Person {name: $name}) RETURN p").param("name", "Mark")
+            ).await.unwrap();
+            while let Some(row) = result.next().await.unwrap() {
+                let node: Node = row.get("p").unwrap();
+                let name: String = node.get("name").unwrap();
+                println!("{}", name);
+            }
+        });
+    }
 
-//Transactions
-let mut txn = graph.start_txn().await.unwrap();
-txn.run_queries([
-"CREATE (p:Person {name: 'mark'})",
-"CREATE (p:Person {name: 'jake'})",
-"CREATE (p:Person {name: 'luke'})",
-])
-.await
-.unwrap();
-txn.commit().await.unwrap(); //or txn.rollback().await.unwrap();
+    //Transactions
+    let mut txn = graph.start_txn().await.unwrap();
+    txn.run_queries([
+        "CREATE (p:Person {name: 'mark'})",
+        "CREATE (p:Person {name: 'jake'})",
+        "CREATE (p:Person {name: 'luke'})",
+    ])
+    .await
+    .unwrap();
+    txn.commit().await.unwrap(); //or txn.rollback().await.unwrap();
 ```
 
 ## MSRV
@@ -101,20 +96,16 @@ The tests will use the official `neo4j` docker image, with the provided version 
 You might run into panics or test failures with the message 'failed to start container'.
 In that case, try to pull the image first before running the tests with `docker pull neo4j:$NEO4J_VERSION_TAG`.
 
-This could happen if you are on a machine with an architecture that is not supported by the image, e.g. `arm64` like the
-Apple silicon Macs.
+This could happen if you are on a machine with an architecture that is not supported by the image, e.g. `arm64` like the Apple silicon Macs.
 In that case, pulling the image will fail with a message like 'no matching manifest for linux/arm64/v8'.
-You need to use the `--platform` flag to pull the image for a different architecture, e.g.
-`docker pull --platform linux/amd64 neo4j:$NEO4J_VERSION_TAG`.
-There is an experimental option in docker to use Rosetta to run those images, so that tests don't take forever to run (
-please check the docker documentation).
+You need to use the `--platform` flag to pull the image for a different architecture, e.g. `docker pull --platform linux/amd64 neo4j:$NEO4J_VERSION_TAG`.
+There is an experimental option in docker to use Rosetta to run those images, so that tests don't take forever to run (please check the docker documentation).
 
 You could also use a newer neo4j version like `4.4` instead, which has support for `arm64` architecture.
 
 ##### Using an existing Neo4j instance
 
-To run the tests with an existing Neo4j instance, you need to have the `NEO4J_TEST_URI` environment variable set to the
-connection string, e.g. `neo4j+s://42421337thisisnotarealinstance.databases.neo4j.io`.
+To run the tests with an existing Neo4j instance, you need to have the `NEO4J_TEST_URI` environment variable set to the connection string, e.g. `neo4j+s://42421337thisisnotarealinstance.databases.neo4j.io`.
 The default user is `neo4j`, but it can be changed with the `NEO4J_TEST_USER` environment variable.
 The default password is `neo`, but it can be changed with the `NEO4J_TEST_PASS` environment variable.
 
@@ -134,11 +125,9 @@ env NEO4J_TEST_URI=bolt://localhost:7687 NEO4J_TEST_USER=neo4j NEO4J_TEST_PASS=s
 > Do not use a production instance.
 
 Running a test against an Aura instance can be done by setting the values as outlined above.
-However, the environment variables used do not match the names that are given in the connection file when an Aura
-instance is created.
+However, the environment variables used do not match the names that are given in the connection file when an Aura instance is created.
 
-By setting the environment variable `NEO4RS_TEST_ON_AURA` to `1`, the tests will look for the environment variables as
-they are used in the connection file.
+By setting the environment variable `NEO4RS_TEST_ON_AURA` to `1`, the tests will look for the environment variables as they are used in the connection file.
 The tests can then also be run by using a `dotenv` like tool, e.g.
 
 ```sh
@@ -151,15 +140,13 @@ dotenvx run -f .auraenv -e NEO4RS_TEST_ON_AURA=1 -- cargo test
 ### Updating `Cargo.lock` files for CI
 
 We have CI tests that verify the MSRV as well as the minimal version of the dependencies.
-The minimal versions are the lowest version that still satisfies the `Cargo.toml` entries, instead of the default of the
-highest version.
+The minimal versions are the lowest version that still satisfies the `Cargo.toml` entries, instead of the default of the highest version.
 
 If you change anything in the `Cargo.toml`, you need to update the `Cargo.lock` files for CI.
 
 This project uses [xtask](https://github.com/matklad/cargo-xtask#cargo-xtask)s to help with updating the lock files.
 
-It is recommended to close all editors, or more specifically, all rust-analyzer instances for this project before
-running the commands below.
+It is recommended to close all editors, or more specifically, all rust-analyzer instances for this project before running the commands below.
 
 #### Update `ci/Cargo.lock.msrv`
 
@@ -174,6 +161,7 @@ cargo xtask msrv
 
 Using `xtask` requires that `curl` and `jq` are available on the system.
 
+
 #### Update `ci/Cargo.lock.min`
 
 ```bash
@@ -183,9 +171,10 @@ cargo xtask min
 
 Using `xtask` requires that `curl` and `jq` are available on the system.
 
+
 ## License
 
 Neo4rs is licensed under either of the following, at your option:
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
