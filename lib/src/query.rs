@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 
+use crate::config::ImpersonateUser;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{bolt::Summary, summary::ResultSummary};
 use crate::{
@@ -74,6 +75,14 @@ impl Query {
         self
     }
 
+    pub fn imp_user(self, imp_user: Option<ImpersonateUser>) -> Self {
+        if let Some(imp_user) = imp_user {
+            self.extra("imp_user", imp_user.as_ref().to_string())
+        } else {
+            self
+        }
+    }
+
     pub fn has_param_key(&self, key: &str) -> bool {
         self.params.value.contains_key(key)
     }
@@ -97,16 +106,24 @@ impl Query {
             .map_err(Retry::into_inner)
     }
 
-    pub(crate) fn into_retryable(
+    pub(crate) fn into_retryable<'a>(
         self,
         db: Option<Database>,
+        imp_user: Option<ImpersonateUser>,
         operation: Operation,
-        pool: &ConnectionPoolManager,
+        pool: &'a ConnectionPoolManager,
         fetch_size: Option<usize>,
-    ) -> RetryableQuery<'_> {
+        bookmarks: &'a [String],
+    ) -> RetryableQuery<'a> {
         let query = match db.as_deref() {
             Some(db) => self.extra("db", db),
             None => self,
+        };
+
+        let query = if let Some(imp_user) = imp_user.as_deref() {
+            query.extra("imp_user", imp_user)
+        } else {
+            query
         };
 
         let is_read = operation.is_read();
@@ -118,6 +135,8 @@ impl Query {
             operation,
             fetch_size,
             db,
+            imp_user,
+            bookmarks: bookmarks.to_vec(),
         }
     }
 
@@ -235,14 +254,11 @@ pub(crate) struct RetryableQuery<'a> {
     operation: Operation,
     fetch_size: Option<usize>,
     db: Option<Database>,
+    imp_user: Option<ImpersonateUser>,
+    bookmarks: Vec<String>,
 }
 
 impl<'a> RetryableQuery<'a> {
-    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub(crate) fn is_read(&self) -> bool {
-        self.operation.is_read()
-    }
-
     pub(crate) async fn retry_run(self) -> (Self, QueryResult<RunResult>) {
         let result = self.run().await;
         (self, result)
@@ -273,7 +289,12 @@ impl<'a> RetryableQuery<'a> {
     async fn connect(&self) -> QueryResult<ManagedConnection> {
         // an error when retrieving a connection is considered permanent
         self.pool
-            .get(Some(self.operation), self.db.clone())
+            .get(
+                Some(self.operation),
+                self.db.clone(),
+                self.imp_user.clone(),
+                &self.bookmarks,
+            )
             .await
             .map_err(Retry::No)
     }

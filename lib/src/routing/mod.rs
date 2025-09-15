@@ -2,6 +2,7 @@ mod connection_registry;
 mod load_balancing;
 mod routed_connection_manager;
 mod routing_table_provider;
+mod types;
 
 use std::fmt::{Display, Formatter};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -56,15 +57,15 @@ pub struct Server {
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-pub struct RouteBuilder<'a> {
+pub struct RouteBuilder {
     routing: Routing,
     bookmarks: Vec<String>,
     db: Option<Database>,
-    imp_user: Option<&'a str>,
+    imp_user: Option<ImpersonateUser>,
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-impl<'a> RouteBuilder<'a> {
+impl RouteBuilder {
     pub fn new(routing: Routing, bookmarks: Vec<String>) -> Self {
         Self {
             routing,
@@ -81,8 +82,7 @@ impl<'a> RouteBuilder<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn with_imp_user(self, imp_user: &'a str) -> Self {
+    pub fn with_imp_user(self, imp_user: ImpersonateUser) -> Self {
         Self {
             imp_user: Some(imp_user),
             ..self
@@ -161,8 +161,9 @@ impl Display for RoutingTable {
     }
 }
 
-use crate::routing::connection_registry::BoltServer;
+use crate::config::ImpersonateUser;
 use crate::{Database, Version};
 pub use load_balancing::round_robin_strategy::RoundRobinStrategy;
 pub use routed_connection_manager::RoutedConnectionManager;
 pub use routing_table_provider::ClusterRoutingTableProvider;
+use types::BoltServer;

@@ -70,6 +70,7 @@ fn update_msrv_lock() -> Result {
         ("home".to_owned(), "0.5.9"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
+        ("time".to_owned(), "0.3.41"),
         ("zerofrom".to_owned(), "0.1.5"),
     ];
     for (krate, version) in pin_versions {
@@ -103,6 +104,7 @@ fn update_min_lock() -> Result {
         ("serde_repr".to_owned(), "0.1.5"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
+        ("time".to_owned(), "0.3.41"),
         ("zerofrom".to_owned(), "0.1.5"),
     ];
     for (krate, version) in pin_versions {
