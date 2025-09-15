@@ -68,6 +68,7 @@ impl Serialize for Extra {
 mod tests {
     use crate::bolt::request::route::Response;
     use crate::bolt::{Message, MessageResponse};
+    use crate::config::ImpersonateUser;
     use crate::connection::Routing;
     use crate::packstream::bolt;
     use crate::routing::RouteBuilder;
@@ -152,7 +153,7 @@ mod tests {
         );
         let route = builder
             .with_db("neo4j".into())
-            .with_imp_user("Foo")
+            .with_imp_user(ImpersonateUser::from("Foo"))
             .build(Version::V4_4);
         let serialized = route.to_bytes().unwrap();
 

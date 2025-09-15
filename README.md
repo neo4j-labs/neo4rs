@@ -58,7 +58,7 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 The crate has a minimum supported Rust version (MSRV) of `1.75.0` as of 0.9.x.
 The version [0.8.x](https://crates.io/crates/neo4rs/0.8.0) has an MSRV of `1.63.0`
 
-A change in the MSRV in *not* considered a breaking change.
+A change in the MSRV is *not* considered a breaking change.
 For versions past 1.0.0, a change in the MSRV can be done in a minor version increment (1.1.3 -> 1.2.0)
 for versions before 1.0.0, a change in the MSRV can be done in a patch version increment (0.1.3 -> 0.1.4).
 
@@ -67,10 +67,11 @@ for versions before 1.0.0, a change in the MSRV can be done in a patch version i
 > [!IMPORTANT]
 > This driver is a work in progress, and not all features are implemented yet.
 
-Only Bolt protocol versions 4.0 and 4.1 are supported.
+Only Bolt protocol versions 4.0, 4.1, 4.2 and 4.3 are supported.
 Support for later versions is planned and in progress.
 
-This means, that certain features like bookmarks or element IDs are not supported yet.
+This means, that certain features like element IDs are not supported yet.
+Features like routing, sessions and bookmarks are supported by turning on the feature `unstable-bolt-protocol-impl-v2`.
 
 ## Development
 

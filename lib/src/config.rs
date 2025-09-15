@@ -60,11 +60,64 @@ impl Deref for Database {
     }
 }
 
+/// Newtype for the name of the ipersonated user.
+/// Stores the name as an `Arc<str>` to avoid cloning the name around.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImpersonateUser(Arc<str>);
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+impl Serialize for ImpersonateUser {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (*self.0).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+impl<'de> Deserialize<'de> for ImpersonateUser {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(ImpersonateUser::from(s))
+    }
+}
+
+impl From<&str> for ImpersonateUser {
+    fn from(s: &str) -> Self {
+        ImpersonateUser(s.into())
+    }
+}
+
+impl From<String> for ImpersonateUser {
+    fn from(s: String) -> Self {
+        ImpersonateUser(s.into())
+    }
+}
+
+impl AsRef<str> for ImpersonateUser {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for ImpersonateUser {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// The configuration that is used once a connection is alive.
 #[derive(Debug, Clone)]
 pub struct LiveConfig {
     pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
+    pub(crate) imp_user: Option<ImpersonateUser>,
 }
 
 /// The configuration used to connect to the database, see [`crate::Graph::connect`].
@@ -76,6 +129,7 @@ pub struct Config {
     pub(crate) max_connections: usize,
     pub(crate) db: Option<Database>,
     pub(crate) fetch_size: usize,
+    pub(crate) imp_user: Option<ImpersonateUser>,
     pub(crate) tls_config: ConnectionTLSConfig,
 }
 
@@ -84,6 +138,7 @@ impl Config {
         LiveConfig {
             db: self.db,
             fetch_size: self.fetch_size,
+            imp_user: self.imp_user,
         }
     }
 }
@@ -96,6 +151,7 @@ pub struct ConfigBuilder {
     db: Option<Database>,
     fetch_size: usize,
     max_connections: usize,
+    imp_user: Option<ImpersonateUser>,
     tls_config: ConnectionTLSConfig,
 }
 
@@ -178,6 +234,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Set a user to impersonate when executing queries
+    pub fn with_impersonate_user(mut self, imp_user: impl Into<ImpersonateUser>) -> Self {
+        self.imp_user = Some(imp_user.into());
+        self
+    }
+
     pub fn build(self) -> Result<Config> {
         if let (Some(uri), Some(user), Some(password)) = (self.uri, self.user, self.password) {
             Ok(Config {
@@ -187,6 +249,7 @@ impl ConfigBuilder {
                 fetch_size: self.fetch_size,
                 max_connections: self.max_connections,
                 db: self.db,
+                imp_user: self.imp_user,
                 tls_config: self.tls_config,
             })
         } else {
@@ -203,6 +266,7 @@ impl Default for ConfigBuilder {
             password: None,
             db: None,
             max_connections: DEFAULT_MAX_CONNECTIONS,
+            imp_user: None,
             fetch_size: DEFAULT_FETCH_SIZE,
             tls_config: ConnectionTLSConfig::None,
         }
