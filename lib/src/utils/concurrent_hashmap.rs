@@ -26,28 +26,36 @@ where
         }
     }
 
-    pub fn insert(&self, key: K, value: V) -> Option<V> {
+    pub fn insert(&self, k: K, v: V) -> Option<V> {
         let mut map = self.inner.write().unwrap();
-        map.insert(key, value)
+        map.insert(k, v)
     }
 
-    pub fn get<Q>(&self, key: &Q) -> Option<V>
+    pub fn get<Q>(&self, k: &Q) -> Option<V>
     where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
         let map = self.inner.read().unwrap();
-        map.get(key).cloned()
+        map.get(k).cloned()
     }
 
-    pub fn remove(&self, key: &K) -> Option<V> {
+    pub fn remove<Q: ?Sized>(&self, k: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
         let mut map = self.inner.write().unwrap();
-        map.remove(key)
+        map.remove(k)
     }
 
-    pub fn contains_key(&self, key: &K) -> bool {
+    pub fn contains_key<Q: ?Sized>(&self, k: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
         let map = self.inner.read().unwrap();
-        map.contains_key(key)
+        map.contains_key(k)
     }
 
     pub fn len(&self) -> usize {
