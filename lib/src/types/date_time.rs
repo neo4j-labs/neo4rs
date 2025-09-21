@@ -1,6 +1,6 @@
 use crate::errors::Error;
 use crate::types::*;
-use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Offset, Timelike, Utc};
 use neo4rs_macros::BoltStruct;
 use std::convert::TryInto;
 
@@ -102,6 +102,18 @@ impl TryFrom<&BoltDateTimeZoneId> for DateTime<FixedOffset> {
     }
 }
 
+impl TryFrom<&BoltDateTimeZoneId> for DateTime<Utc> {
+    type Error = Error;
+
+    fn try_from(value: &BoltDateTimeZoneId) -> std::result::Result<Self, Self::Error> {
+        let seconds = value.seconds.value;
+        let nanoseconds = value.nanoseconds.value as u32;
+
+        let dt = DateTime::from_timestamp(seconds, nanoseconds).ok_or(Error::ConversionError)?;
+        Ok(dt)
+    }
+}
+
 impl From<NaiveDateTime> for BoltLocalDateTime {
     fn from(value: NaiveDateTime) -> Self {
         let seconds = value.and_utc().timestamp().into();
@@ -146,6 +158,20 @@ impl From<DateTime<FixedOffset>> for BoltDateTime {
     }
 }
 
+impl From<DateTime<Utc>> for BoltDateTime {
+    fn from(value: DateTime<Utc>) -> Self {
+        let seconds = (value.timestamp() + value.offset().fix().local_minus_utc() as i64).into();
+        let nanoseconds = (value.nanosecond() as i64).into();
+        let tz_offset_seconds = value.offset().fix().local_minus_utc().into();
+
+        BoltDateTime {
+            seconds,
+            nanoseconds,
+            tz_offset_seconds,
+        }
+    }
+}
+
 impl TryInto<DateTime<FixedOffset>> for BoltDateTime {
     type Error = Error;
 
@@ -172,6 +198,33 @@ impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
             .ok_or(Error::ConversionError)?;
 
         Ok(DateTime::from_naive_utc_and_offset(datetime, offset))
+    }
+}
+
+
+impl TryInto<DateTime<Utc>> for BoltDateTime {
+    type Error = Error;
+
+    fn try_into(self) -> Result<DateTime<Utc>> {
+        (&self).try_into()
+    }
+}
+
+impl TryFrom<&BoltDateTime> for DateTime<Utc> {
+    type Error = Error;
+
+    fn try_from(
+        BoltDateTime {
+            seconds,
+            nanoseconds,
+            tz_offset_seconds,
+        }: &BoltDateTime,
+    ) -> std::result::Result<Self, Self::Error> {
+        let seconds = seconds.value - tz_offset_seconds.value;
+        let datetime = DateTime::from_timestamp(seconds, nanoseconds.value as u32)
+            .ok_or(Error::ConversionError)?
+            .to_utc();
+        Ok(datetime)
     }
 }
 

@@ -1579,6 +1579,17 @@ mod tests {
     }
 
     #[test]
+    fn datetime_utc() {
+        let expected = test_datetime();
+
+        let datetime = BoltDateTime::from(expected);
+        let datetime = BoltType::DateTime(datetime);
+
+        let actual = datetime.to::<DateTime<Utc>>().unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn datetime_nanoseconds() {
         #[derive(Debug, PartialEq, Deserialize)]
         #[serde(transparent)]
