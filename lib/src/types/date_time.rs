@@ -201,7 +201,6 @@ impl TryFrom<&BoltDateTime> for DateTime<FixedOffset> {
     }
 }
 
-
 impl TryInto<DateTime<Utc>> for BoltDateTime {
     type Error = Error;
 
