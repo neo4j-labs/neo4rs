@@ -285,6 +285,12 @@ impl From<chrono::DateTime<chrono::FixedOffset>> for BoltType {
     }
 }
 
+impl From<chrono::DateTime<chrono::Utc>> for BoltType {
+    fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
+        BoltType::DateTime(value.into())
+    }
+}
+
 impl From<(chrono::NaiveTime, chrono::FixedOffset)> for BoltType {
     fn from(value: (chrono::NaiveTime, chrono::FixedOffset)) -> Self {
         BoltType::Time(value.into())
