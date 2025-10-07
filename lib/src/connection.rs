@@ -457,14 +457,14 @@ impl ConnectionInfo {
         let builder = ClientConfig::builder();
         let config = match tls_config {
             ConnectionTLSConfig::None => {
-                match rustls_native_certs::load_native_certs() {
-                    Ok(certs) => {
-                        root_cert_store.add_parsable_certificates(certs);
-                    }
-                    Err(e) => {
-                        warn!("Failed to load native certificates: {e}");
-                    }
+                let native_certs = rustls_native_certs::load_native_certs();
+                if !native_certs.errors.is_empty() {
+                    warn!(
+                        "Failed to load native certificates: {:?}",
+                        native_certs.errors
+                    );
                 }
+                root_cert_store.add_parsable_certificates(native_certs.certs);
                 builder
                     .with_root_certificates(root_cert_store)
                     .with_no_client_auth()
@@ -501,14 +501,14 @@ impl ConnectionInfo {
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
                 } else if mutual.validation {
-                    match rustls_native_certs::load_native_certs() {
-                        Ok(certs) => {
-                            root_cert_store.add_parsable_certificates(certs);
-                        }
-                        Err(e) => {
-                            warn!("Failed to load native certificates: {e}");
-                        }
+                    let native_certs = rustls_native_certs::load_native_certs();
+                    if !native_certs.errors.is_empty() {
+                        warn!(
+                            "Failed to load native certificates: {:?}",
+                            native_certs.errors
+                        );
                     }
+                    root_cert_store.add_parsable_certificates(native_certs.certs);
                     builder
                         .with_root_certificates(root_cert_store)
                         .with_client_auth_cert(cert_certs.collect(), keys)
