@@ -68,6 +68,7 @@ fn update_msrv_lock() -> Result {
         ("idna_adapter".to_owned(), "1.2.0"),
         ("litemap".to_owned(), "0.7.4"),
         ("home".to_owned(), "0.5.9"),
+        ("serde_with".to_owned(), "3.14.1"),
         ("testcontainers".to_owned(), "0.23.1"),
         ("testcontainers-modules".to_owned(), "0.11.4"),
         ("time".to_owned(), "0.3.41"),
