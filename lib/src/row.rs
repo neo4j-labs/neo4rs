@@ -3,7 +3,7 @@ use crate::{
         serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D,
         BoltRelation, BoltUnboundedRelation,
     },
-    BoltType,
+    BoltString, BoltType,
 };
 
 use serde::Deserialize;
@@ -157,6 +157,10 @@ impl Row {
             }
         }
         Row { attributes }
+    }
+
+    pub fn keys(&self) -> Vec<&BoltString> {
+        self.attributes.value.keys().collect()
     }
 
     /// Get an attribute of this relationship and deserialize it into custom type that implements [`serde::Deserialize`]
