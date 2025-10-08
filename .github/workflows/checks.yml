@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        neo4j: [ "5", "4.4" ]
+        neo4j: [ "2025", "5", "4.4" ]
     runs-on: ubuntu-latest
     services:
       neo4j:
