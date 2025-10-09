@@ -1,9 +1,9 @@
 [package]
-name = "include_snippet"
-version = "0.0.0"
+name = "neo4rs_include_snippet"
+version = "0.9.0-rc.8"
 edition = "2021"
 description = "Internal proc macro for the include_snippet! macro"
-publish = false
+publish = true
 
 [lib]
 proc-macro = true
