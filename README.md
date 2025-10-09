@@ -90,7 +90,7 @@ Docker is recommended since the tests don't necessarily clean up after themselve
 
 To run the tests with docker, you need to have docker installed and running.
 You can control the version of Neo4j that is used by setting the `NEO4J_VERSION_TAG` environment variable.
-The default version is `4.2`.
+The default version is `5`.
 The tests will use the official `neo4j` docker image, with the provided version as tag.
 
 You might run into panics or test failures with the message 'failed to start container'.
