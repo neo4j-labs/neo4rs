@@ -37,7 +37,7 @@ impl RoundRobinStrategy {
                 Some(if i == 0 { all_servers.len() - 1 } else { i - 1 })
             }).unwrap();
 
-            if let Some(server) = all_servers.get(i.wrapping_sub(prev)) {
+            if let Some(server) = all_servers.get(prev) {
                 if servers.contains(server) {
                     return Some(server.clone());
                 }
