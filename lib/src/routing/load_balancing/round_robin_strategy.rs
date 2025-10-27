@@ -33,10 +33,11 @@ impl RoundRobinStrategy {
             if used >= all_servers.len() {
                 return None; // All servers have been used
             }
-            let _ =
-                index.compare_exchange(0, all_servers.len(), Ordering::Relaxed, Ordering::Relaxed);
-            let i = index.fetch_sub(1, Ordering::Relaxed);
-            if let Some(server) = all_servers.get(i - 1) {
+            let prev = index.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |i| {
+                Some(if i == 0 { all_servers.len() - 1 } else { i - 1 })
+            }).unwrap();
+
+            if let Some(server) = all_servers.get(i.wrapping_sub(prev)) {
                 if servers.contains(server) {
                     return Some(server.clone());
                 }
