@@ -33,10 +33,12 @@ impl RoundRobinStrategy {
             if used >= all_servers.len() {
                 return None; // All servers have been used
             }
-            let _ =
-                index.compare_exchange(0, all_servers.len(), Ordering::Relaxed, Ordering::Relaxed);
-            let i = index.fetch_sub(1, Ordering::Relaxed);
-            if let Some(server) = all_servers.get(i - 1) {
+
+            let _ = index.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |i| {
+                Some((i + all_servers.len() - 1) % all_servers.len())
+            });
+
+            if let Some(server) = all_servers.get(index.load(Ordering::Relaxed)) {
                 if servers.contains(server) {
                     return Some(server.clone());
                 }
@@ -203,17 +205,34 @@ mod tests {
         assert_eq!(all_readers.len(), 3);
         let strategy = RoundRobinStrategy::new(registry.clone());
 
-        // select a reader for db-1
+        // select some readers for db-1
         let reader =
             RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
         assert_eq!(reader.address, "server2");
-        // select a reader for db-2
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server1");
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server2");
+
+        // select some readers for db-2
         let reader =
             RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
         assert_eq!(reader.address, "server1");
-        // select another reader for db-1
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server3");
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers2, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server1");
+
+        // select some other readers for db-1
         let reader =
             RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
         assert_eq!(reader.address, "server2");
+        let reader =
+            RoundRobinStrategy::select(&all_readers, &servers1, &strategy.reader_index).unwrap();
+        assert_eq!(reader.address, "server1");
     }
 }
