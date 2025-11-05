@@ -38,6 +38,8 @@ pub struct RowStream {
     state: State,
     fetch_size: usize,
     buffer: VecDeque<Row>,
+    /// Cumulative number of bytes read from the server for this query.
+    total_bytes_read: usize,
 }
 
 impl RowStream {
@@ -55,6 +57,7 @@ impl RowStream {
             fetch_size,
             state: State::Ready,
             buffer: VecDeque::with_capacity(fetch_size),
+            total_bytes_read: 0,
         }
     }
 }
@@ -72,6 +75,9 @@ pub struct DetachedRowStream {
 impl DetachedRowStream {
     pub(crate) fn new(stream: RowStream, connection: ManagedConnection) -> Self {
         DetachedRowStream { stream, connection }
+    }
+    pub fn total_bytes_read(&self) -> usize {
+        self.stream.total_bytes_read
     }
 }
 
@@ -128,18 +134,20 @@ impl RowStream {
 
                     self.state = loop {
                         match connection.recv().await {
-                            Ok(BoltResponse::Success(s)) => {
+                            Ok((BoltResponse::Success(s), total_bytes)) => {
+                                self.total_bytes_read += total_bytes;
                                 break if s.get("has_more").unwrap_or(false) {
                                     State::Ready
                                 } else {
                                     State::Complete(())
                                 };
                             }
-                            Ok(BoltResponse::Record(record)) => {
+                            Ok((BoltResponse::Record(record), total_bytes)) => {
                                 let row = Row::new(self.fields.clone(), record.data);
+                                self.total_bytes_read += total_bytes;
                                 self.buffer.push_back(row);
                             }
-                            Ok(msg) => return Err(msg.into_error("PULL")),
+                            Ok((msg, _total_bytes)) => return Err(msg.into_error("PULL")),
                             Err(e) => return Err(e),
                         }
                     };
