@@ -1,0 +1,12 @@
+[package]
+name = "include_snippet"
+version = "0.0.0"
+edition = "2021"
+description = "Internal proc macro for the include_snippet! macro"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+unsynn = { version = "0.2.1", default-features = false }
