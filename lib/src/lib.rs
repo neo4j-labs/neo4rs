@@ -539,6 +539,7 @@ pub use crate::types::{
 };
 pub use crate::version::Version;
 pub(crate) use messages::Success;
+use neo4rs_include_snippet::include_snippet;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
