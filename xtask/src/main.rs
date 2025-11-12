@@ -64,7 +64,7 @@ fn update_msrv_lock() -> Result {
 
     pin_msrv_versions(dry_run, &sh, &cargo, &lockfile)?;
 
-    cmd!(sh, "{cargo} +{msrv} test --no-run --all-features").run_if(dry_run)?;
+    cmd!(sh, "cargo +{msrv} test --no-run --all-features").run_if(dry_run)?;
 
     cmd!(sh, "cp {lockfile} {ci_dir}/Cargo.lock.msrv").run_if(dry_run)?;
 
@@ -86,7 +86,7 @@ fn update_min_lock() -> Result {
 
     cmd!(
         sh,
-        "{cargo} +nightly -Z minimal-versions test --no-run --all-features"
+        "cargo +nightly -Z minimal-versions test --package neo4rs --no-run --all-features"
     )
     .env("RUST_LOG", "debug")
     .run_if(dry_run)?;
