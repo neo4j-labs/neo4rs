@@ -13,7 +13,7 @@ documentation = "https://docs.rs/neo4rs"
 readme = "../README.md"
 keywords = ["neo4j", "driver", "bolt", "cypher", "tokio"]
 categories = ["database", "network-programming", "asynchronous"]
-rust-version = "1.75.0"
+rust-version = "1.81.0"
 
 [features]
 json = ["serde_json"]

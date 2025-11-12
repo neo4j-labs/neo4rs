@@ -345,7 +345,7 @@ impl InitOpts {
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-    pub(crate) fn to_hello(&self, version: Version) -> Hello {
+    pub(crate) fn to_hello(&self, version: Version) -> Hello<'_> {
         match self.routing {
             Routing::No => HelloBuilder::new(&self.user, &self.password).build(version),
             Routing::Yes(ref routing) => HelloBuilder::new(&self.user, &self.password)
