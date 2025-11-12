@@ -55,7 +55,7 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## MSRV
 
-The crate has a minimum supported Rust version (MSRV) of `1.75.0` as of 0.9.x.
+The crate has a minimum supported Rust version (MSRV) of `1.81.0` as of 0.9.x.
 The version [0.8.x](https://crates.io/crates/neo4rs/0.8.0) has an MSRV of `1.63.0`
 
 A change in the MSRV is *not* considered a breaking change.
