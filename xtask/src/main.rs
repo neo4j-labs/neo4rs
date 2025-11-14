@@ -99,9 +99,7 @@ fn update_min_lock() -> Result {
 fn pin_msrv_versions(dry_run: bool, sh: &Shell, cargo: &str, lockfile: &str) -> Result<()> {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    let pin_versions: &[(&str, &str)] = &[
-        ("nalgebra", "0.32.6"),
-    ];
+    let pin_versions: &[(&str, &str)] = &[("nalgebra", "0.32.6")];
     for (krate, version) in pin_versions {
         pin_version(dry_run, sh, cargo, krate, version)?;
     }
