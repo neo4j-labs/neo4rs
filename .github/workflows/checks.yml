@@ -24,7 +24,7 @@ env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
   MSRV: 1.85.0
-  HACK: hack --package neo4rs --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-result-summary
+  HACK_OPTS: --each-feature --exclude-features unstable-serde-packstream-format,unstable-bolt-protocol-impl-v2,unstable-result-summary
 
 jobs:
   fmt:
@@ -75,7 +75,7 @@ jobs:
         run: cp ci/Cargo.lock.msrv Cargo.lock
 
       - name: Run clippy
-        run: cargo +$MSRV --locked ${{ env.HACK }} clippy -- -D warnings
+        run: cargo +${{ env.MSRV }} --locked  hack --package neo4rs ${{ env.HACK_OPTS }} clippy -- -D warnings
 
   unit-tests:
     name: Run unit tests
@@ -109,7 +109,7 @@ jobs:
         run: cp ci/Cargo.lock.msrv Cargo.lock
 
       - name: Run unit tests
-        run: cargo +$MSRV --locked ${{ env.HACK }} nextest run --lib
+        run: cargo +${{ env.MSRV }} --locked  hack --package neo4rs ${{ env.HACK_OPTS }} nextest run --lib
 
   integration-tests:
     name: Run integration tests
@@ -153,7 +153,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run integration tests
-        run: cargo {{ env.HACK }} nextest run -E 'kind(test)'
+        run: cargo hack ${{ env.HACK_OPTS }} nextest --manifest-path './integrationtests/Cargo.toml' run -E 'kind(test)'
 
   min_dep:
     name: Validate minimal dependency versions
@@ -178,7 +178,7 @@ jobs:
         run: cp ci/Cargo.lock.min Cargo.lock
 
       - name: Run minimal dependency versions unit tests
-        run: cargo +$MSRV nextest --package neo4rs run --lib --all-features --locked
+        run: cargo +${{ env.MSRV }} nextest run --package neo4rs --lib --all-features --locked
 
   release:
     name: Release
