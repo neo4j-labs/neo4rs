@@ -2,7 +2,7 @@
 
 use std::env;
 
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 fn main() {
     if let Err(e) = try_main() {
@@ -99,11 +99,10 @@ fn update_min_lock() -> Result {
 fn pin_msrv_versions(dry_run: bool, sh: &Shell, cargo: &str, lockfile: &str) -> Result<()> {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    let pin_versions: &[(String, &str)] = &[
-        ("backon".to_owned(), "1.5.2"),
-        ("idna_adapter".to_owned(), "1.2.0"),
-        ("litemap".to_owned(), "0.7.5"),
-        ("home".to_owned(), "0.5.11"),
+    let pin_versions: &[(&str, &str)] = &[
+        ("backon", "1.5.2"),
+        ("idna_adapter", "1.2.0"),
+        ("litemap", "0.7.5"),
     ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, sh, cargo, krate, version)?;
