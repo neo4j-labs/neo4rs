@@ -1,0 +1,51 @@
+[package]
+name = "neo4rs_tests"
+version = "0.0.0"
+edition = "2024"
+description = "Rust driver for Neo4j"
+license = "MIT"
+repository = "https://github.com/neo4j-labs/neo4rs"
+documentation = "https://docs.rs/neo4rs"
+readme = "../README.md"
+publish = false
+
+[workspace]
+
+[features]
+json = ["neo4rs/json"]
+uuid = ["neo4rs/uuid"]
+unstable-v1 = ["neo4rs/unstable-v1"]
+unstable-serde-packstream-format = ["neo4rs/unstable-serde-packstream-format"]
+unstable-result-summary = ["neo4rs/unstable-result-summary"]
+unstable-bolt-protocol-impl-v2 = ["neo4rs/unstable-bolt-protocol-impl-v2"]
+
+[dependencies]
+neo4rs = { version = "0.9.0-rc.8", path = "../lib" }
+
+[dev-dependencies]
+futures = { version = "0.3.0" }
+pretty_env_logger = "0.5.0"
+serde = { version = "1.0.185" }
+uuid = { version = "1.0.0", features = ["v4"] }
+
+[dev-dependencies.chrono]
+version = "0.4.35"
+default-features = false
+features = ["std", "serde"]
+
+[dev-dependencies.lenient_semver]
+version = "0.4.2"
+default-features = false
+features = ["version_lite"]
+
+[dev-dependencies.testcontainers]
+version = "0.25.2"
+features = ["blocking"]
+
+[dev-dependencies.testcontainers-modules]
+version = "0.13.0"
+features = ["neo4j"]
+
+[dependencies.tokio]
+version = "1.5.0"
+features = ["full"]

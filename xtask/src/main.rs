@@ -64,7 +64,7 @@ fn update_msrv_lock() -> Result {
 
     pin_msrv_versions(dry_run, &sh, &cargo, &lockfile)?;
 
-    cmd!(sh, "{cargo} +{msrv} test --no-run --all-features").run_if(dry_run)?;
+    cmd!(sh, "cargo +{msrv} test --no-run --all-features").run_if(dry_run)?;
 
     cmd!(sh, "cp {lockfile} {ci_dir}/Cargo.lock.msrv").run_if(dry_run)?;
 
@@ -86,7 +86,7 @@ fn update_min_lock() -> Result {
 
     cmd!(
         sh,
-        "{cargo} +nightly -Z minimal-versions test --no-run --all-features"
+        "cargo +nightly -Z minimal-versions test --package neo4rs --no-run --all-features"
     )
     .env("RUST_LOG", "debug")
     .run_if(dry_run)?;
@@ -99,12 +99,7 @@ fn update_min_lock() -> Result {
 fn pin_msrv_versions(dry_run: bool, sh: &Shell, cargo: &str, lockfile: &str) -> Result<()> {
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
-    let pin_versions: &[(String, &str)] = &[
-        ("backon".to_owned(), "1.5.2"),
-        ("idna_adapter".to_owned(), "1.2.0"),
-        ("litemap".to_owned(), "0.7.5"),
-        ("home".to_owned(), "0.5.11"),
-    ];
+    let pin_versions: &[(&str, &str)] = &[("nalgebra", "0.32.6")];
     for (krate, version) in pin_versions {
         pin_version(dry_run, sh, cargo, krate, version)?;
     }
