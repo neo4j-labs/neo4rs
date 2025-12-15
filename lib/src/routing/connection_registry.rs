@@ -67,13 +67,14 @@ impl ConnectionRegistry {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        router: Option<ConnectionPool>,
     ) -> Vec<BoltServer> {
         if let Some(db_name) = db.as_deref() {
             if let Some(table) = self.databases.get(db_name) {
                 if table.is_expired() {
                     debug!("Routing table for database {db_name} is expired");
                     match self
-                        .fetch_routing_table(db.clone(), imp_user, bookmarks)
+                        .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
                         .await
                     {
                         Ok(new_table) => {
@@ -92,7 +93,7 @@ impl ConnectionRegistry {
                 }
             } else {
                 match self
-                    .fetch_routing_table(db.clone(), imp_user, bookmarks)
+                    .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
                     .await
                 {
                     Ok(new_table) => {
@@ -109,7 +110,7 @@ impl ConnectionRegistry {
             }
         } else {
             match self
-                .fetch_routing_table(db.clone(), imp_user, bookmarks)
+                .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
                 .await
             {
                 Ok(new_table) => {
@@ -170,10 +171,11 @@ impl ConnectionRegistry {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        router: Option<ConnectionPool>,
     ) -> Result<RoutingTable, Error> {
         let table = self
             .provider
-            .fetch_routing_table(bookmarks, db, imp_user)
+            .fetch_routing_table(bookmarks, db, imp_user, router)
             .await?;
         self.update(&self.config, &table)?;
         Ok(table)
@@ -183,8 +185,9 @@ impl ConnectionRegistry {
         &self,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        router: Option<ConnectionPool>,
     ) -> Result<Option<Database>, Error> {
-        let routing_table = self.fetch_routing_table(None, imp_user, bookmarks).await?;
+        let routing_table = self.fetch_routing_table(None, imp_user, bookmarks, router).await?;
         Ok(routing_table.db)
     }
 }
@@ -229,7 +232,8 @@ mod tests {
             _bookmarks: &[String],
             db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
-        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+            _router: Option<ConnectionPool>,
+        ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
             let vec = self.routing_tables.clone();
             if let Some(db) = db {
                 if let Some(table) = vec.iter().find(|t| t.db.as_ref() == Some(&db)) {

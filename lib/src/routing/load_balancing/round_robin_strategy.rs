@@ -8,6 +8,7 @@ pub struct RoundRobinStrategy {
     connection_registry: Arc<ConnectionRegistry>,
     reader_index: AtomicUsize,
     writer_index: AtomicUsize,
+    router_index: AtomicUsize,
 }
 
 impl RoundRobinStrategy {
@@ -16,6 +17,7 @@ impl RoundRobinStrategy {
             connection_registry,
             reader_index: AtomicUsize::new(0),
             writer_index: AtomicUsize::new(0),
+            router_index: AtomicUsize::new(0),
         }
     }
 
@@ -86,6 +88,25 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
         all_writers.sort_by(|a, b| a.address.cmp(&b.address));
         Self::select(&all_writers, &writers, &self.writer_index)
     }
+
+    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        let routers = servers
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+        let mut all_routers = self
+            .connection_registry
+            .all_servers()
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+
+        // Sort all routers by address to ensure consistent ordering
+        all_routers.sort_by(|a, b| a.address.cmp(&b.address));
+        Self::select(&all_routers, &routers, &self.router_index)
+    }
 }
 
 #[cfg(test)]
@@ -107,7 +128,8 @@ mod tests {
             _bookmarks: &[String],
             _db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
-        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+            _router: Option<crate::pool::ConnectionPool>,
+        ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
             unimplemented!()
         }
     }

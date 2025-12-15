@@ -38,9 +38,17 @@ impl RoutedConnectionManager {
         bookmarks: &[String],
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
+
+        let router = loop {
+            if let Some(selected_router) = self.select_router(&self.connection_registry.all_servers()) {
+                debug!("Selected router: {selected_router:?}");
+                break self.connection_registry.get_server_pool(&selected_router);
+            } else { break None; };
+        };
+
         let servers = self
             .connection_registry
-            .servers(db.clone(), imp_user.clone(), bookmarks)
+            .servers(db.clone(), imp_user.clone(), bookmarks, router)
             .await;
 
         loop {
@@ -107,5 +115,9 @@ impl RoutedConnectionManager {
 
     fn select_writer(&self, servers: &[BoltServer]) -> Option<BoltServer> {
         self.load_balancing_strategy.select_writer(servers)
+    }
+
+    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        self.load_balancing_strategy.select_router(servers)
     }
 }

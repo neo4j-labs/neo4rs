@@ -1,5 +1,6 @@
 use crate::config::ImpersonateUser;
-use crate::connection::{Connection, ConnectionInfo};
+use crate::connection::ConnectionInfo;
+use crate::pool::{create_pool, ConnectionPool};
 use crate::routing::{RouteBuilder, RoutingTable};
 use crate::{Config, Database, Error};
 use std::future::Future;
@@ -11,16 +12,19 @@ pub(crate) trait RoutingTableProvider: Send + Sync {
         bookmarks: &[String],
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
-    ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>>;
+        router: Option<ConnectionPool>,
+    ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>>;
 }
 
 pub struct ClusterRoutingTableProvider {
     config: Config,
+    pool: ConnectionPool,
 }
 
 impl ClusterRoutingTableProvider {
     pub fn new(config: Config) -> Self {
-        ClusterRoutingTableProvider { config }
+        let pool = create_pool(&config).unwrap();
+        ClusterRoutingTableProvider { config, pool }
     }
 }
 
@@ -30,8 +34,10 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
         bookmarks: &[String],
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
-    ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+        router: Option<ConnectionPool>,
+    ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
         let config = self.config.clone();
+        let pool = router.unwrap_or(self.pool.clone());
         let bookmarks = bookmarks.to_vec();
         Box::pin(async move {
             let info = ConnectionInfo::new(
@@ -40,7 +46,8 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
                 &config.password,
                 &config.tls_config,
             )?;
-            let mut connection = Connection::new(&info).await?;
+            let mut connection = pool.get().await?;
+            let version = connection.version();
             let mut builder = RouteBuilder::new(info.init.routing, bookmarks);
             if let Some(db) = db.clone() {
                 if !db.is_empty() {
@@ -52,7 +59,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
                     builder = builder.with_imp_user(imp_user);
                 }
             }
-            connection.route(builder.build(connection.version())).await
+            connection.route(builder.build(version)).await
         })
     }
 }
