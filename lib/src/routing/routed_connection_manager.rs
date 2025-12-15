@@ -39,11 +39,13 @@ impl RoutedConnectionManager {
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
 
-        let router = loop {
-            if let Some(selected_router) = self.select_router(&self.connection_registry.all_servers()) {
-                debug!("Selected router: {selected_router:?}");
-                break self.connection_registry.get_server_pool(&selected_router);
-            } else { break None; };
+        let router = if let Some(selected_router) =
+            self.select_router(&self.connection_registry.all_servers())
+        {
+            debug!("Selected router: {selected_router:?}");
+            self.connection_registry.get_server_pool(&selected_router)
+        } else {
+            None
         };
 
         let servers = self
@@ -100,8 +102,11 @@ impl RoutedConnectionManager {
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
     ) -> Result<Option<Database>, Error> {
+        let router = self
+            .select_router(&self.connection_registry.all_servers())
+            .map(|server| self.connection_registry.get_server_pool(&server).unwrap());
         self.connection_registry
-            .get_default_db(imp_user, bookmarks)
+            .get_default_db(imp_user, bookmarks, router)
             .await
     }
 
