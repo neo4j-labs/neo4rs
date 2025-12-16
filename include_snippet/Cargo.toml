@@ -9,5 +9,7 @@ publish = true
 [lib]
 proc-macro = true
 
-[dependencies]
-unsynn = { version = "0.2.1", default-features = false }
+[dependencies.unsynn]
+default-features = false
+# 0.3.0 is broken on MSRV, it reports a wrong rust-version (actually required 1.88)
+version = "0.2.1"

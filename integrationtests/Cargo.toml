@@ -50,11 +50,11 @@ default-features = false
 features = ["version_lite"]
 
 [dev-dependencies.testcontainers]
-version = "0.25.2"
+version = "0.26.0"
 features = ["blocking"]
 
 [dev-dependencies.testcontainers-modules]
-version = "0.13.0"
+version = "0.14.0"
 features = ["neo4j"]
 
 [dependencies.tokio]
