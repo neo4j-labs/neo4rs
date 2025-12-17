@@ -39,6 +39,7 @@ impl RoutedConnectionManager {
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
 
+        // We need to ensure that the router is selected before attempting to get a server pool.
         let router = if let Some(selected_router) =
             self.select_router(&self.connection_registry.all_servers())
         {
@@ -48,6 +49,10 @@ impl RoutedConnectionManager {
             None
         };
 
+        // We request the list of servers for the selected db.
+        // If db is None, we will fetch the default database from the router.
+        // If something goes wrong, we will return an empty list of servers: this will cause
+        // the connection manager to fail.
         let servers = self
             .connection_registry
             .servers(db.clone(), imp_user.clone(), bookmarks, router)
@@ -97,7 +102,7 @@ impl RoutedConnectionManager {
         }
     }
 
-    pub async fn get_default_db(
+    pub(crate) async fn get_default_db(
         &self,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],

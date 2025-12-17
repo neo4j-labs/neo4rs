@@ -21,6 +21,16 @@ impl RoundRobinStrategy {
         }
     }
 
+    // Note: Using Relaxed ordering is appropriate here because:
+    // - The index counter doesn't need to synchronize with any other memory operations
+    // - We only care about getting a different index value across threads for load balancing
+    // - The correctness of server selection doesn't depend on memory ordering guarantees
+    // - If races occur, worst case is we select a server slightly out of order, which is acceptable
+    //
+    // Acquire/Release would be needed if:
+    // - We were synchronizing access to shared data based on the index value
+    // - The index acted as a guard for other memory operations
+    // - We needed happens-before relationships with other threads
     fn select(
         all_servers: &[BoltServer],
         servers: &[BoltServer],
