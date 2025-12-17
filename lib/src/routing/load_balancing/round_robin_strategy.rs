@@ -129,7 +129,7 @@ mod tests {
             _db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
             _router: Option<crate::pool::ConnectionPool>,
-        ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
+        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
             unimplemented!()
         }
     }

@@ -13,7 +13,7 @@ pub(crate) trait RoutingTableProvider: Send + Sync {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         router: Option<ConnectionPool>,
-    ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>>;
+    ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>>;
 }
 
 pub struct ClusterRoutingTableProvider {
@@ -35,7 +35,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
         db: Option<Database>,
         imp_user: Option<ImpersonateUser>,
         router: Option<ConnectionPool>,
-    ) -> Pin<Box<dyn Future<Output=Result<RoutingTable, Error>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
         let config = self.config.clone();
         let pool = router.unwrap_or(self.pool.clone());
         let bookmarks = bookmarks.to_vec();
