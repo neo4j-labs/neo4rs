@@ -8,6 +8,7 @@ pub struct RoundRobinStrategy {
     connection_registry: Arc<ConnectionRegistry>,
     reader_index: AtomicUsize,
     writer_index: AtomicUsize,
+    router_index: AtomicUsize,
 }
 
 impl RoundRobinStrategy {
@@ -16,9 +17,20 @@ impl RoundRobinStrategy {
             connection_registry,
             reader_index: AtomicUsize::new(0),
             writer_index: AtomicUsize::new(0),
+            router_index: AtomicUsize::new(0),
         }
     }
 
+    // Note: Using Relaxed ordering is appropriate here because:
+    // - The index counter doesn't need to synchronize with any other memory operations
+    // - We only care about getting a different index value across threads for load balancing
+    // - The correctness of server selection doesn't depend on memory ordering guarantees
+    // - If races occur, worst case is we select a server slightly out of order, which is acceptable
+    //
+    // Acquire/Release would be needed if:
+    // - We were synchronizing access to shared data based on the index value
+    // - The index acted as a guard for other memory operations
+    // - We needed happens-before relationships with other threads
     fn select(
         all_servers: &[BoltServer],
         servers: &[BoltServer],
@@ -86,6 +98,25 @@ impl LoadBalancingStrategy for RoundRobinStrategy {
         all_writers.sort_by(|a, b| a.address.cmp(&b.address));
         Self::select(&all_writers, &writers, &self.writer_index)
     }
+
+    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        let routers = servers
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+        let mut all_routers = self
+            .connection_registry
+            .all_servers()
+            .iter()
+            .filter(|s| s.role == "ROUTE")
+            .cloned()
+            .collect::<Vec<BoltServer>>();
+
+        // Sort all routers by address to ensure consistent ordering
+        all_routers.sort_by(|a, b| a.address.cmp(&b.address));
+        Self::select(&all_routers, &routers, &self.router_index)
+    }
 }
 
 #[cfg(test)]
@@ -107,6 +138,7 @@ mod tests {
             _bookmarks: &[String],
             _db: Option<Database>,
             _imp_user: Option<ImpersonateUser>,
+            _router: Option<crate::pool::ConnectionPool>,
         ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
             unimplemented!()
         }

@@ -38,9 +38,24 @@ impl RoutedConnectionManager {
         bookmarks: &[String],
     ) -> Result<ManagedConnection, Error> {
         let op = operation.unwrap_or(Operation::Write);
+
+        // We need to ensure that the router is selected before attempting to get a server pool.
+        let router = if let Some(selected_router) =
+            self.select_router(&self.connection_registry.all_servers())
+        {
+            debug!("Selected router: {selected_router:?}");
+            self.connection_registry.get_server_pool(&selected_router)
+        } else {
+            None
+        };
+
+        // We request the list of servers for the selected db.
+        // If db is None, we will fetch the default database from the router.
+        // If something goes wrong, we will return an empty list of servers: this will cause
+        // the connection manager to fail.
         let servers = self
             .connection_registry
-            .servers(db.clone(), imp_user.clone(), bookmarks)
+            .servers(db.clone(), imp_user.clone(), bookmarks, router)
             .await;
 
         loop {
@@ -87,13 +102,16 @@ impl RoutedConnectionManager {
         }
     }
 
-    pub async fn get_default_db(
+    pub(crate) async fn get_default_db(
         &self,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
     ) -> Result<Option<Database>, Error> {
+        let router = self
+            .select_router(&self.connection_registry.all_servers())
+            .map(|server| self.connection_registry.get_server_pool(&server).unwrap());
         self.connection_registry
-            .get_default_db(imp_user, bookmarks)
+            .get_default_db(imp_user, bookmarks, router)
             .await
     }
 
@@ -107,5 +125,9 @@ impl RoutedConnectionManager {
 
     fn select_writer(&self, servers: &[BoltServer]) -> Option<BoltServer> {
         self.load_balancing_strategy.select_writer(servers)
+    }
+
+    fn select_router(&self, servers: &[BoltServer]) -> Option<BoltServer> {
+        self.load_balancing_strategy.select_router(servers)
     }
 }
