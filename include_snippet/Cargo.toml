@@ -1,0 +1,15 @@
+[package]
+name = "neo4rs_include_snippet"
+version = "0.9.0-rc.8"
+edition = "2021"
+description = "Internal proc macro for the include_snippet! macro"
+rust-version = "1.81"
+publish = true
+
+[lib]
+proc-macro = true
+
+[dependencies.unsynn]
+default-features = false
+# 0.3.0 is broken on MSRV, it reports a wrong rust-version (actually required 1.88)
+version = "0.2.1"

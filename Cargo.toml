@@ -1,8 +1,4 @@
 [workspace]
 resolver = "2"
 
-members = [
-    "lib",
-    "macros",
-    "xtask",
-]
+members = ["lib", "macros", "include_snippet", "xtask"]

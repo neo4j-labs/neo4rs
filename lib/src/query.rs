@@ -258,7 +258,7 @@ pub(crate) struct RetryableQuery<'a> {
     bookmarks: Vec<String>,
 }
 
-impl<'a> RetryableQuery<'a> {
+impl RetryableQuery<'_> {
     pub(crate) async fn retry_run(self) -> (Self, QueryResult<RunResult>) {
         let result = self.run().await;
         (self, result)
