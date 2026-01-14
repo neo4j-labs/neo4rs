@@ -145,7 +145,7 @@ impl Graph {
             &[],
             Some(self.config.fetch_size),
         )
-        .await
+            .await
     }
 
     /// Starts a new transaction on the configured database specifying the desired operation.
@@ -166,7 +166,7 @@ impl Graph {
             bookmarks.as_deref().unwrap_or_default(),
             Some(self.config.fetch_size),
         )
-        .await
+            .await
     }
 
     /// Starts a new transaction on the provided database.
@@ -182,7 +182,7 @@ impl Graph {
             &[],
             Some(self.config.fetch_size),
         )
-        .await
+            .await
     }
 
     #[allow(unused_variables)]
@@ -208,7 +208,7 @@ impl Graph {
                 imp_user,
                 bookmarks,
             )
-            .await
+                .await
         }
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
         {
@@ -235,7 +235,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     /// Runs a query on the provided database using a connection from the connection pool.
@@ -262,7 +262,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
@@ -274,7 +274,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     #[allow(unused_variables)]
@@ -324,7 +324,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     /// Executes a query READ on the configured database and returns a [`DetachedRowStream`]
@@ -342,7 +342,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -366,7 +366,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     /// Executes a query on the provided database and returns a [`DetachedRowStream`]
@@ -388,7 +388,7 @@ impl Graph {
             Some(self.config.fetch_size),
             q.into(),
         )
-        .await
+            .await
     }
 
     #[allow(unused_variables)]
@@ -433,7 +433,7 @@ impl Graph {
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     /// Creates a new session with the given configuration.
     /// A session is a wrapper around the graph instance. It will keep references
-    /// to the impersonaed user, to the default database and to the bookmarks.
+    /// to the impersonated user, to the default database and to the bookmarks.
     pub fn with_session(&self, config: Option<SessionConfig>) -> Session {
         Session::new(config.unwrap_or_default(), Arc::new(self.clone()))
     }
