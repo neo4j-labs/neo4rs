@@ -137,6 +137,7 @@ pub enum Neo4jSecurityErrorKind {
     Authentication,
     AuthorizationExpired,
     TokenExpired,
+    Forbidden,
     Other,
     Unknown,
 }
@@ -173,6 +174,9 @@ impl Neo4jErrorKind {
                 ),
                 (Some("Security"), Some("TokenExpired")) => Self::Client(
                     Neo4jClientErrorKind::Security(Neo4jSecurityErrorKind::TokenExpired),
+                ),
+                (Some("Security"), Some("Forbidden")) => Self::Client(
+                    Neo4jClientErrorKind::Security(Neo4jSecurityErrorKind::Forbidden),
                 ),
                 (Some("Database"), Some("DatabaseNotFound")) => {
                     Self::Client(Neo4jClientErrorKind::FatalDiscovery)
