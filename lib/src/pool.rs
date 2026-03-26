@@ -24,8 +24,10 @@ impl ConnectionManager {
         user: &str,
         password: &str,
         tls_config: &ConnectionTLSConfig,
+        connection_timeout: Duration,
+        tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
-        let info = ConnectionInfo::new(uri, user, password, tls_config)?;
+        let info = ConnectionInfo::new(uri, user, password, tls_config, connection_timeout, tcp_keepalive)?;
         let backoff = backoff();
         Ok(ConnectionManager { info, backoff })
     }
@@ -56,7 +58,13 @@ impl Manager for ConnectionManager {
 
     async fn recycle(&self, obj: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
         trace!("recycling connection");
-        Ok(obj.reset().await?)
+        match tokio::time::timeout(Duration::from_secs(5), obj.reset()).await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(e)) => Err(deadpool::managed::RecycleError::Backend(e)),
+            Err(_) => Err(deadpool::managed::RecycleError::message(
+                "Connection health check timed out",
+            )),
+        }
     }
 }
 
@@ -66,13 +74,31 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         &config.user,
         &config.password,
         &config.tls_config,
+        config.connection_timeout,
+        config.tcp_keepalive,
     )?;
     info!(
         "creating connection pool for node {} with max size {}",
         config.uri, config.max_connections
     );
-    Ok(ConnectionPool::builder(mgr)
-        .max_size(config.max_connections)
-        .build()
-        .expect("No timeouts configured"))
+    let mut builder = ConnectionPool::builder(mgr)
+        .max_size(config.max_connections);
+
+    // Wire idle_timeout as the recycle timeout — connections idle longer than this
+    // will fail the recycle check, causing deadpool to discard and recreate them.
+    if let Some(idle_timeout) = config.idle_timeout {
+        builder = builder
+            .recycle_timeout(Some(idle_timeout))
+            .runtime(deadpool::Runtime::Tokio1);
+    }
+
+    // Wire max_lifetime as the wait timeout — puts an upper bound on how long
+    // a caller will wait for a connection from the pool.
+    if let Some(max_lifetime) = config.max_lifetime {
+        builder = builder
+            .wait_timeout(Some(max_lifetime))
+            .runtime(deadpool::Runtime::Tokio1);
+    }
+
+    Ok(builder.build().expect("Pool build failed"))
 }

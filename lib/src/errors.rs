@@ -111,6 +111,9 @@ pub enum Error {
 
     #[error("{0}")]
     ServerUnavailableError(String),
+
+    #[error("connection timed out")]
+    ConnectionTimedOut,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

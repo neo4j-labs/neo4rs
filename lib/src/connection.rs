@@ -26,6 +26,7 @@ use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use std::fmt::{Debug, Display, Formatter};
+use std::time::Duration;
 use std::{fs::File, io::BufReader, mem, sync::Arc};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufStream},
@@ -46,6 +47,8 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 pub struct Connection {
     version: Version,
     stream: BufStream<ConnectionStream>,
+    /// Timeout applied to recv operations to prevent hanging on broken connections.
+    recv_timeout: Duration,
     #[allow(unused)]
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     hints: Option<ConnectionsHints>,
@@ -63,22 +66,46 @@ impl Connection {
         self.version
     }
 
+    /// Configure TCP keepalive on the given `TcpStream` using `socket2`.
+    fn configure_tcp_keepalive(stream: &TcpStream, keepalive: Option<Duration>) -> Result<()> {
+        if let Some(interval) = keepalive {
+            let sock_ref = socket2::SockRef::from(stream);
+            let keepalive = socket2::TcpKeepalive::new()
+                .with_time(interval)
+                .with_interval(Duration::from_secs(10));
+            #[cfg(not(windows))]
+            let keepalive = keepalive.with_retries(3);
+            sock_ref.set_tcp_keepalive(&keepalive)?;
+        }
+        Ok(())
+    }
+
     pub(crate) async fn prepare(opts: &PrepareOpts) -> Result<Self> {
-        let mut stream = match &opts.host {
-            Host::Domain(domain) => TcpStream::connect((&**domain, opts.port)).await?,
-            Host::Ipv4(ip) => TcpStream::connect((*ip, opts.port)).await?,
-            Host::Ipv6(ip) => TcpStream::connect((*ip, opts.port)).await?,
+        let timeout_dur = opts.connection_timeout;
+        let connect_future = async {
+            match &opts.host {
+                Host::Domain(domain) => TcpStream::connect((&**domain, opts.port)).await,
+                Host::Ipv4(ip) => TcpStream::connect((*ip, opts.port)).await,
+                Host::Ipv6(ip) => TcpStream::connect((*ip, opts.port)).await,
+            }
         };
+        let stream = tokio::time::timeout(timeout_dur, connect_future)
+            .await
+            .map_err(|_| Error::ConnectionTimedOut)??;
+
+        // Configure TCP keepalive on the raw socket
+        Self::configure_tcp_keepalive(&stream, opts.tcp_keepalive)?;
 
         Ok(match &opts.encryption {
             Some((connector, domain)) => {
                 let mut stream = connector.connect(domain.clone(), stream).await?;
                 let version = Self::init(&mut stream).await?;
-                Self::create(stream, version)
+                Self::create(stream, version, timeout_dur)
             }
             None => {
+                let mut stream = stream;
                 let version = Self::init(&mut stream).await?;
-                Self::create(stream, version)
+                Self::create(stream, version, timeout_dur)
             }
         })
     }
@@ -94,10 +121,11 @@ impl Connection {
         Ok(version)
     }
 
-    fn create(stream: impl Into<ConnectionStream>, version: Version) -> Connection {
+    fn create(stream: impl Into<ConnectionStream>, version: Version, recv_timeout: Duration) -> Connection {
         Connection {
             version,
             stream: BufStream::new(stream.into()),
+            recv_timeout,
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             hints: None,
         }
@@ -198,7 +226,9 @@ impl Connection {
     }
 
     pub async fn recv(&mut self) -> Result<BoltResponse> {
-        let bytes = self.recv_bytes().await?;
+        let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
+            .await
+            .map_err(|_| Error::ConnectionTimedOut)??;
         BoltResponse::parse(self.version, bytes)
     }
 
@@ -307,6 +337,8 @@ pub(crate) struct PrepareOpts {
     pub(crate) host: Host<Arc<str>>,
     pub(crate) port: u16,
     pub(crate) encryption: Option<(TlsConnector, ServerName<'static>)>,
+    pub(crate) connection_timeout: Duration,
+    pub(crate) tcp_keepalive: Option<Duration>,
 }
 
 impl Debug for PrepareOpts {
@@ -384,6 +416,8 @@ impl ConnectionInfo {
         user: &str,
         password: &str,
         tls_config: &ConnectionTLSConfig,
+        connection_timeout: Duration,
+        tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
         let mut url = NeoUrl::parse(uri)?;
 
@@ -437,6 +471,8 @@ impl ConnectionInfo {
             host,
             port: url.port(),
             encryption,
+            connection_timeout,
+            tcp_keepalive,
         };
 
         let init = InitOpts {

@@ -3,10 +3,12 @@ use crate::errors::{Error, Result};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
+const DEFAULT_CONNECTION_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_TCP_KEEPALIVE: Option<Duration> = Some(Duration::from_secs(60));
 
 /// Newtype for the name of the database.
 /// Stores the name as an `Arc<str>` to avoid cloning the name around.
@@ -131,6 +133,14 @@ pub struct Config {
     pub(crate) fetch_size: usize,
     pub(crate) imp_user: Option<ImpersonateUser>,
     pub(crate) tls_config: ConnectionTLSConfig,
+    /// Timeout for establishing a new connection and for read operations.
+    pub(crate) connection_timeout: Duration,
+    /// TCP keepalive interval. If `Some`, TCP keepalive is enabled on the socket.
+    pub(crate) tcp_keepalive: Option<Duration>,
+    /// Maximum idle time for a connection in the pool before it is discarded.
+    pub(crate) idle_timeout: Option<Duration>,
+    /// Maximum lifetime of a connection in the pool before it is discarded.
+    pub(crate) max_lifetime: Option<Duration>,
 }
 
 impl Config {
@@ -153,6 +163,10 @@ pub struct ConfigBuilder {
     max_connections: usize,
     imp_user: Option<ImpersonateUser>,
     tls_config: ConnectionTLSConfig,
+    connection_timeout: Duration,
+    tcp_keepalive: Option<Duration>,
+    idle_timeout: Option<Duration>,
+    max_lifetime: Option<Duration>,
 }
 
 impl ConfigBuilder {
@@ -240,6 +254,39 @@ impl ConfigBuilder {
         self
     }
 
+    /// The timeout for establishing a new connection and for read operations.
+    ///
+    /// Defaults to 30 seconds if not set.
+    pub fn connection_timeout(mut self, timeout: Duration) -> Self {
+        self.connection_timeout = timeout;
+        self
+    }
+
+    /// The TCP keepalive interval. Set to `Some(duration)` to enable TCP keepalive
+    /// on the underlying socket, or `None` to disable it.
+    ///
+    /// Defaults to `Some(60 seconds)` if not set.
+    pub fn tcp_keepalive(mut self, interval: Option<Duration>) -> Self {
+        self.tcp_keepalive = interval;
+        self
+    }
+
+    /// The maximum idle time for a connection in the pool before it is discarded.
+    ///
+    /// Defaults to `None` (no idle timeout) if not set.
+    pub fn idle_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.idle_timeout = timeout;
+        self
+    }
+
+    /// The maximum lifetime of a connection in the pool before it is discarded.
+    ///
+    /// Defaults to `None` (no maximum lifetime) if not set.
+    pub fn max_lifetime(mut self, lifetime: Option<Duration>) -> Self {
+        self.max_lifetime = lifetime;
+        self
+    }
+
     pub fn build(self) -> Result<Config> {
         if let (Some(uri), Some(user), Some(password)) = (self.uri, self.user, self.password) {
             Ok(Config {
@@ -251,6 +298,10 @@ impl ConfigBuilder {
                 db: self.db,
                 imp_user: self.imp_user,
                 tls_config: self.tls_config,
+                connection_timeout: self.connection_timeout,
+                tcp_keepalive: self.tcp_keepalive,
+                idle_timeout: self.idle_timeout,
+                max_lifetime: self.max_lifetime,
             })
         } else {
             Err(Error::InvalidConfig)
@@ -269,6 +320,10 @@ impl Default for ConfigBuilder {
             imp_user: None,
             fetch_size: DEFAULT_FETCH_SIZE,
             tls_config: ConnectionTLSConfig::None,
+            connection_timeout: DEFAULT_CONNECTION_TIMEOUT,
+            tcp_keepalive: DEFAULT_TCP_KEEPALIVE,
+            idle_timeout: None,
+            max_lifetime: None,
         }
     }
 }
