@@ -388,6 +388,64 @@ mod tests {
     }
 
     #[test]
+    fn should_build_with_timeout_defaults() {
+        let config = ConfigBuilder::default()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .build()
+            .unwrap();
+        assert_eq!(config.connection_timeout, Duration::from_secs(30));
+        assert_eq!(config.tcp_keepalive, Some(Duration::from_secs(60)));
+        assert_eq!(config.idle_timeout, None);
+        assert_eq!(config.max_lifetime, None);
+    }
+
+    #[test]
+    fn should_build_with_custom_timeouts() {
+        let config = ConfigBuilder::default()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .connection_timeout(Duration::from_secs(10))
+            .tcp_keepalive(Some(Duration::from_secs(120)))
+            .idle_timeout(Some(Duration::from_secs(300)))
+            .max_lifetime(Some(Duration::from_secs(3600)))
+            .build()
+            .unwrap();
+        assert_eq!(config.connection_timeout, Duration::from_secs(10));
+        assert_eq!(config.tcp_keepalive, Some(Duration::from_secs(120)));
+        assert_eq!(config.idle_timeout, Some(Duration::from_secs(300)));
+        assert_eq!(config.max_lifetime, Some(Duration::from_secs(3600)));
+    }
+
+    #[test]
+    fn should_disable_tcp_keepalive() {
+        let config = ConfigBuilder::default()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .tcp_keepalive(None)
+            .build()
+            .unwrap();
+        assert_eq!(config.tcp_keepalive, None);
+    }
+
+    #[test]
+    fn should_set_idle_and_max_lifetime() {
+        let config = ConfigBuilder::default()
+            .uri("127.0.0.1:7687")
+            .user("some_user")
+            .password("some_password")
+            .idle_timeout(Some(Duration::from_secs(600)))
+            .max_lifetime(Some(Duration::from_secs(1800)))
+            .build()
+            .unwrap();
+        assert_eq!(config.idle_timeout, Some(Duration::from_secs(600)));
+        assert_eq!(config.max_lifetime, Some(Duration::from_secs(1800)));
+    }
+
+    #[test]
     fn should_reject_invalid_config() {
         assert!(ConfigBuilder::default()
             .user("some_user")

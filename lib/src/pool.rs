@@ -102,3 +102,36 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
 
     Ok(builder.build().expect("Pool build failed"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ConfigBuilder;
+    use std::time::Duration;
+
+    #[test]
+    fn should_create_pool_with_default_config() {
+        let config = ConfigBuilder::default()
+            .uri("bolt://127.0.0.1:7687")
+            .user("neo4j")
+            .password("test")
+            .build()
+            .unwrap();
+        let pool = create_pool(&config);
+        assert!(pool.is_ok());
+    }
+
+    #[test]
+    fn should_create_pool_with_idle_and_max_lifetime() {
+        let config = ConfigBuilder::default()
+            .uri("bolt://127.0.0.1:7687")
+            .user("neo4j")
+            .password("test")
+            .idle_timeout(Some(Duration::from_secs(300)))
+            .max_lifetime(Some(Duration::from_secs(3600)))
+            .build()
+            .unwrap();
+        let pool = create_pool(&config);
+        assert!(pool.is_ok());
+    }
+}
