@@ -266,24 +266,24 @@ impl ConfigBuilder {
     /// on the underlying socket, or `None` to disable it.
     ///
     /// Defaults to `Some(60 seconds)` if not set.
-    pub fn tcp_keepalive(mut self, interval: Option<Duration>) -> Self {
-        self.tcp_keepalive = interval;
+    pub fn tcp_keepalive(mut self, interval: impl Into<Option<Duration>>) -> Self {
+        self.tcp_keepalive = interval.into();
         self
     }
 
     /// The maximum idle time for a connection in the pool before it is discarded.
     ///
     /// Defaults to `None` (no idle timeout) if not set.
-    pub fn idle_timeout(mut self, timeout: Option<Duration>) -> Self {
-        self.idle_timeout = timeout;
+    pub fn idle_timeout(mut self, timeout: impl Into<Option<Duration>>) -> Self {
+        self.idle_timeout = timeout.into();
         self
     }
 
     /// The maximum lifetime of a connection in the pool before it is discarded.
     ///
     /// Defaults to `None` (no maximum lifetime) if not set.
-    pub fn max_lifetime(mut self, lifetime: Option<Duration>) -> Self {
-        self.max_lifetime = lifetime;
+    pub fn max_lifetime(mut self, lifetime: impl Into<Option<Duration>>) -> Self {
+        self.max_lifetime = lifetime.into();
         self
     }
 
