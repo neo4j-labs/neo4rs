@@ -27,7 +27,14 @@ impl ConnectionManager {
         connection_timeout: Duration,
         tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
-        let info = ConnectionInfo::new(uri, user, password, tls_config, connection_timeout, tcp_keepalive)?;
+        let info = ConnectionInfo::new(
+            uri,
+            user,
+            password,
+            tls_config,
+            connection_timeout,
+            tcp_keepalive,
+        )?;
         let backoff = backoff();
         Ok(ConnectionManager { info, backoff })
     }
@@ -81,8 +88,7 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         "creating connection pool for node {} with max size {}",
         config.uri, config.max_connections
     );
-    let mut builder = ConnectionPool::builder(mgr)
-        .max_size(config.max_connections);
+    let mut builder = ConnectionPool::builder(mgr).max_size(config.max_connections);
 
     // Wire idle_timeout as the recycle timeout — connections idle longer than this
     // will fail the recycle check, causing deadpool to discard and recreate them.

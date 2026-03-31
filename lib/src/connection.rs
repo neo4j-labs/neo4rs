@@ -121,7 +121,11 @@ impl Connection {
         Ok(version)
     }
 
-    fn create(stream: impl Into<ConnectionStream>, version: Version, recv_timeout: Duration) -> Connection {
+    fn create(
+        stream: impl Into<ConnectionStream>,
+        version: Version,
+        recv_timeout: Duration,
+    ) -> Connection {
         Connection {
             version,
             stream: BufStream::new(stream.into()),
