@@ -59,7 +59,7 @@ default-features = false
 features = ["std", "serde"]
 
 [dependencies.deadpool]
-version = "0.12.0"
+version = "0.12.0"       # 0.13 requires bumping MSRV to 1.85
 default-features = false
 features = ["managed"]
 
