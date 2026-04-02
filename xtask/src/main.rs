@@ -100,9 +100,14 @@ fn pin_msrv_versions(dry_run: bool, sh: &Shell, cargo: &str, lockfile: &str) -> 
     cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
 
     let pin_versions: &[(&str, &str)] = &[
-        ("backon", "1.5.2"),       // 1.6.0 bumped MSRV to 1.85
-        ("idna_adapter", "1.2.0"), // 1.2.1 requires 1.82, transitive from url
-        ("nalgebra", "0.32.6"),    // transitive requirement from nav_types,
+        ("backon", "1.5.2"),             // 1.6.0 requires 1.85
+        ("deranged", "0.5.5"),           // 0.5.6 requires 1.85
+        ("idna_adapter", "1.2.0"),       // 1.2.1 requires 1.82, transitive from url
+        ("nalgebra", "0.32.6"),          // transitive requirement from nav_types,
+        ("security-framework", "3.6.0"), // 3.7.0 requires 1.85
+        ("serde_with", "3.16.1"),        // 3.17.0 requires 1.82, 3.18.0 does 1.88
+        ("time", "0.3.44"),              // 0.3.45 requires 1.83, and 1.88 since 0.3.46
+        ("uuid", "1.20.0"),              // 1.21.0 requires 1.85, also brings in getrandom@0.4
     ];
     for (krate, version) in pin_versions {
         pin_version(dry_run, sh, cargo, krate, version)?;
