@@ -34,9 +34,14 @@
 //! * `fetch_size` - number of rows to fetch in batches (default is 200)
 //! * `max_connections` - maximum size of the connection pool (default is 16)
 //! * `db` - the database to connect to (default is `neo4j`)
+//! * `connection_timeout` - timeout for connection and recv operations (default is 30s)
+//! * `tcp_keepalive` - OS-level TCP keepalive for dead connection detection (default is Some(60s))
+//! * `idle_timeout` - duration after which idle connections are discarded from the pool (default is None)
+//! * `max_lifetime` - maximum lifetime of a connection before it is discarded from the pool (default is None)
 //!
 //! ```no_run
 //! use neo4rs::*;
+//! use std::time::Duration;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -47,6 +52,7 @@
 //!        .db("neo4j")
 //!        .fetch_size(500)
 //!        .max_connections(10)
+//!        .connection_timeout(Duration::from_secs(10))
 //!        .build()
 //!        .unwrap();
 //!    let graph = Graph::connect(config).unwrap();

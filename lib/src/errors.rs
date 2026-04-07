@@ -111,6 +111,9 @@ pub enum Error {
 
     #[error("{0}")]
     ServerUnavailableError(String),
+
+    #[error("connection timed out")]
+    ConnectionTimedOut,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -270,6 +273,17 @@ impl Neo4jError {
 
     pub(crate) fn can_retry(&self) -> bool {
         self.kind.can_retry()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_display_connection_timed_out() {
+        let error = Error::ConnectionTimedOut;
+        assert_eq!(format!("{}", error), "connection timed out");
     }
 }
 
