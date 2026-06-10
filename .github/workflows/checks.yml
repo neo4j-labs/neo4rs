@@ -18,6 +18,7 @@ on:
         type: choice
         options:
           - neo4rs
+          - neo4rs_include_snippet
           - neo4rs-macros
 
 env:
