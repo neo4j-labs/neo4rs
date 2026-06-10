@@ -29,23 +29,23 @@ unstable-bolt-protocol-impl-v2 = [
 ]
 
 [dependencies]
-bytes = { version = "1.5.0", features = ["serde"] }
-chrono-tz = "0.10.0"
-delegate = "0.13.0"
-futures = { version = "0.3.0" }
-log = "0.4.0"
+bytes = { version = "1.5", features = ["serde"] }
+chrono-tz = "0.10"
+delegate = "0.13"
+futures = { version = "0.3" }
+log = "0.4"
 nav-types = { version = "0.5.2", optional = true }
 neo4rs_include_snippet = { path = "../include_snippet" }
 neo4rs-macros = { version = "0.3.0", path = "../macros" }
-pastey = "0.2.0"
+pastey = "0.2"
 pin-project-lite = "0.2.9"
-rustls-native-certs = "0.8.0"
-rustls-pki-types = "1.9.0"
+rustls-native-certs = "0.8"
+rustls-pki-types = "1.9"
 serde = { version = "1.0.185", features = ["derive"] }                     # TODO: eliminate derive
-serde_json = { version = "1.0.0", optional = true }
-thiserror = "2.0.0"
+serde_json = { version = "1", optional = true }
+thiserror = "2"
 time = { version = "0.3.22", optional = true }
-url = "2.0.0"
+url = "2"
 uuid = { version = "1.18.1", features = ["serde", "v4"], optional = true }
 
 [dependencies.backon]
@@ -59,7 +59,7 @@ default-features = false
 features = ["std", "serde"]
 
 [dependencies.deadpool]
-version = "0.12.0"       # 0.13 requires bumping MSRV to 1.85
+version = "0.12"                     # 0.13 requires bumping MSRV to 1.85
 default-features = false
 features = ["managed", "rt_tokio_1"]
 
@@ -69,11 +69,11 @@ default-features = false
 features = ["tls12", "ring"]
 
 [dependencies.tokio]
-version = "1.5.0"
+version = "1.5"
 features = ["full"]
 
 [dependencies.tokio-rustls]
-version = "0.26.0"
+version = "0.26"
 default-features = false
 features = ["tls12", "ring"]
 
@@ -83,11 +83,11 @@ features = ["all"]
 
 [dev-dependencies]
 pretty_env_logger = "0.5.0"
-serde_bytes = "0.11.0"
-serde_json = "1.0.0"
+serde_bytes = "0.11"
+serde_json = "1"
 serde_test = "1.0.176"
-serde_with = "3.0.0"
+serde_with = "3"
 tap = "1.0.1"
 test-case = "3.3.1"
-time = { version = "0.3.0", features = ["serde"] }
-uuid = { version = "1.0.0", features = ["v4"] }
+time = { version = "0.3.22", features = ["serde"] }
+uuid = { version = "1.18.1", features = ["v4"] }
