@@ -23,7 +23,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use log::{info, warn};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::CryptoProvider;
-use rustls::pki_types::{CertificateDer, UnixTime};
+use rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use std::fmt::{Debug, Display, Formatter};
 use std::time::Duration;
@@ -511,8 +511,8 @@ impl ConnectionInfo {
             }
             ConnectionTLSConfig::ClientCACertificate(certificate) => {
                 let cert_file = File::open(&certificate.cert_file)?;
-                let mut reader = BufReader::new(cert_file);
-                let certs = rustls_pemfile::certs(&mut reader).flatten();
+                let reader = BufReader::new(cert_file);
+                let certs = CertificateDer::pem_reader_iter(reader).flatten();
                 root_cert_store.add_parsable_certificates(certs);
                 builder
                     .with_root_certificates(root_cert_store)
@@ -524,17 +524,19 @@ impl ConnectionInfo {
                 .with_no_client_auth(),
             ConnectionTLSConfig::MutualTLS(mutual) => {
                 let cert_file = File::open(&mutual.client_cert)?;
-                let mut cert_reader = BufReader::new(cert_file);
-                let cert_certs = rustls_pemfile::certs(&mut cert_reader).flatten();
+                let cert_reader = BufReader::new(cert_file);
+                let cert_certs = CertificateDer::pem_reader_iter(cert_reader).flatten();
 
                 let cert_key = File::open(&mutual.client_key)?;
-                let mut key_reader = BufReader::new(cert_key);
-                let keys = rustls_pemfile::private_key(&mut key_reader);
-                let keys = keys?.unwrap();
+                let key_reader = BufReader::new(cert_key);
+                let keys = PrivateKeyDer::pem_reader_iter(key_reader)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(std::io::Error::other);
+                let keys = keys?.pop().unwrap();
                 if mutual.cert_file.is_some() {
                     let root_cert_file = File::open(mutual.cert_file.as_ref().unwrap())?;
-                    let mut root_reader = BufReader::new(root_cert_file);
-                    let root_certs = rustls_pemfile::certs(&mut root_reader).flatten();
+                    let root_reader = BufReader::new(root_cert_file);
+                    let root_certs = CertificateDer::pem_reader_iter(root_reader).flatten();
                     root_cert_store.add_parsable_certificates(root_certs);
                     builder
                         .with_root_certificates(root_cert_store)
