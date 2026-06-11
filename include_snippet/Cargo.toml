@@ -1,8 +1,18 @@
 [package]
 name = "neo4rs_include_snippet"
 version = "0.9.0-rc.10"
+authors = [
+    "Neo4j Labs <devrel@neo4j.com>",
+    "John Pradeep Vincent <yehohanan7@gmail.com>",
+]
 edition = "2021"
 description = "Internal proc macro for the include_snippet! macro, used in the neo4rs crate"
+license = "MIT"
+repository = "https://github.com/neo4j-labs/neo4rs"
+documentation = "https://docs.rs/neo4rs"
+readme = "../README.md"
+keywords = ["neo4j", "driver", "bolt", "cypher", "tokio"]
+categories = ["database", "network-programming", "asynchronous"]
 rust-version = "1.81"
 publish = true
 
