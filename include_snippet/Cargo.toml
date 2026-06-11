@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs_include_snippet"
-version = "0.9.0-rc.8"
+version = "0.9.0-rc.10"
 edition = "2021"
 description = "Internal proc macro for the include_snippet! macro, used in the neo4rs crate"
 rust-version = "1.81"
