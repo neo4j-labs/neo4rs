@@ -24,7 +24,7 @@
 //!
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/example.rs")]
+#![doc = include_snippet!("integrationtests/example.rs")]
 //! }
 //! ```
 //!
@@ -57,7 +57,7 @@
 //!        .unwrap();
 //!    let graph = Graph::connect(config).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/configurations.rs")]
+#![doc = include_snippet!("integrationtests/configurations.rs")]
 //! }
 //! ```
 //!
@@ -76,7 +76,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/nodes.rs")]
+#![doc = include_snippet!("integrationtests/nodes.rs")]
 //! }
 //! ```
 //!
@@ -99,7 +99,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/transactions.rs")]
+#![doc = include_snippet!("integrationtests/transactions.rs")]
 //! }
 //!
 //! ```
@@ -125,7 +125,7 @@
 //!        .unwrap();
 //!    let graph = Graph::connect(config).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/streams_within_a_transaction.rs")]
+#![doc = include_snippet!("integrationtests/streams_within_a_transaction.rs")]
 //! }
 //!
 //! ```
@@ -149,7 +149,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/result_stream.rs")]
+#![doc = include_snippet!("integrationtests/result_stream.rs")]
 //! }
 //!
 //! ```
@@ -176,7 +176,7 @@ async fn main() {
 )]
 #![cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
-    doc = include_snippet!("../integrationtests/tests/bookmarks.rs")
+    doc = include_snippet!("integrationtests/bookmarks.rs")
 )]
 #![cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
@@ -206,7 +206,7 @@ async fn main() {
 )]
 #![cfg_attr(
     feature = "unstable-result-summary",
-    doc = include_snippet!("../integrationtests/tests/result_summary.rs")
+    doc = include_snippet!("integrationtests/result_summary.rs")
 )]
 #![cfg_attr(
     feature = "unstable-result-summary",
@@ -227,7 +227,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/rollback_a_transaction.rs")]
+#![doc = include_snippet!("integrationtests/rollback_a_transaction.rs")]
 //! }
 //!
 //! ```
@@ -252,7 +252,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/txn_vs_graph.rs")]
+#![doc = include_snippet!("integrationtests/txn_vs_graph.rs")]
 //! }
 //!
 //! ```
@@ -272,7 +272,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/relationships.rs")]
+#![doc = include_snippet!("integrationtests/relationships.rs")]
 //! }
 //! ```
 //!
@@ -289,7 +289,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/unbounded_relationships.rs")]
+#![doc = include_snippet!("integrationtests/unbounded_relationships.rs")]
 //! }
 //!
 //! ```
@@ -316,7 +316,7 @@ async fn main() {
 //!             point({ x: 1.1, y: 5.4, crs: 'cartesian' }) AS p2
 //!        RETURN point.distance(p1,p2) AS dist, p1, p2
 //!     ";
-#![doc = include_snippet!("../integrationtests/tests/points.rs")]
+#![doc = include_snippet!("integrationtests/points.rs")]
 //! }
 //!
 //! ```
@@ -334,7 +334,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/raw_bytes.rs")]
+#![doc = include_snippet!("integrationtests/raw_bytes.rs")]
 //! }
 //!
 //! ```
@@ -352,7 +352,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/durations.rs")]
+#![doc = include_snippet!("integrationtests/durations.rs")]
 //! }
 //!
 //! ```
@@ -372,7 +372,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/dates.rs")]
+#![doc = include_snippet!("integrationtests/dates.rs")]
 //! }
 //! ```
 //!
@@ -401,7 +401,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/time_as_param.rs")]
+#![doc = include_snippet!("integrationtests/time_as_param.rs")]
 //! }
 //! ```
 //!
@@ -418,7 +418,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/parse_time_from_result.rs")]
+#![doc = include_snippet!("integrationtests/parse_time_from_result.rs")]
 //! }
 //!
 //! ```
@@ -449,7 +449,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/datetime_as_param.rs")]
+#![doc = include_snippet!("integrationtests/datetime_as_param.rs")]
 //! }
 //! ```
 //!
@@ -465,7 +465,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/parse_datetime_from_result.rs")]
+#![doc = include_snippet!("integrationtests/parse_datetime_from_result.rs")]
 //! }
 //!
 //! ```
@@ -484,7 +484,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_snippet!("../integrationtests/tests/path.rs")]
+#![doc = include_snippet!("integrationtests/path.rs")]
 //! }
 //! ```
 //!
