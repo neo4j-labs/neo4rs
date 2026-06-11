@@ -35,7 +35,7 @@ delegate = "0.13"
 futures = { version = "0.3" }
 log = "0.4"
 nav-types = { version = "0.5.2", optional = true }
-neo4rs_include_snippet = { path = "../include_snippet" }
+neo4rs_include_snippet = { version = "0.9.0-rc.10", path = "../include_snippet" }
 neo4rs-macros = { version = "0.3.0", path = "../macros" }
 pastey = "0.2"
 pin-project-lite = "0.2.9"
