@@ -62,21 +62,7 @@ fn update_msrv_lock() -> Result {
         .read()
     }?;
 
-    cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
-
-    let pin_versions: &[(String, &str)] = &[
-        ("idna_adapter".to_owned(), "1.2.0"),
-        ("litemap".to_owned(), "0.7.4"),
-        ("home".to_owned(), "0.5.9"),
-        ("serde_with".to_owned(), "3.14.1"),
-        ("testcontainers".to_owned(), "0.23.1"),
-        ("testcontainers-modules".to_owned(), "0.11.4"),
-        ("time".to_owned(), "0.3.41"),
-        ("zerofrom".to_owned(), "0.1.5"),
-    ];
-    for (krate, version) in pin_versions {
-        pin_version(dry_run, &sh, &cargo, krate, version)?;
-    }
+    pin_msrv_versions(dry_run, &sh, &cargo, &lockfile)?;
 
     cmd!(sh, "cargo +{msrv} test --no-run --all-features").run_if(dry_run)?;
 
@@ -96,26 +82,11 @@ fn update_min_lock() -> Result {
     let sh = Shell::new()?;
     let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
 
-    cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
-
-    let pin_versions: &[(String, &str)] = &[
-        ("idna_adapter".to_owned(), "1.2.0"),
-        ("litemap".to_owned(), "0.7.4"),
-        ("home".to_owned(), "0.5.9"),
-        ("serde_repr".to_owned(), "0.1.5"),
-        ("serde_with".to_owned(), "3.14.1"),
-        ("testcontainers".to_owned(), "0.23.1"),
-        ("testcontainers-modules".to_owned(), "0.11.4"),
-        ("time".to_owned(), "0.3.41"),
-        ("zerofrom".to_owned(), "0.1.5"),
-    ];
-    for (krate, version) in pin_versions {
-        pin_version(dry_run, &sh, &cargo, krate, version)?;
-    }
+    pin_msrv_versions(dry_run, &sh, &cargo, &lockfile)?;
 
     cmd!(
         sh,
-        "cargo +nightly -Z minimal-versions test --no-run --all-features"
+        "cargo +nightly -Z minimal-versions test --package neo4rs --no-run --all-features"
     )
     .env("RUST_LOG", "debug")
     .run_if(dry_run)?;
@@ -125,12 +96,35 @@ fn update_min_lock() -> Result {
     Ok(())
 }
 
+fn pin_msrv_versions(dry_run: bool, sh: &Shell, cargo: &str, lockfile: &str) -> Result<()> {
+    cmd!(sh, "rm {lockfile}").run_if(dry_run)?;
+
+    let indexmap_dep = latest_version(sh, "indexmap")?;
+
+    let pin_versions = &[
+        ("backon", "1.5.2"),             // 1.6.0 requires 1.85
+        ("deranged", "0.5.5"),           // 0.5.6 requires 1.85
+        ("idna_adapter", "1.2.0"),       // 1.2.1 requires 1.82, transitive from url
+        ("nalgebra", "0.32.6"),          // transitive requirement from nav_types,
+        ("security-framework", "3.6.0"), // 3.7.0 requires 1.85
+        ("serde_with", "3.16.1"),        // 3.17.0 requires 1.82, 3.18.0 does 1.88
+        (indexmap_dep, "2.11.4"),        // 2.12.0 requires 1.82, 2.14.0 does 1.85
+        ("time", "0.3.44"),              // 0.3.45 requires 1.83, and 1.88 since 0.3.46
+        ("uuid", "1.20.0"),              // 1.21.0 requires 1.85, also brings in getrandom@0.4
+    ];
+    for (krate, version) in pin_versions {
+        pin_version(dry_run, sh, cargo, krate, version)?;
+    }
+
+    Ok(())
+}
+
 fn pin_version(dry_run: bool, sh: &Shell, cargo: &str, krate: &str, version: &str) -> Result<()> {
     cmd!(sh, "{cargo} update --package {krate} --precise {version}").run_if(dry_run)?;
     Ok(())
 }
 
-fn latest_version(sh: &Shell, krate: &str) -> Result<String> {
+fn latest_version(sh: &Shell, krate: &str) -> Result<&'static str> {
     let index = match krate.len() {
         1 => format!("https://index.crates.io/1/{krate}"),
         2 => format!("https://index.crates.io/2/{krate}"),
@@ -149,7 +143,10 @@ fn latest_version(sh: &Shell, krate: &str) -> Result<String> {
         .stdin(index)
         .read()?;
 
-    Ok(format!("{krate}@{version}"))
+    let name = format!("{krate}@{version}");
+    let name = Box::leak(name.into_boxed_str());
+
+    Ok(name)
 }
 
 struct Env {

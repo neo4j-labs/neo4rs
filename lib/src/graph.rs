@@ -89,6 +89,8 @@ impl Graph {
                 &config.user,
                 &config.password,
                 &config.tls_config,
+                config.connection_timeout,
+                config.tcp_keepalive,
             )?;
             if matches!(info.init.routing, Routing::Yes(_)) {
                 debug!("Routing enabled, creating a routed connection manager");
@@ -471,11 +473,16 @@ impl Graph {
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    /// Creates a new session with the given configuration.
+    /// A session is a wrapper around the graph instance. It will keep references
+    /// to the impersonated user, to the default database and to the bookmarks.
     pub fn with_session(&self, config: Option<SessionConfig>) -> Session {
         Session::new(config.unwrap_or_default(), Arc::new(self.clone()))
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    /// Returns the default database for the given user (if present).
+    /// The database will be cached by the session.
     pub async fn get_default_db(
         &self,
         imp_user: Option<ImpersonateUser>,

@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - neo4rs
+          - neo4rs_include_snippet
           - neo4rs-macros
       version:
         description: >-
@@ -17,10 +18,14 @@ on:
           See https://github.com/crate-ci/cargo-release/blob/7527065e413b9625ccb09800b765f6c49d011c79/docs/reference.md#bump-level for more details.
         required: true
         type: string
+      skip_semver:
+        description: Skip SemVer Checks, only use this for new releases
+        required: false
+        type: boolean
 
 env:
   RUSTUP_TOOLCHAIN: stable
-  MSRV: 1.75.0
+  MSRV: 1.81.0
 
 jobs:
   make-release-pr:
@@ -32,7 +37,7 @@ jobs:
     steps:
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -75,5 +80,5 @@ jobs:
           version: ${{ inputs.version }}
           crate-name: ${{ inputs.crate || 'neo4rs' }}
           pr-title: "Set <%= crates.length === 1 ? crates[0].name : '' %> version to <%= version.actual %>"
-          check-semver: true
+          check-semver: ${{ inputs.skip_semver != true }}
           base-branch: main

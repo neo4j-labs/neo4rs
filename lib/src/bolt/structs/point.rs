@@ -349,7 +349,7 @@ impl<'de> Deserialize<'de> for Point {
             type Value = Point;
 
             fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                formatter.write_str(concat!("a valid Point2D or Point3D struct"))
+                formatter.write_str("a valid Point2D or Point3D struct")
             }
 
             fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>

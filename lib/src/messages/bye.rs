@@ -8,6 +8,7 @@ use neo4rs_macros::BoltStruct;
     feature = "unstable-bolt-protocol-impl-v2",
     deprecated(since = "0.9.0", note = "Use `crate::bolt::Bye` instead.")
 )]
+#[allow(unused)]
 pub struct Bye;
 
 #[cfg(test)]

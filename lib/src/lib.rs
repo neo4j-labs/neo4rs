@@ -24,7 +24,7 @@
 //!
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/example.rs")]
+#![doc = include_snippet!("integrationtests/example.rs")]
 //! }
 //! ```
 //!
@@ -34,9 +34,14 @@
 //! * `fetch_size` - number of rows to fetch in batches (default is 200)
 //! * `max_connections` - maximum size of the connection pool (default is 16)
 //! * `db` - the database to connect to (default is `neo4j`)
+//! * `connection_timeout` - timeout for connection and recv operations (default is 30s)
+//! * `tcp_keepalive` - OS-level TCP keepalive for dead connection detection (default is Some(60s))
+//! * `idle_timeout` - duration after which idle connections are discarded from the pool (default is None)
+//! * `max_lifetime` - maximum lifetime of a connection before it is discarded from the pool (default is None)
 //!
 //! ```no_run
 //! use neo4rs::*;
+//! use std::time::Duration;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -47,11 +52,12 @@
 //!        .db("neo4j")
 //!        .fetch_size(500)
 //!        .max_connections(10)
+//!        .connection_timeout(Duration::from_secs(10))
 //!        .build()
 //!        .unwrap();
 //!    let graph = Graph::connect(config).unwrap();
 //!
-#![doc = include_str!("../include/configurations.rs")]
+#![doc = include_snippet!("integrationtests/configurations.rs")]
 //! }
 //! ```
 //!
@@ -70,7 +76,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/nodes.rs")]
+#![doc = include_snippet!("integrationtests/nodes.rs")]
 //! }
 //! ```
 //!
@@ -93,7 +99,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/transactions.rs")]
+#![doc = include_snippet!("integrationtests/transactions.rs")]
 //! }
 //!
 //! ```
@@ -119,7 +125,7 @@
 //!        .unwrap();
 //!    let graph = Graph::connect(config).unwrap();
 //!
-#![doc = include_str!("../include/streams_within_a_transaction.rs")]
+#![doc = include_snippet!("integrationtests/streams_within_a_transaction.rs")]
 //! }
 //!
 //! ```
@@ -143,7 +149,7 @@
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/result_stream.rs")]
+#![doc = include_snippet!("integrationtests/result_stream.rs")]
 //! }
 //!
 //! ```
@@ -170,7 +176,7 @@ async fn main() {
 )]
 #![cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
-    doc = include_str!("../include/bookmarks.rs")
+    doc = include_snippet!("integrationtests/bookmarks.rs")
 )]
 #![cfg_attr(
     feature = "unstable-bolt-protocol-impl-v2",
@@ -200,7 +206,7 @@ async fn main() {
 )]
 #![cfg_attr(
     feature = "unstable-result-summary",
-    doc = include_str!("../include/result_summary.rs")
+    doc = include_snippet!("integrationtests/result_summary.rs")
 )]
 #![cfg_attr(
     feature = "unstable-result-summary",
@@ -221,7 +227,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/rollback_a_transaction.rs")]
+#![doc = include_snippet!("integrationtests/rollback_a_transaction.rs")]
 //! }
 //!
 //! ```
@@ -246,7 +252,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/txn_vs_graph.rs")]
+#![doc = include_snippet!("integrationtests/txn_vs_graph.rs")]
 //! }
 //!
 //! ```
@@ -266,7 +272,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/relationships.rs")]
+#![doc = include_snippet!("integrationtests/relationships.rs")]
 //! }
 //! ```
 //!
@@ -283,7 +289,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/unbounded_relationships.rs")]
+#![doc = include_snippet!("integrationtests/unbounded_relationships.rs")]
 //! }
 //!
 //! ```
@@ -310,7 +316,7 @@ async fn main() {
 //!             point({ x: 1.1, y: 5.4, crs: 'cartesian' }) AS p2
 //!        RETURN point.distance(p1,p2) AS dist, p1, p2
 //!     ";
-#![doc = include_str!("../include/points.rs")]
+#![doc = include_snippet!("integrationtests/points.rs")]
 //! }
 //!
 //! ```
@@ -328,7 +334,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/raw_bytes.rs")]
+#![doc = include_snippet!("integrationtests/raw_bytes.rs")]
 //! }
 //!
 //! ```
@@ -346,7 +352,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/durations.rs")]
+#![doc = include_snippet!("integrationtests/durations.rs")]
 //! }
 //!
 //! ```
@@ -366,7 +372,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/dates.rs")]
+#![doc = include_snippet!("integrationtests/dates.rs")]
 //! }
 //! ```
 //!
@@ -395,7 +401,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/time_as_param.rs")]
+#![doc = include_snippet!("integrationtests/time_as_param.rs")]
 //! }
 //! ```
 //!
@@ -412,7 +418,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/parse_time_from_result.rs")]
+#![doc = include_snippet!("integrationtests/parse_time_from_result.rs")]
 //! }
 //!
 //! ```
@@ -443,7 +449,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/datetime_as_param.rs")]
+#![doc = include_snippet!("integrationtests/datetime_as_param.rs")]
 //! }
 //! ```
 //!
@@ -459,7 +465,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/parse_datetime_from_result.rs")]
+#![doc = include_snippet!("integrationtests/parse_datetime_from_result.rs")]
 //! }
 //!
 //! ```
@@ -478,7 +484,7 @@ async fn main() {
 //!    let pass = "neo";
 //!    let graph = Graph::new(uri, user, pass).unwrap();
 //!
-#![doc = include_str!("../include/path.rs")]
+#![doc = include_snippet!("integrationtests/path.rs")]
 //! }
 //! ```
 //!
@@ -539,6 +545,7 @@ pub use crate::types::{
 };
 pub use crate::version::Version;
 pub(crate) use messages::Success;
+use neo4rs_include_snippet::include_snippet;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone, Copy)]

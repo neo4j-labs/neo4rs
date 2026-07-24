@@ -40,19 +40,19 @@ where
         map.get(k).cloned()
     }
 
-    pub fn remove<Q: ?Sized>(&self, k: &Q) -> Option<V>
+    pub fn remove<Q>(&self, k: &Q) -> Option<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         let mut map = self.inner.write().unwrap();
         map.remove(k)
     }
 
-    pub fn contains_key<Q: ?Sized>(&self, k: &Q) -> bool
+    pub fn contains_key<Q>(&self, k: &Q) -> bool
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         let map = self.inner.read().unwrap();
         map.contains_key(k)

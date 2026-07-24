@@ -55,7 +55,7 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## MSRV
 
-The crate has a minimum supported Rust version (MSRV) of `1.75.0` as of 0.9.x.
+The crate has a minimum supported Rust version (MSRV) of `1.81.0` as of 0.9.x.
 The version [0.8.x](https://crates.io/crates/neo4rs/0.8.0) has an MSRV of `1.63.0`
 
 A change in the MSRV is *not* considered a breaking change.
@@ -90,7 +90,7 @@ Docker is recommended since the tests don't necessarily clean up after themselve
 
 To run the tests with docker, you need to have docker installed and running.
 You can control the version of Neo4j that is used by setting the `NEO4J_VERSION_TAG` environment variable.
-The default version is `4.2`.
+The default version is `5`.
 The tests will use the official `neo4j` docker image, with the provided version as tag.
 
 You might run into panics or test failures with the message 'failed to start container'.

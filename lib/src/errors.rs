@@ -114,6 +114,9 @@ pub enum Error {
 
     #[error("{0}")]
     ExceededResultLimit(String),
+
+    #[error("connection timed out")]
+    ConnectionTimedOut,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -140,6 +143,7 @@ pub enum Neo4jSecurityErrorKind {
     Authentication,
     AuthorizationExpired,
     TokenExpired,
+    Forbidden,
     Other,
     Unknown,
 }
@@ -176,6 +180,9 @@ impl Neo4jErrorKind {
                 ),
                 (Some("Security"), Some("TokenExpired")) => Self::Client(
                     Neo4jClientErrorKind::Security(Neo4jSecurityErrorKind::TokenExpired),
+                ),
+                (Some("Security"), Some("Forbidden")) => Self::Client(
+                    Neo4jClientErrorKind::Security(Neo4jSecurityErrorKind::Forbidden),
                 ),
                 (Some("Database"), Some("DatabaseNotFound")) => {
                     Self::Client(Neo4jClientErrorKind::FatalDiscovery)
@@ -269,6 +276,17 @@ impl Neo4jError {
 
     pub(crate) fn can_retry(&self) -> bool {
         self.kind.can_retry()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_display_connection_timed_out() {
+        let error = Error::ConnectionTimedOut;
+        assert_eq!(format!("{}", error), "connection timed out");
     }
 }
 
