@@ -25,6 +25,7 @@ impl ConnectionManager {
         password: &str,
         tls_config: &ConnectionTLSConfig,
         connection_timeout: Duration,
+        recv_timeout: Option<Duration>,
         tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
         let info = ConnectionInfo::new(
@@ -33,6 +34,7 @@ impl ConnectionManager {
             password,
             tls_config,
             connection_timeout,
+            recv_timeout,
             tcp_keepalive,
         )?;
         let backoff = backoff();
@@ -82,6 +84,7 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         &config.password,
         &config.tls_config,
         config.connection_timeout,
+        config.recv_timeout,
         config.tcp_keepalive,
     )?;
     info!(

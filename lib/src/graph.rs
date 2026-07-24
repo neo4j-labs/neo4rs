@@ -90,6 +90,7 @@ impl Graph {
                 &config.password,
                 &config.tls_config,
                 config.connection_timeout,
+                config.recv_timeout,
                 config.tcp_keepalive,
             )?;
             if matches!(info.init.routing, Routing::Yes(_)) {

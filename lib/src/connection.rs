@@ -47,8 +47,8 @@ const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
 pub struct Connection {
     version: Version,
     stream: BufStream<ConnectionStream>,
-    /// Timeout applied to recv operations to prevent hanging on broken connections.
-    recv_timeout: Duration,
+    /// Timeout applied to each single-message recv, when configured.
+    recv_timeout: Option<Duration>,
     #[allow(unused)]
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     hints: Option<ConnectionsHints>,
@@ -56,6 +56,16 @@ pub struct Connection {
 
 impl Connection {
     pub(crate) async fn new(info: &ConnectionInfo) -> Result<Self> {
+        // Bound the WHOLE establishment (TCP connect + TLS handshake + Bolt
+        // version exchange + hello), not just the TCP connect that
+        // `prepare` bounds internally: a peer that accepts the socket but
+        // never answers the handshake would otherwise hang forever.
+        tokio::time::timeout(info.prepare.connection_timeout, Self::establish(info))
+            .await
+            .map_err(|_| Error::ConnectionTimedOut)?
+    }
+
+    async fn establish(info: &ConnectionInfo) -> Result<Self> {
         let mut connection = Self::prepare(&info.prepare).await?;
         let hello = info.init.to_hello(connection.version);
         connection.hello(hello).await?;
@@ -100,12 +110,12 @@ impl Connection {
             Some((connector, domain)) => {
                 let mut stream = connector.connect(domain.clone(), stream).await?;
                 let version = Self::init(&mut stream).await?;
-                Self::create(stream, version, timeout_dur)
+                Self::create(stream, version, opts.recv_timeout)
             }
             None => {
                 let mut stream = stream;
                 let version = Self::init(&mut stream).await?;
-                Self::create(stream, version, timeout_dur)
+                Self::create(stream, version, opts.recv_timeout)
             }
         })
     }
@@ -124,7 +134,7 @@ impl Connection {
     fn create(
         stream: impl Into<ConnectionStream>,
         version: Version,
-        recv_timeout: Duration,
+        recv_timeout: Option<Duration>,
     ) -> Connection {
         Connection {
             version,
@@ -231,9 +241,12 @@ impl Connection {
     }
 
     pub async fn recv(&mut self) -> Result<(BoltResponse, usize)> {
-        let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
-            .await
-            .map_err(|_| Error::ConnectionTimedOut)??;
+        let bytes = match self.recv_timeout {
+            Some(limit) => tokio::time::timeout(limit, self.recv_bytes())
+                .await
+                .map_err(|_| Error::ConnectionTimedOut)??,
+            None => self.recv_bytes().await?,
+        };
         let total_bytes_read = bytes.len();
         let response = BoltResponse::parse(self.version, bytes)?;
         Ok((response, total_bytes_read))
@@ -345,6 +358,7 @@ pub(crate) struct PrepareOpts {
     pub(crate) port: u16,
     pub(crate) encryption: Option<(TlsConnector, ServerName<'static>)>,
     pub(crate) connection_timeout: Duration,
+    pub(crate) recv_timeout: Option<Duration>,
     pub(crate) tcp_keepalive: Option<Duration>,
 }
 
@@ -424,6 +438,7 @@ impl ConnectionInfo {
         password: &str,
         tls_config: &ConnectionTLSConfig,
         connection_timeout: Duration,
+        recv_timeout: Option<Duration>,
         tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
         let mut url = NeoUrl::parse(uri)?;
@@ -479,6 +494,7 @@ impl ConnectionInfo {
             port: url.port(),
             encryption,
             connection_timeout,
+            recv_timeout,
             tcp_keepalive,
         };
 
@@ -796,7 +812,37 @@ impl ServerCertVerifier for NoCertificateVerification {
 mod tests {
     use url::Host;
 
-    use super::NeoUrl;
+    use super::{Connection, ConnectionInfo, NeoUrl};
+    use crate::auth::ConnectionTLSConfig;
+    use crate::errors::Error;
+    use std::time::{Duration, Instant};
+
+    // A bound listener that never accepts lets the TCP handshake complete
+    // (backlog) but stalls the Bolt version exchange. The upstream per-stage
+    // bound only covers the TCP connect, so without the whole-establishment
+    // timeout in `Connection::new` this would hang forever.
+    #[tokio::test]
+    async fn connection_timeout_bounds_unresponsive_server() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let info = ConnectionInfo::new(
+            &format!("bolt://{addr}"),
+            "neo4j",
+            "password",
+            &ConnectionTLSConfig::None,
+            Duration::from_millis(250),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let started = Instant::now();
+        let res = Connection::new(&info).await;
+
+        assert!(matches!(res, Err(Error::ConnectionTimedOut)));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
 
     #[test]
     fn should_parse_uri() {

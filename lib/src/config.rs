@@ -133,8 +133,15 @@ pub struct Config {
     pub(crate) fetch_size: usize,
     pub(crate) imp_user: Option<ImpersonateUser>,
     pub(crate) tls_config: ConnectionTLSConfig,
-    /// Timeout for establishing a new connection and for read operations.
+    /// Timeout for establishing a new connection (TCP + TLS + Bolt handshake/hello).
     pub(crate) connection_timeout: Duration,
+    /// Timeout for receiving a single Bolt message on an established connection.
+    /// `None` (the default) means receives are unbounded: legitimate server-side
+    /// work (e.g. `CALL db.awaitIndexes()`, eager aggregations) can take minutes
+    /// before the first response message, so this is opt-in, decoupled from
+    /// `connection_timeout`. (Divergence from upstream #283, which uses the
+    /// connection timeout for both.)
+    pub(crate) recv_timeout: Option<Duration>,
     /// TCP keepalive interval. If `Some`, TCP keepalive is enabled on the socket.
     pub(crate) tcp_keepalive: Option<Duration>,
     /// Maximum idle time for a connection in the pool before it is discarded.
@@ -164,6 +171,7 @@ pub struct ConfigBuilder {
     imp_user: Option<ImpersonateUser>,
     tls_config: ConnectionTLSConfig,
     connection_timeout: Duration,
+    recv_timeout: Option<Duration>,
     tcp_keepalive: Option<Duration>,
     idle_timeout: Option<Duration>,
     max_lifetime: Option<Duration>,
@@ -262,6 +270,17 @@ impl ConfigBuilder {
         self
     }
 
+    /// Timeout for receiving a single Bolt message on an established connection.
+    ///
+    /// Defaults to `None` (unbounded): server-side work such as
+    /// `CALL db.awaitIndexes()` or eager aggregations can legitimately take
+    /// minutes before the first response message arrives. Set this only if
+    /// every operation on the connection is known to respond quickly.
+    pub fn recv_timeout(mut self, timeout: impl Into<Option<Duration>>) -> Self {
+        self.recv_timeout = timeout.into();
+        self
+    }
+
     /// The TCP keepalive interval. Set to `Some(duration)` to enable TCP keepalive
     /// on the underlying socket, or `None` to disable it.
     ///
@@ -299,6 +318,7 @@ impl ConfigBuilder {
                 imp_user: self.imp_user,
                 tls_config: self.tls_config,
                 connection_timeout: self.connection_timeout,
+                recv_timeout: self.recv_timeout,
                 tcp_keepalive: self.tcp_keepalive,
                 idle_timeout: self.idle_timeout,
                 max_lifetime: self.max_lifetime,
@@ -321,6 +341,7 @@ impl Default for ConfigBuilder {
             fetch_size: DEFAULT_FETCH_SIZE,
             tls_config: ConnectionTLSConfig::None,
             connection_timeout: DEFAULT_CONNECTION_TIMEOUT,
+            recv_timeout: None,
             tcp_keepalive: DEFAULT_TCP_KEEPALIVE,
             idle_timeout: None,
             max_lifetime: None,
@@ -396,6 +417,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(config.connection_timeout, Duration::from_secs(30));
+        assert_eq!(config.recv_timeout, None);
         assert_eq!(config.tcp_keepalive, Some(Duration::from_secs(60)));
         assert_eq!(config.idle_timeout, None);
         assert_eq!(config.max_lifetime, None);

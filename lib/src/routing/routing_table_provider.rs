@@ -46,6 +46,7 @@ impl RoutingTableProvider for ClusterRoutingTableProvider {
                 &config.password,
                 &config.tls_config,
                 config.connection_timeout,
+                config.recv_timeout,
                 config.tcp_keepalive,
             )?;
             let mut connection = pool.get().await?;
