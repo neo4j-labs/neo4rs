@@ -46,10 +46,10 @@ impl ConnectionRegistry {
             .get(&server.to_neo_url(self.scheme.as_str()))
     }
 
-    /// Mark a server as available for a specific database.
+    /// Mark a server as unavailable for a specific database.
     pub(crate) fn mark_unavailable(&self, server: &BoltServer) {
         for db_name in self.databases.keys() {
-            debug!("Marking server as available: {server:?}");
+            debug!("Marking server as unavailable: {server:?}");
             let mut table = self.databases.get(&db_name).unwrap();
             if table.mark_server_unavailable(server) {
                 self.databases.insert(db_name, table);
@@ -71,58 +71,36 @@ impl ConnectionRegistry {
     ) -> Vec<BoltServer> {
         if let Some(db_name) = db.as_deref() {
             if let Some(table) = self.databases.get(db_name) {
-                if table.is_expired() {
-                    debug!("Routing table for database {db_name} is expired");
-                    match self
-                        .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
-                        .await
-                    {
-                        Ok(new_table) => {
-                            let database_table: DatabaseTable = new_table.into();
-                            let servers = database_table.resolve();
-                            debug!("Routing table for database {db_name} refreshed");
-                            servers
-                        }
-                        Err(e) => {
-                            error!("Failed to refresh routing table for database {db_name}: {e}");
-                            vec![]
-                        }
-                    }
-                } else {
-                    table.resolve()
+                if !table.is_expired() {
+                    return table.resolve();
                 }
-            } else {
-                match self
-                    .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
-                    .await
-                {
-                    Ok(new_table) => {
-                        let database_table: DatabaseTable = new_table.into();
-                        let servers = database_table.resolve();
-                        debug!("Routing table for database {db_name} refreshed");
-                        servers
-                    }
-                    Err(e) => {
-                        error!("Failed to refresh routing table for database {db_name}: {e}");
-                        vec![]
-                    }
-                }
+                debug!("Routing table for database {db_name} is expired");
             }
-        } else {
-            match self
-                .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
-                .await
-            {
-                Ok(new_table) => {
-                    let db_name = new_table.db.as_deref().unwrap_or("");
-                    debug!("Routing table for database {db_name} refreshed");
-                    let database_table: DatabaseTable = new_table.into();
-                    database_table.resolve()
-                }
-                Err(e) => {
-                    error!("Failed to refresh routing table for database default: {e}");
-                    vec![]
-                }
+        }
+        self.refresh_servers(db, imp_user, bookmarks, router).await
+    }
+
+    pub async fn refresh_servers(
+        &self,
+        db: Option<Database>,
+        imp_user: Option<ImpersonateUser>,
+        bookmarks: &[String],
+        router: Option<ConnectionPool>,
+    ) -> Vec<BoltServer> {
+        match self
+            .fetch_routing_table(db.clone(), imp_user, bookmarks, router)
+            .await
+        {
+            Ok(new_table) => {
+                let db_name = new_table.db.as_deref().unwrap_or("").to_owned();
+                let database_table: DatabaseTable = new_table.into();
+                let servers = database_table.resolve();
+                debug!("Routing table for database {db_name} refreshed");
+                servers
+            }
+            Err(e) => {
+                error!("Failed to refresh routing table for database {db:?}: {e}");
+                vec![]
             }
         }
     }
@@ -200,8 +178,11 @@ mod tests {
     use crate::auth::ConnectionTLSConfig;
     use crate::routing::RoutingTable;
     use crate::routing::Server;
+    use std::collections::VecDeque;
     use std::future::Future;
     use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
 
     fn make_config() -> Config {
         Config {
@@ -431,5 +412,94 @@ mod tests {
         let servers = registry.servers(db2, None, &[], None).await;
         assert_eq!(servers.len(), 5);
         assert_eq!(registry.pool_registry.keys().len(), 8);
+    }
+
+    struct SequentialRoutingTableProvider {
+        tables: Mutex<VecDeque<RoutingTable>>,
+        fetch_count: AtomicUsize,
+    }
+
+    impl SequentialRoutingTableProvider {
+        fn new(tables: Vec<RoutingTable>) -> Self {
+            Self {
+                tables: Mutex::new(tables.into()),
+                fetch_count: AtomicUsize::new(0),
+            }
+        }
+
+        fn fetch_count(&self) -> usize {
+            self.fetch_count.load(Ordering::SeqCst)
+        }
+    }
+
+    impl RoutingTableProvider for SequentialRoutingTableProvider {
+        fn fetch_routing_table(
+            &self,
+            _bookmarks: &[String],
+            _db: Option<Database>,
+            _imp_user: Option<ImpersonateUser>,
+            _router: Option<ConnectionPool>,
+        ) -> Pin<Box<dyn Future<Output = Result<RoutingTable, Error>> + Send>> {
+            self.fetch_count.fetch_add(1, Ordering::SeqCst);
+            let table = self.tables.lock().unwrap().pop_front();
+            Box::pin(async move {
+                table.ok_or_else(|| Error::RoutingTableRefreshFailed("no routing table".into()))
+            })
+        }
+    }
+
+    fn single_writer_table(writer: &str) -> RoutingTable {
+        RoutingTable {
+            ttl: 300,
+            db: Some("neo4j".into()),
+            servers: vec![
+                Server {
+                    addresses: vec![writer.to_string()],
+                    role: "WRITE".to_string(),
+                },
+                Server {
+                    addresses: vec!["host0:7687".to_string()],
+                    role: "ROUTE".to_string(),
+                },
+            ],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_refresh_servers_ignores_ttl() {
+        let provider = Arc::new(SequentialRoutingTableProvider::new(vec![
+            single_writer_table("host1:7687"),
+            single_writer_table("host2:7687"),
+        ]));
+        let config = make_config();
+        let registry = ConnectionRegistry::new(&config, provider.clone());
+
+        let db = Some(Database::from("neo4j"));
+        let servers = registry.servers(db.clone(), None, &[], None).await;
+        assert_eq!(provider.fetch_count(), 1);
+        assert!(servers
+            .iter()
+            .any(|s| s.role == "WRITE" && s.address == "host1"));
+
+        registry.mark_unavailable(&BoltServer {
+            address: "host1".to_string(),
+            port: 7687,
+            role: "WRITE".to_string(),
+        });
+        let servers = registry.servers(db.clone(), None, &[], None).await;
+        assert_eq!(provider.fetch_count(), 1);
+        assert!(!servers.iter().any(|s| s.role == "WRITE"));
+
+        let servers = registry.refresh_servers(db.clone(), None, &[], None).await;
+        assert_eq!(provider.fetch_count(), 2);
+        assert!(servers
+            .iter()
+            .any(|s| s.role == "WRITE" && s.address == "host2"));
+
+        let servers = registry.servers(db, None, &[], None).await;
+        assert_eq!(provider.fetch_count(), 2);
+        assert!(servers
+            .iter()
+            .any(|s| s.role == "WRITE" && s.address == "host2"));
     }
 }
