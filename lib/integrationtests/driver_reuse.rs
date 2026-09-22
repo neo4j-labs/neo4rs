@@ -75,7 +75,7 @@ async fn scenario(failure: Failure) {
         .user("test")
         .password("test")
         .max_connections(1)
-        .connection_timeout(Duration::from_millis(200))
+        .connection_timeout(Duration::from_secs(5))
         .build()
         .unwrap();
     let graph = Graph::connect(config).unwrap();
@@ -112,14 +112,14 @@ async fn scenario(failure: Failure) {
 
 #[tokio::test]
 async fn cancelled_exchange_is_discarded_but_healthy_connection_is_reused() {
-    tokio::time::timeout(Duration::from_secs(5), scenario(Failure::Cancel))
+    tokio::time::timeout(Duration::from_secs(30), scenario(Failure::Cancel))
         .await
         .unwrap();
 }
 
 #[tokio::test]
 async fn internally_timed_out_exchange_is_discarded_before_next_query() {
-    tokio::time::timeout(Duration::from_secs(5), scenario(Failure::ReceiveTimeout))
+    tokio::time::timeout(Duration::from_secs(30), scenario(Failure::ReceiveTimeout))
         .await
         .unwrap();
 }

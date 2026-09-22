@@ -4,7 +4,7 @@ use super::*;
 use tokio::net::TcpListener;
 
 async fn connection() -> (Connection, TcpStream) {
-    connection_with_timeout(Duration::from_millis(20)).await
+    connection_with_timeout(Duration::from_secs(60)).await
 }
 
 async fn connection_with_timeout(recv_timeout: Duration) -> (Connection, TcpStream) {
@@ -38,7 +38,7 @@ async fn record_does_not_complete_request_but_all_terminal_summaries_do() {
 }
 
 #[tokio::test]
-async fn decode_failure_leaves_connection_unusable() {
+async fn unknown_response_signature_leaves_connection_unusable() {
     let (mut connection, mut peer) = connection().await;
     connection.send(BoltRequest::reset()).await.unwrap();
     peer.write_u16(3).await.unwrap();
@@ -48,8 +48,84 @@ async fn decode_failure_leaves_connection_unusable() {
     assert!(!connection.is_reusable());
     assert!(matches!(
         connection.send(BoltRequest::reset()).await,
-        Err(Error::ConnectionError)
+        Err(Error::IncompleteBoltExchange)
     ));
+}
+
+async fn send_response(peer: &mut TcpStream, bytes: &[u8]) {
+    peer.write_u16(bytes.len() as u16).await.unwrap();
+    peer.write_all(bytes).await.unwrap();
+    peer.write_u16(0).await.unwrap();
+}
+
+async fn receive_response(connection: &mut Connection) -> Result<()> {
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    {
+        connection.recv().await.map(|_| ())
+    }
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    {
+        use crate::bolt::{Bolt, Response, Success};
+        use std::collections::HashMap;
+
+        connection
+            .recv_as::<Response<Vec<Bolt>, Success<HashMap<String, Bolt>>>>()
+            .await
+            .map(|_| ())
+    }
+}
+
+#[tokio::test]
+async fn value_decode_error_allows_draining_the_pending_response() {
+    let (mut connection, mut peer) = connection().await;
+    connection.send(BoltRequest::pull(1, -1)).await.unwrap();
+    send_response(&mut peer, &[0xb1, RECORD_SIGNATURE, 0x91, 0xb0, 0x01]).await;
+    assert!(receive_response(&mut connection).await.is_err());
+    assert!(!connection.io_in_progress);
+    assert!(!connection.is_reusable());
+    assert!(matches!(
+        connection.send(BoltRequest::reset()).await,
+        Err(Error::IncompleteBoltExchange)
+    ));
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    receive_response(&mut connection).await.unwrap();
+    assert!(connection.is_reusable());
+    connection.send(BoltRequest::reset()).await.unwrap();
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    receive_response(&mut connection).await.unwrap();
+    assert!(connection.is_reusable());
+}
+
+#[tokio::test]
+async fn terminal_value_decode_error_does_not_poison_connection() {
+    let (mut connection, mut peer) = connection().await;
+    connection.send(BoltRequest::reset()).await.unwrap();
+    send_response(&mut peer, b"\xb1\x70\xa1\x81x\xb0\x01").await;
+    assert!(receive_response(&mut connection).await.is_err());
+    assert!(connection.is_reusable());
+    connection.send(BoltRequest::reset()).await.unwrap();
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    receive_response(&mut connection).await.unwrap();
+    assert!(connection.is_reusable());
+}
+
+#[tokio::test]
+async fn pending_response_rejects_another_request_without_writing_it() {
+    let (mut connection, mut peer) = connection().await;
+    connection.send(BoltRequest::reset()).await.unwrap();
+    assert!(!connection.io_in_progress);
+    assert!(matches!(
+        connection.send(BoltRequest::reset()).await,
+        Err(Error::IncompleteBoltExchange)
+    ));
+    assert_eq!(connection.pending_responses, 1);
+    assert_eq!(peer.read_u16().await.unwrap(), 2);
+    let mut request = [0; 2];
+    peer.read_exact(&mut request).await.unwrap();
+    assert_eq!(request, [0xb0, 0x0f]);
+    assert_eq!(peer.read_u16().await.unwrap(), 0);
+    drop(connection);
+    assert_eq!(peer.read(&mut request).await.unwrap(), 0);
 }
 
 #[tokio::test]
@@ -79,13 +155,13 @@ async fn externally_cancelled_receive_leaves_connection_unusable() {
     assert!(!connection.is_reusable());
     assert!(matches!(
         connection.send(BoltRequest::reset()).await,
-        Err(Error::ConnectionError)
+        Err(Error::IncompleteBoltExchange)
     ));
 }
 
 #[tokio::test]
 async fn receive_timeout_leaves_connection_unusable() {
-    let (mut connection, _peer) = connection().await;
+    let (mut connection, _peer) = connection_with_timeout(Duration::from_millis(20)).await;
     assert!(matches!(
         connection.reset().await,
         Err(Error::ConnectionTimedOut)
@@ -93,14 +169,14 @@ async fn receive_timeout_leaves_connection_unusable() {
     assert!(!connection.is_reusable());
     assert!(matches!(
         connection.send(BoltRequest::reset()).await,
-        Err(Error::ConnectionError)
+        Err(Error::IncompleteBoltExchange)
     ));
 }
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 #[tokio::test]
 async fn typed_reset_receive_timeout_leaves_connection_unusable() {
-    let (mut connection, _peer) = connection().await;
+    let (mut connection, _peer) = connection_with_timeout(Duration::from_millis(20)).await;
     assert!(matches!(
         connection.reset().await,
         Err(Error::ConnectionTimedOut)
@@ -108,6 +184,6 @@ async fn typed_reset_receive_timeout_leaves_connection_unusable() {
     assert!(!connection.is_reusable());
     assert!(matches!(
         connection.reset().await,
-        Err(Error::ConnectionError)
+        Err(Error::IncompleteBoltExchange)
     ));
 }

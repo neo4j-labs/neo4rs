@@ -244,9 +244,8 @@ impl Connection {
         let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
             .await
             .map_err(|_| Error::ConnectionTimedOut)??;
-        let response = BoltResponse::parse(self.version, bytes.clone())?;
         self.complete_response(&bytes)?;
-        Ok(response)
+        BoltResponse::parse(self.version, bytes)
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -255,9 +254,8 @@ impl Connection {
         let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
             .await
             .map_err(|_| Error::ConnectionTimedOut)??;
-        let response = T::parse(bytes.clone())?;
         self.complete_response(&bytes)?;
-        Ok(response)
+        Ok(T::parse(bytes)?)
     }
 
     pub(crate) fn is_reusable(&self) -> bool {
@@ -284,8 +282,8 @@ impl Connection {
     }
 
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
-        if self.io_in_progress {
-            return Err(Error::ConnectionError);
+        if !self.is_reusable() {
+            return Err(Error::IncompleteBoltExchange);
         }
         self.io_in_progress = true;
         self.pending_responses += 1;
@@ -303,7 +301,7 @@ impl Connection {
 
     async fn recv_bytes(&mut self) -> Result<Bytes> {
         if self.io_in_progress {
-            return Err(Error::ConnectionError);
+            return Err(Error::IncompleteBoltExchange);
         }
         self.io_in_progress = true;
         let mut bytes = BytesMut::new();
