@@ -42,6 +42,13 @@ use tokio_rustls::{
 use url::{Host, Url};
 
 const MAX_CHUNK_SIZE: usize = 65_535 - mem::size_of::<u16>();
+const SUCCESS_SIGNATURE: u8 = 0x70;
+const RECORD_SIGNATURE: u8 = 0x71;
+const IGNORED_SIGNATURE: u8 = 0x7e;
+const FAILURE_SIGNATURE: u8 = 0x7f;
+
+#[cfg(test)]
+mod reuse_tests;
 
 #[derive(Debug)]
 pub struct Connection {
@@ -49,6 +56,8 @@ pub struct Connection {
     stream: BufStream<ConnectionStream>,
     /// Timeout applied to recv operations to prevent hanging on broken connections.
     recv_timeout: Duration,
+    pending_responses: usize,
+    io_in_progress: bool,
     #[allow(unused)]
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     hints: Option<ConnectionsHints>,
@@ -130,6 +139,8 @@ impl Connection {
             version,
             stream: BufStream::new(stream.into()),
             recv_timeout,
+            pending_responses: 0,
+            io_in_progress: false,
             #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
             hints: None,
         }
@@ -233,17 +244,49 @@ impl Connection {
         let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
             .await
             .map_err(|_| Error::ConnectionTimedOut)??;
+        self.complete_response(&bytes)?;
         BoltResponse::parse(self.version, bytes)
     }
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     #[allow(unused)]
     pub(crate) async fn recv_as<T: MessageResponse>(&mut self) -> Result<T> {
-        let bytes = self.recv_bytes().await?;
+        let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
+            .await
+            .map_err(|_| Error::ConnectionTimedOut)??;
+        self.complete_response(&bytes)?;
         Ok(T::parse(bytes)?)
     }
 
+    pub(crate) fn is_reusable(&self) -> bool {
+        self.pending_responses == 0 && !self.io_in_progress
+    }
+
+    fn complete_response(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.pending_responses == 0 {
+            return Err(Error::UnexpectedMessage("unsolicited Bolt response".into()));
+        }
+        match bytes.get(1).copied() {
+            Some(SUCCESS_SIGNATURE | FAILURE_SIGNATURE | IGNORED_SIGNATURE) => {
+                self.pending_responses -= 1
+            }
+            Some(RECORD_SIGNATURE) => {}
+            _ => {
+                return Err(Error::UnexpectedMessage(
+                    "unknown Bolt response signature".into(),
+                ))
+            }
+        }
+        self.io_in_progress = false;
+        Ok(())
+    }
+
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
+        if !self.is_reusable() {
+            return Err(Error::IncompleteBoltExchange);
+        }
+        self.io_in_progress = true;
+        self.pending_responses += 1;
         Self::dbg("send", &bytes);
         let end_marker: [u8; 2] = [0, 0];
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
@@ -252,10 +295,15 @@ impl Connection {
         }
         self.stream.write_all(&end_marker).await?;
         self.stream.flush().await?;
+        self.io_in_progress = false;
         Ok(())
     }
 
     async fn recv_bytes(&mut self) -> Result<Bytes> {
+        if self.io_in_progress {
+            return Err(Error::IncompleteBoltExchange);
+        }
+        self.io_in_progress = true;
         let mut bytes = BytesMut::new();
         let mut chunk_size = 0;
         while chunk_size == 0 {

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](http://semver.org).
 
+## [Unreleased]
+
+### Changed
+
+- With `unstable-bolt-protocol-impl-v2` (including `unstable-v1`), `connection_timeout` now also limits each response-message read, matching the default protocol implementation. The default is 30 seconds; operations that previously waited indefinitely can now return `ConnectionTimedOut`. Increase `ConfigBuilder::connection_timeout` for long-running operations. Connections with interrupted reads are discarded rather than returned to the pool.
+
 ## [0.9.0-rc.3](https://github.com/neo4j-labs/neo4rs/tree/0.9.0-rc.3) - 2025-01-15
 
 [Full Changelog](https://github.com/neo4j-labs/neo4rs/compare/v0.9.0-rc.2...0.9.0-rc.3)

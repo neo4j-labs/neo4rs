@@ -64,6 +64,11 @@ impl Manager for ConnectionManager {
     }
 
     async fn recycle(&self, obj: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
+        if !obj.is_reusable() {
+            return Err(deadpool::managed::RecycleError::message(
+                "Connection has an unfinished or failed Bolt exchange",
+            ));
+        }
         trace!("recycling connection");
         match tokio::time::timeout(Duration::from_secs(5), obj.reset()).await {
             Ok(Ok(())) => Ok(()),

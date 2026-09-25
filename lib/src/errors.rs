@@ -33,6 +33,9 @@ pub enum Error {
     #[error("connection error")]
     ConnectionError,
 
+    #[error("connection has an incomplete Bolt exchange; pending responses must be consumed before sending another request, and interrupted I/O requires a new connection")]
+    IncompleteBoltExchange,
+
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
     #[error("The connection has been closed [{}]: {}", _0.code, _0.message)]
     ConnectionClosed(crate::bolt::Failure),
