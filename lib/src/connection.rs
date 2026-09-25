@@ -331,10 +331,14 @@ impl Connection {
         }
         let mut remaining = chunk_size;
         while remaining > 0 {
-            remaining -= (&mut self.stream)
+            let received = (&mut self.stream)
                 .take(remaining as u64)
                 .read_buf(buf)
                 .await?;
+            if received == 0 {
+                return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
+            }
+            remaining -= received;
         }
         Ok(())
     }
@@ -841,7 +845,16 @@ impl ServerCertVerifier for NoCertificateVerification {
 mod tests {
     use url::Host;
 
-    use super::NeoUrl;
+    use super::{Connection, NeoUrl};
+    use crate::{errors::Error, version::Version};
+    use std::{io::ErrorKind, sync::mpsc, thread, time::Duration};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+    };
+
+    const RECV_TIMEOUT: Duration = Duration::from_secs(30);
+    const READ_LOOP_DEADLINE: Duration = Duration::from_secs(5);
 
     #[test]
     fn should_parse_uri() {
@@ -865,5 +878,93 @@ mod tests {
         assert_eq!(url.port(), 4242);
         assert_eq!(url.host(), Host::Domain("127.0.0.1"));
         assert_eq!(url.scheme(), "bolt");
+    }
+
+    async fn serve_bytes_then_close(bytes: Vec<u8>) -> u16 {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            socket.write_all(&bytes).await.unwrap();
+            socket.shutdown().await.unwrap();
+        });
+        port
+    }
+
+    async fn connect(port: u16) -> Connection {
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        Connection::create(stream, Version::V4_4, RECV_TIMEOUT)
+    }
+
+    enum ReadOutcome {
+        Completed,
+        UnexpectedEof,
+        OtherError,
+    }
+
+    fn recv_bytes_on_worker_thread(server_bytes: Vec<u8>) -> ReadOutcome {
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let port = serve_bytes_then_close(server_bytes).await;
+                let mut connection = connect(port).await;
+                let outcome = match connection.recv_bytes().await {
+                    Ok(_) => ReadOutcome::Completed,
+                    Err(Error::IOError { detail }) if detail.kind() == ErrorKind::UnexpectedEof => {
+                        ReadOutcome::UnexpectedEof
+                    }
+                    Err(_) => ReadOutcome::OtherError,
+                };
+                let _ = tx.send(outcome);
+            });
+        });
+        rx.recv_timeout(READ_LOOP_DEADLINE)
+            .expect("read loop did not terminate within the deadline")
+    }
+
+    #[test]
+    fn eof_inside_chunk_body_returns_unexpected_eof() {
+        let outcome = recv_bytes_on_worker_thread(vec![0x00, 0x08, 0x01, 0x02, 0x03]);
+        assert!(matches!(outcome, ReadOutcome::UnexpectedEof));
+    }
+
+    #[test]
+    fn eof_before_chunk_header_returns_unexpected_eof() {
+        let outcome = recv_bytes_on_worker_thread(Vec::new());
+        assert!(matches!(outcome, ReadOutcome::UnexpectedEof));
+    }
+
+    #[test]
+    fn eof_inside_chunk_header_returns_unexpected_eof() {
+        let outcome = recv_bytes_on_worker_thread(vec![0x00]);
+        assert!(matches!(outcome, ReadOutcome::UnexpectedEof));
+    }
+
+    #[tokio::test]
+    async fn noop_chunks_do_not_break_message_reception() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut reset = [0; 6];
+            socket.read_exact(&mut reset).await.unwrap();
+            assert_eq!(reset, [0, 2, 0xb0, 0x0f, 0, 0]);
+            socket
+                .write_all(&[
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xB1, 0x70, 0xA0, 0x00, 0x00,
+                ])
+                .await
+                .unwrap();
+        });
+        let mut connection = connect(port).await;
+        connection
+            .reset()
+            .await
+            .expect("a SUCCESS message preceded by NOOP chunks must parse");
+        server.await.unwrap();
     }
 }
