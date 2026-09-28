@@ -91,9 +91,10 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         config.connection_timeout,
         config.tcp_keepalive,
     )?;
+    // Log the parsed host and port, not the URI: a URI can carry credentials.
     info!(
-        "creating connection pool for node {} with max size {}",
-        config.uri, config.max_connections
+        "creating connection pool for node {}:{} with max size {}",
+        mgr.info.prepare.host, mgr.info.prepare.port, config.max_connections
     );
     let mut builder = ConnectionPool::builder(mgr).max_size(config.max_connections);
 
