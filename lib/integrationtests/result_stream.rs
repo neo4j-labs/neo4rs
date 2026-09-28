@@ -27,14 +27,16 @@ async fn result_stream() {
         .await
         .unwrap();
 
-    // using `execute` without consuming the result will do nothing
+    // `execute` sends the query together with the request for the first batch
+    // of results, so the query runs on the server even if the result stream is
+    // never consumed. Prefer `run` if you do not need the results.
     // This will trigger a `unused_must_use` warning
     graph
         .execute(query("CREATE (n:MyNode {p: 'prop'})"))
         .await
         .unwrap();
 
-    // consuming the result stream of`execute` will run the query on the server
+    // consuming the result stream of `execute` fetches all the results
     graph
         .execute(query("CREATE (n:MyNode {p: 'prop'})"))
         .await
@@ -54,6 +56,6 @@ async fn result_stream() {
         .get::<i64>("n")
         .unwrap();
 
-    assert_eq!(after, before + 2);
+    assert_eq!(after, before + 3);
     // snippet-end
 }

@@ -130,13 +130,17 @@
 //!
 //! ```
 //!
-//! ### Streams are evaluated lazily
+//! ### Streams fetch their results in batches
 //!
-//! The [`RowStream`] returned by various `execute` functions need to be
-//! consumed with [`RowStream::next`] in order to actually execute the
-//! query.
-//! The various `run` functions on the other hand are always executed
-//! eagerly.
+//! [`Graph::execute`] sends the query together with the request for the first
+//! batch of results, so the query runs on the server right away. The following
+//! batches are fetched when the [`DetachedRowStream`] is consumed with
+//! [`DetachedRowStream::next`].
+//! Within a transaction, [`Txn::execute`] returns a [`RowStream`] that only
+//! runs the query when it is consumed with [`RowStream::next`] for the first
+//! time, because several streams can share the connection of the transaction.
+//! The various `run` functions are always executed eagerly and discard the
+//! results.
 //!
 //!
 //! ```no_run
@@ -544,7 +548,6 @@ pub use crate::types::{
     BoltPoint2D, BoltPoint3D, BoltRelation, BoltString, BoltTime, BoltType, BoltUnboundedRelation,
 };
 pub use crate::version::Version;
-pub(crate) use messages::Success;
 use neo4rs_include_snippet::include_snippet;
 use std::fmt::Display;
 

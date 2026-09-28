@@ -49,6 +49,8 @@ async fn scenario(failure: Failure) {
         let (mut broken, _) = listener.accept().await.unwrap();
         hello(&mut broken).await;
         assert_eq!(message(&mut broken).await[1], 0x10);
+        // The first PULL is pipelined with RUN and arrives before any response.
+        assert_eq!(message(&mut broken).await[1], 0x3f);
         started.send(()).unwrap();
         let mut byte = [0];
         assert_eq!(

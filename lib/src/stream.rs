@@ -4,7 +4,7 @@ use crate::messages::{BoltRequest, BoltResponse};
 use crate::summary::{ResultSummary, Streaming};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
-    bolt::{Bolt, Discard, Pull, Response, Summary, WrapExtra as _},
+    bolt::{Bolt, Discard, Pull, Response, WrapExtra as _},
     BoltType,
 };
 use crate::{
@@ -46,6 +46,7 @@ impl RowStream {
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")] available_after: i64,
         fields: BoltList,
         fetch_size: usize,
+        state: State,
     ) -> Self {
         RowStream {
             qid,
@@ -53,7 +54,7 @@ impl RowStream {
             available_after,
             fields,
             fetch_size,
-            state: State::Ready,
+            state,
             buffer: VecDeque::with_capacity(fetch_size),
         }
     }
@@ -85,68 +86,126 @@ impl RowStream {
                 return Ok(Some(row));
             }
 
-            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            {
-                if self.state == State::Ready {
-                    let pull = Pull::some(self.fetch_size as i64).for_query(self.qid);
-                    let connection = handle.connection();
-                    connection.send_as(pull).await?;
-                    self.state = loop {
-                        let response = connection
-                            .recv_as::<Response<Vec<Bolt>, Streaming>>()
-                            .await?;
-                        match response {
-                            Response::Detail(record) => {
-                                let record = BoltList::from(
-                                    record
-                                        .into_iter()
-                                        .map(BoltType::from)
-                                        .collect::<Vec<BoltType>>(),
-                                );
-                                let row = Row::new(self.fields.clone(), record);
-                                self.buffer.push_back(row);
-                            }
-                            Response::Success(Streaming::HasMore) => break State::Ready,
-                            Response::Success(Streaming::Done(mut s)) => {
-                                s.set_t_first(self.available_after);
-                                break State::Complete(s);
-                            }
-                            otherwise => return Err(otherwise.into_error("PULL")),
-                        }
-                    };
-                } else if let State::Complete(_) = self.state {
-                    break Ok(None);
+            match self.state {
+                State::Ready => self.pull(handle.connection()).await?,
+                State::Pulling | State::Discarding => self.receive(handle.connection()).await?,
+                State::Complete(_) => return Ok(None),
+            }
+        }
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    async fn pull(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        let pull = Pull::some(self.fetch_size as i64).for_query(self.qid);
+        connection.send_as(pull).await?;
+        self.state = State::Pulling;
+        Ok(())
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    async fn pull(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        let pull = BoltRequest::pull(self.fetch_size, self.qid);
+        connection.send(pull).await?;
+        self.state = State::Pulling;
+        Ok(())
+    }
+
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    async fn discard(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        let discard = Discard::all().for_query(self.qid);
+        connection.send_as(discard).await?;
+        self.state = State::Discarding;
+        Ok(())
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    async fn discard(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        let discard = BoltRequest::discard_all_for(self.qid);
+        connection.send(discard).await?;
+        self.state = State::Discarding;
+        Ok(())
+    }
+
+    /// Receives the responses to the request in flight until its summary arrives.
+    ///
+    /// An error while decoding a single record leaves the state untouched, so the
+    /// next call continues to receive the same batch and the connection stays in sync.
+    #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+    async fn receive(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        loop {
+            let response = connection
+                .recv_as::<Response<Vec<Bolt>, Streaming>>()
+                .await?;
+            match response {
+                Response::Detail(record) => {
+                    let record = BoltList::from(
+                        record
+                            .into_iter()
+                            .map(BoltType::from)
+                            .collect::<Vec<BoltType>>(),
+                    );
+                    let row = Row::new(self.fields.clone(), record);
+                    self.buffer.push_back(row);
+                }
+                Response::Success(Streaming::HasMore) => {
+                    let discarding = self.state == State::Discarding;
+                    self.state = State::Ready;
+                    if discarding {
+                        return Err(Error::UnexpectedMessage(
+                            "Query returned has_more after a discard_all".into(),
+                        ));
+                    }
+                    return Ok(());
+                }
+                Response::Success(Streaming::Done(mut s)) => {
+                    s.set_t_first(self.available_after);
+                    self.state = State::Complete(s);
+                    return Ok(());
+                }
+                otherwise => {
+                    let request = self.request_in_flight();
+                    self.state = State::Ready;
+                    return Err(otherwise.into_error(request));
                 }
             }
+        }
+    }
 
-            #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-            {
-                if self.state == State::Ready {
-                    let pull = BoltRequest::pull(self.fetch_size, self.qid);
-                    let connection = handle.connection();
-                    connection.send(pull).await?;
-
-                    self.state = loop {
-                        match connection.recv().await {
-                            Ok(BoltResponse::Success(s)) => {
-                                break if s.get("has_more").unwrap_or(false) {
-                                    State::Ready
-                                } else {
-                                    State::Complete(())
-                                };
-                            }
-                            Ok(BoltResponse::Record(record)) => {
-                                let row = Row::new(self.fields.clone(), record.data);
-                                self.buffer.push_back(row);
-                            }
-                            Ok(msg) => return Err(msg.into_error("PULL")),
-                            Err(e) => return Err(e),
-                        }
+    /// Receives the responses to the request in flight until its summary arrives.
+    ///
+    /// An error while decoding a single record leaves the state untouched, so the
+    /// next call continues to receive the same batch and the connection stays in sync.
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    async fn receive(&mut self, connection: &mut ManagedConnection) -> Result<()> {
+        loop {
+            match connection.recv().await? {
+                BoltResponse::Success(s) => {
+                    let has_more =
+                        self.state == State::Pulling && s.get("has_more").unwrap_or(false);
+                    self.state = if has_more {
+                        State::Ready
+                    } else {
+                        State::Complete(())
                     };
-                } else if let State::Complete(_) = self.state {
-                    break Ok(None);
-                };
+                    return Ok(());
+                }
+                BoltResponse::Record(record) => {
+                    let row = Row::new(self.fields.clone(), record.data);
+                    self.buffer.push_back(row);
+                }
+                otherwise => {
+                    let request = self.request_in_flight();
+                    self.state = State::Ready;
+                    return Err(otherwise.into_error(request));
+                }
             }
+        }
+    }
+
+    fn request_in_flight(&self) -> &'static str {
+        match self.state {
+            State::Discarding => "DISCARD",
+            _ => "PULL",
         }
     }
 
@@ -246,55 +305,22 @@ impl RowStream {
     /// Stop consuming the stream and return a summary, if available.
     /// Stopping the stream will also discard any messages on the server side.
     pub async fn finish(mut self, mut handle: impl TransactionHandle) -> Result<RunResult> {
-        self.buffer.clear();
-
+        loop {
+            self.buffer.clear();
+            match self.state {
+                State::Ready => self.discard(handle.connection()).await?,
+                State::Pulling | State::Discarding => self.receive(handle.connection()).await?,
+                State::Complete(_) => break,
+            }
+        }
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         match self.state {
-            State::Ready => {
-                let summary = {
-                    let connected = handle.connection();
-                    connected
-                        .send_recv_as(Discard::all().for_query(self.qid))
-                        .await
-                }?;
-                let summary = match summary {
-                    Summary::Success(s) => match s.metadata {
-                        Streaming::Done(summary) => *summary,
-                        Streaming::HasMore => {
-                            unreachable!("Query returned has_more after a discard_all");
-                        }
-                    },
-                    Summary::Ignored => {
-                        return Err(Error::RequestIgnoredError);
-                    }
-                    Summary::Failure(f) => {
-                        return Err(f.into_error());
-                    }
-                };
-                Ok(summary)
-            }
             State::Complete(summary) => Ok(*summary),
+            _ => unreachable!("the loop only ends once the stream is complete"),
         }
 
         #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        match self.state {
-            State::Ready => {
-                let summary = {
-                    let connected = handle.connection();
-                    connected
-                        .send_recv(BoltRequest::discard_all_for(self.qid))
-                        .await
-                }?;
-                let summary = match summary {
-                    crate::messages::BoltResponse::Success(_) => Ok(()),
-                    crate::messages::BoltResponse::Failure(f) => Err(Error::Neo4j(f.into_error())),
-                    msg => Err(msg.into_error("DISCARD")),
-                };
-                self.state = State::Complete(());
-                summary
-            }
-            State::Complete(_) => Ok(()),
-        }
+        Ok(())
     }
 
     /// Turns this RowStream into a [`futures::stream::TryStream`] where
@@ -476,7 +502,12 @@ impl DetachedRowStream {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-enum State {
+pub(crate) enum State {
+    /// No request is in flight, the next batch of records must be requested with PULL.
     Ready,
+    /// A PULL is in flight: its records and then its summary are still to be received.
+    Pulling,
+    /// A DISCARD is in flight: only its summary is still to be received.
+    Discarding,
     Complete(BoxedSummary),
 }
