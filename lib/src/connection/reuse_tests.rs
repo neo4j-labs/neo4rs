@@ -187,3 +187,93 @@ async fn typed_reset_receive_timeout_leaves_connection_unusable() {
         Err(Error::IncompleteBoltExchange)
     ));
 }
+
+async fn read_request(peer: &mut TcpStream) -> Vec<u8> {
+    let mut body = Vec::new();
+    loop {
+        let length = peer.read_u16().await.unwrap();
+        if length == 0 {
+            return body;
+        }
+        let offset = body.len();
+        body.resize(offset + usize::from(length), 0);
+        peer.read_exact(&mut body[offset..]).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn send_pipelined_writes_every_request_before_any_response() {
+    let (mut connection, mut peer) = connection().await;
+    let version = connection.version;
+    let batch = vec![
+        BoltRequest::reset().into_bytes(version).unwrap(),
+        BoltRequest::pull(1, -1).into_bytes(version).unwrap(),
+    ];
+    connection.send_pipelined(batch).await.unwrap();
+    assert!(!connection.io_in_progress);
+    assert!(!connection.is_reusable());
+
+    // Both requests are on the wire although the peer has not answered anything yet.
+    assert_eq!(read_request(&mut peer).await, [0xb0, 0x0f]);
+    assert_eq!(read_request(&mut peer).await[1], 0x3f);
+
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    receive_response(&mut connection).await.unwrap();
+    assert!(!connection.is_reusable());
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    receive_response(&mut connection).await.unwrap();
+    assert!(connection.is_reusable());
+}
+
+#[tokio::test]
+async fn send_pipelined_rejects_a_connection_with_a_pending_response() {
+    let (mut connection, _peer) = connection().await;
+    let version = connection.version;
+    connection.send(BoltRequest::reset()).await.unwrap();
+    let batch = vec![BoltRequest::reset().into_bytes(version).unwrap()];
+    assert!(matches!(
+        connection.send_pipelined(batch).await,
+        Err(Error::IncompleteBoltExchange)
+    ));
+}
+
+#[tokio::test]
+async fn drain_pending_responses_makes_a_synced_connection_reusable() {
+    let (mut connection, mut peer) = connection().await;
+    let version = connection.version;
+    let batch = vec![
+        BoltRequest::pull(1, -1).into_bytes(version).unwrap(),
+        BoltRequest::discard_all_for(-1)
+            .into_bytes(version)
+            .unwrap(),
+    ];
+    connection.send_pipelined(batch).await.unwrap();
+    assert!(!connection.is_reusable());
+
+    // The peer answers both requests: a record with a value that cannot be
+    // decoded, the summary of the PULL and the summary of the DISCARD.
+    send_response(&mut peer, &[0xb1, RECORD_SIGNATURE, 0x91, 0xb0, 0x01]).await;
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+
+    connection.drain_pending_responses().await.unwrap();
+    assert!(connection.is_reusable());
+    connection.send(BoltRequest::reset()).await.unwrap();
+}
+
+#[tokio::test]
+async fn drain_pending_responses_rejects_an_interrupted_read() {
+    let (mut connection, mut peer) = connection_with_timeout(Duration::from_millis(50)).await;
+    connection.send(BoltRequest::reset()).await.unwrap();
+    // Only the chunk header arrives: the read times out in the middle of a message.
+    peer.write_u16(3).await.unwrap();
+    assert!(matches!(
+        receive_response(&mut connection).await,
+        Err(Error::ConnectionTimedOut)
+    ));
+    assert!(matches!(
+        connection.drain_pending_responses().await,
+        Err(Error::IncompleteBoltExchange)
+    ));
+    assert!(!connection.is_reusable());
+}

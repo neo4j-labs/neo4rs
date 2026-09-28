@@ -9,10 +9,11 @@ use crate::{
     messages::{BoltRequest, BoltResponse},
     pool::ManagedConnection,
     retry::Retry,
-    stream::{DetachedRowStream, RowStream},
+    stream::{DetachedRowStream, RowStream, State},
     types::{BoltList, BoltMap, BoltString, BoltType},
-    Database, Error, Operation, Success,
+    Database, Error, Operation,
 };
+use log::warn;
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 pub type RunResult = ResultSummary;
@@ -154,7 +155,8 @@ impl Query {
         mut connection: ManagedConnection,
     ) -> QueryResult<DetachedRowStream> {
         let request = BoltRequest::run(&self.query, self.params.clone(), self.extra.clone());
-        Self::try_execute(request, fetch_size, &mut connection)
+        // The stream owns the connection, so the first PULL can be pipelined with RUN.
+        Self::try_execute(request, fetch_size, FollowUp::Pull, &mut connection)
             .await
             .map(|stream| DetachedRowStream::new(stream, connection))
     }
@@ -165,7 +167,9 @@ impl Query {
         connection: &mut ManagedConnection,
     ) -> Result<RowStream> {
         let run = BoltRequest::run(&self.query, self.params, self.extra);
-        Self::try_execute(run, fetch_size, connection)
+        // Other streams of the same transaction share this connection, so a PULL
+        // must not be left in flight: the stream requests its records lazily.
+        Self::try_execute(run, fetch_size, FollowUp::None, connection)
             .await
             .map_err(Retry::into_inner)
     }
@@ -174,39 +178,70 @@ impl Query {
         request: BoltRequest,
         connection: &mut ManagedConnection,
     ) -> QueryResult<RunResult> {
-        let result = Self::try_execute(request, 4096, connection).await?;
+        // The result is consumed before this call returns, so DISCARD can be
+        // pipelined with RUN even when other streams share the connection.
+        let result = Self::try_execute(request, 4096, FollowUp::Discard, connection).await?;
         Ok(result.finish(connection).await?)
     }
 
+    /// Sends RUN and, if a follow-up is given, pipelines it in the same flush.
+    ///
+    /// Pipelining saves one network round-trip, but leaves the response to the
+    /// follow-up in flight: the returned stream must be the only user of the
+    /// connection until it has received that response.
+    #[cfg_attr(feature = "unstable-bolt-protocol-impl-v2", allow(deprecated))]
     async fn try_execute(
         request: BoltRequest,
         fetch_size: usize,
+        follow_up: FollowUp,
         connection: &mut ManagedConnection,
     ) -> QueryResult<RowStream> {
-        Self::try_request(request, connection).await.map(|success| {
-            let fields: BoltList = success.get("fields").unwrap_or_default();
-            let qid: i64 = success.get("qid").unwrap_or(-1);
-
-            #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-            {
-                let available: i64 = success.get("t_first").unwrap_or(-1);
-                RowStream::new(qid, available, fields, fetch_size)
+        let (follow_up, state) = match follow_up {
+            FollowUp::None => (None, State::Ready),
+            FollowUp::Pull => (Some(BoltRequest::pull(fetch_size, -1)), State::Pulling),
+            FollowUp::Discard => (Some(BoltRequest::discard_all_for(-1)), State::Discarding),
+        };
+        let pipelined = follow_up.is_some();
+        let response = match follow_up {
+            Some(follow_up) => {
+                let version = connection.version();
+                let requests = [request.into_bytes(version)?, follow_up.into_bytes(version)?];
+                connection.send_pipelined(requests).await?;
+                connection.recv().await
             }
-
-            #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-            {
-                RowStream::new(qid, fields, fetch_size)
+            None => connection.send_recv(request).await,
+        };
+        let success = match response {
+            Ok(BoltResponse::Success(success)) => success,
+            Ok(failure @ (BoltResponse::Failure(_) | BoltResponse::Ignore(_))) if pipelined => {
+                Self::receive_ignored(connection).await;
+                return wrap_error(Ok(failure), "RUN");
             }
-        })
+            otherwise => return wrap_error(otherwise, "RUN"),
+        };
+
+        let fields: BoltList = success.get("fields").unwrap_or_default();
+        let qid: i64 = success.get("qid").unwrap_or(-1);
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            let available: i64 = success.get("t_first").unwrap_or(-1);
+            Ok(RowStream::new(qid, available, fields, fetch_size, state))
+        }
+
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            Ok(RowStream::new(qid, fields, fetch_size, state))
+        }
     }
 
-    async fn try_request(
-        request: BoltRequest,
-        connection: &mut ManagedConnection,
-    ) -> QueryResult<Success> {
-        match connection.send_recv(request).await {
-            Ok(BoltResponse::Success(success)) => Ok(success),
-            otherwise => wrap_error(otherwise, "RUN"),
+    /// After a FAILURE, the server answers the pipelined follow-up with IGNORED.
+    /// Receiving it keeps the connection in sync, so the pool can reset and reuse it.
+    async fn receive_ignored(connection: &mut ManagedConnection) {
+        match connection.recv().await {
+            Ok(BoltResponse::Ignore(_)) => {}
+            Ok(response) => warn!("Expected IGNORED for the pipelined request, got {response:?}"),
+            Err(e) => warn!("Failed to receive IGNORED for the pipelined request: {e}"),
         }
     }
 }
@@ -233,6 +268,16 @@ impl std::fmt::Debug for Query {
 }
 
 pub(crate) type QueryResult<T> = Result<T, Retry<Error>>;
+
+/// The request that is pipelined right after RUN.
+enum FollowUp {
+    /// Only RUN is sent, the stream requests its records later.
+    None,
+    /// PULL with the fetch size, the stream continues by receiving the records.
+    Pull,
+    /// DISCARD, the stream continues by receiving the summary only.
+    Discard,
+}
 
 fn wrap_error<T>(resp: impl IntoError, req: &'static str) -> QueryResult<T> {
     let error = resp.into_error(req);

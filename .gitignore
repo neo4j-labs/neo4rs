@@ -1,4 +1,5 @@
 /target
+/integrationtests/target
 Cargo.lock
 container-license-acceptance.txt
 Session.vim

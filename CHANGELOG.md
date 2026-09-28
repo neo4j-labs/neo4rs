@@ -9,7 +9,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 
 ### Changed
 
+- `Graph::execute` pipelines the first `PULL` with `RUN`, and `Graph::run`/`Txn::run` pipeline `DISCARD` with `RUN`, in a single network flush. A query on a pooled connection now costs one round-trip less. As a result, `Graph::execute` runs the query on the server right away, even if the returned stream is never consumed; before, the query only ran on the first `next()` [#112](https://github.com/neo4j-labs/neo4rs/issues/112). `Txn::execute` is unchanged and still runs the query on the first `next()`, because several streams can share the connection of a transaction. A stream that is dropped before it is consumed no longer costs a new connection: the pool drains the pending responses, then resets the connection and reuses it [#293](https://github.com/neo4j-labs/neo4rs/issues/293).
 - With `unstable-bolt-protocol-impl-v2` (including `unstable-v1`), `connection_timeout` now also limits each response-message read, matching the default protocol implementation. The default is 30 seconds; operations that previously waited indefinitely can now return `ConnectionTimedOut`. Increase `ConfigBuilder::connection_timeout` for long-running operations. Connections with interrupted reads are discarded rather than returned to the pool.
+
+### Fixed
+
+- The connection pool logs the host and port of the server instead of the configured URI. A URI can carry credentials, which ended up in the log at `INFO` level.
+- A record that cannot be decoded no longer leaves the stream stuck. The next `next()` or `finish()` call continues to receive the same batch, so the connection stays in sync and is reused by the pool instead of being discarded [#300](https://github.com/neo4j-labs/neo4rs/issues/300).
 
 ## [0.9.0-rc.3](https://github.com/neo4j-labs/neo4rs/tree/0.9.0-rc.3) - 2025-01-15
 
