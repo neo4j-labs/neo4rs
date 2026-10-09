@@ -64,13 +64,15 @@ impl Manager for ConnectionManager {
     }
 
     async fn recycle(&self, obj: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
-        if !obj.is_reusable() {
-            return Err(deadpool::managed::RecycleError::message(
-                "Connection has an unfinished or failed Bolt exchange",
-            ));
-        }
         trace!("recycling connection");
-        match tokio::time::timeout(Duration::from_secs(5), obj.reset()).await {
+        // A stream dropped before it was consumed leaves its pipelined PULL in flight.
+        // Its responses are drained here, so the connection can be reset and reused.
+        // A connection with an interrupted read fails the drain and is discarded.
+        let health_check = async {
+            obj.drain_pending_responses().await?;
+            obj.reset().await
+        };
+        match tokio::time::timeout(Duration::from_secs(5), health_check).await {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => Err(deadpool::managed::RecycleError::Backend(e)),
             Err(_) => Err(deadpool::managed::RecycleError::message(
@@ -89,9 +91,10 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
         config.connection_timeout,
         config.tcp_keepalive,
     )?;
+    // Log the parsed host and port, not the URI: a URI can carry credentials.
     info!(
-        "creating connection pool for node {} with max size {}",
-        config.uri, config.max_connections
+        "creating connection pool for node {}:{} with max size {}",
+        mgr.info.prepare.host, mgr.info.prepare.port, config.max_connections
     );
     let mut builder = ConnectionPool::builder(mgr).max_size(config.max_connections);
 

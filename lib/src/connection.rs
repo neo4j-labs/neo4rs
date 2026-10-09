@@ -262,6 +262,23 @@ impl Connection {
         self.pending_responses == 0 && !self.io_in_progress
     }
 
+    /// Receives the responses that are still outstanding for requests already sent,
+    /// so that a connection returned to the pool with a request in flight can be
+    /// reused. The responses are not decoded, only counted. A read that was
+    /// interrupted midway cannot be recovered because the framing is unknown.
+    pub(crate) async fn drain_pending_responses(&mut self) -> Result<()> {
+        if self.io_in_progress {
+            return Err(Error::IncompleteBoltExchange);
+        }
+        while self.pending_responses > 0 {
+            let bytes = tokio::time::timeout(self.recv_timeout, self.recv_bytes())
+                .await
+                .map_err(|_| Error::ConnectionTimedOut)??;
+            self.complete_response(&bytes)?;
+        }
+        Ok(())
+    }
+
     fn complete_response(&mut self, bytes: &[u8]) -> Result<()> {
         if self.pending_responses == 0 {
             return Err(Error::UnexpectedMessage("unsolicited Bolt response".into()));
@@ -282,20 +299,39 @@ impl Connection {
     }
 
     async fn send_bytes(&mut self, bytes: Bytes) -> Result<()> {
+        self.send_pipelined([bytes]).await
+    }
+
+    /// Sends several requests in a single flush and expects one response per request.
+    ///
+    /// The server answers pipelined requests in order, so the caller must receive
+    /// every response before the connection is reusable again. After a FAILURE,
+    /// the server answers each of the following requests with IGNORED.
+    pub(crate) async fn send_pipelined(
+        &mut self,
+        messages: impl IntoIterator<Item = Bytes>,
+    ) -> Result<()> {
         if !self.is_reusable() {
             return Err(Error::IncompleteBoltExchange);
         }
         self.io_in_progress = true;
-        self.pending_responses += 1;
-        Self::dbg("send", &bytes);
+        for bytes in messages {
+            self.pending_responses += 1;
+            self.write_message(&bytes).await?;
+        }
+        self.stream.flush().await?;
+        self.io_in_progress = false;
+        Ok(())
+    }
+
+    async fn write_message(&mut self, bytes: &Bytes) -> Result<()> {
+        Self::dbg("send", bytes);
         let end_marker: [u8; 2] = [0, 0];
         for c in bytes.chunks(MAX_CHUNK_SIZE) {
             self.stream.write_u16(c.len() as u16).await?;
             self.stream.write_all(c).await?;
         }
         self.stream.write_all(&end_marker).await?;
-        self.stream.flush().await?;
-        self.io_in_progress = false;
         Ok(())
     }
 
