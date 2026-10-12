@@ -1,5 +1,7 @@
 # Neo4rs [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
 
+> This is an experimental Neo4j Labs project and not part of Neo4j's supported product lineup. See the [Neo4j Labs disclaimer](./LABS_DISCLAIMER.txt).
+
 [ci-badge]: https://github.com/neo4j-labs/neo4rs/actions/workflows/checks.yml/badge.svg
 [ci-url]: https://github.com/neo4j-labs/neo4rs
 [crates-badge]: https://img.shields.io/crates/v/neo4rs.svg?style=shield
