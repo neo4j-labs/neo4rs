@@ -124,7 +124,11 @@ fn pin_msrv_versions(dry_run: bool, sh: &Shell, lockfile: &str) -> Result<()> {
 }
 
 fn pin_version(dry_run: bool, sh: &Shell, krate: &str, version: &str) -> Result<()> {
-    cmd!(sh, "cargo +nightly -Z no-index-update update --package {krate} --precise {version}").run_if(dry_run)?;
+    cmd!(
+        sh,
+        "cargo +nightly -Z no-index-update update --package {krate} --precise {version}"
+    )
+    .run_if(dry_run)?;
     Ok(())
 }
 
