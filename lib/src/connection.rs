@@ -25,6 +25,7 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
+use rustls_platform_verifier::BuilderVerifierExt;
 use std::fmt::{Debug, Display, Formatter};
 use std::time::Duration;
 use std::{fs::File, io::BufReader, mem, sync::Arc};
@@ -584,19 +585,10 @@ impl ConnectionInfo {
 
         let builder = ClientConfig::builder();
         let config = match tls_config {
-            ConnectionTLSConfig::None => {
-                let native_certs = rustls_native_certs::load_native_certs();
-                if !native_certs.errors.is_empty() {
-                    warn!(
-                        "Failed to load native certificates: {:?}",
-                        native_certs.errors
-                    );
-                }
-                root_cert_store.add_parsable_certificates(native_certs.certs);
-                builder
-                    .with_root_certificates(root_cert_store)
-                    .with_no_client_auth()
-            }
+            ConnectionTLSConfig::None => builder
+                .with_platform_verifier()
+                .map_err(std::io::Error::other)?
+                .with_no_client_auth(),
             ConnectionTLSConfig::ClientCACertificate(certificate) => {
                 let cert_file = File::open(&certificate.cert_file)?;
                 let reader = BufReader::new(cert_file);
@@ -631,16 +623,9 @@ impl ConnectionInfo {
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
                 } else if mutual.validation {
-                    let native_certs = rustls_native_certs::load_native_certs();
-                    if !native_certs.errors.is_empty() {
-                        warn!(
-                            "Failed to load native certificates: {:?}",
-                            native_certs.errors
-                        );
-                    }
-                    root_cert_store.add_parsable_certificates(native_certs.certs);
                     builder
-                        .with_root_certificates(root_cert_store)
+                        .with_platform_verifier()
+                        .map_err(std::io::Error::other)?
                         .with_client_auth_cert(cert_certs.collect(), keys)
                         .map_err(|_e| Error::ConnectionError)?
                 } else {
