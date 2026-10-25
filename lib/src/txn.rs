@@ -8,6 +8,8 @@ use {
 };
 
 use crate::config::ImpersonateUser;
+#[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+use crate::{BoltMap, BoltType};
 use crate::{
     Operation, RunResult,
     config::Database,
@@ -16,6 +18,45 @@ use crate::{
     query::Query,
     stream::RowStream,
 };
+
+/// Options sent to Neo4j when an explicit transaction is started.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TransactionConfig {
+    tx_timeout: Option<u32>,
+    tx_metadata: Option<Vec<(String, String)>>,
+}
+
+impl TransactionConfig {
+    /// Sets the server-side transaction timeout in milliseconds.
+    ///
+    /// A timeout of zero disables the transaction timeout.
+    pub fn with_tx_timeout(mut self, tx_timeout: u32) -> Self {
+        self.tx_timeout = Some(tx_timeout);
+        self
+    }
+
+    /// Sets metadata attached to the transaction as string key/value pairs.
+    pub fn with_tx_metadata(mut self, tx_metadata: Vec<(String, String)>) -> Self {
+        self.tx_metadata = Some(tx_metadata);
+        self
+    }
+
+    #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+    fn into_bolt_map(self) -> BoltMap {
+        let mut extra = BoltMap::new();
+        if let Some(tx_timeout) = self.tx_timeout {
+            extra.put("tx_timeout".into(), tx_timeout.into());
+        }
+        if let Some(tx_metadata) = self.tx_metadata {
+            let metadata = tx_metadata
+                .into_iter()
+                .map(|(key, value)| (key.into(), value.into()))
+                .collect();
+            extra.put("tx_metadata".into(), BoltType::Map(metadata));
+        }
+        extra
+    }
+}
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
 ///
@@ -41,8 +82,9 @@ impl Txn {
         mut connection: ManagedConnection,
         operation: Operation,
         imp_user: Option<ImpersonateUser>,
+        config: TransactionConfig,
     ) -> Result<Self> {
-        let begin = BoltRequest::begin(db.as_deref());
+        let begin = BoltRequest::begin(db.as_deref(), config.into_bolt_map());
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => {
                 let connection = DiscardOnAbandon::new(connection);
@@ -66,11 +108,17 @@ impl Txn {
         operation: Operation,
         imp_user: Option<ImpersonateUser>,
         bookmarks: &[String],
+        config: TransactionConfig,
     ) -> Result<Self> {
         debug!("Starting transaction with bookmarks: {:?}", bookmarks);
-        let begin = Begin::builder(db.as_deref())
-            .with_bookmarks(bookmarks.to_vec())
-            .build(connection.version());
+        let mut builder = Begin::builder(db.as_deref()).with_bookmarks(bookmarks.to_vec());
+        if let Some(tx_timeout) = config.tx_timeout {
+            builder = builder.with_tx_timeout(tx_timeout);
+        }
+        if let Some(tx_metadata) = config.tx_metadata {
+            builder = builder.with_tx_metadata(tx_metadata);
+        }
+        let begin = builder.build(connection.version());
         match connection.send_recv_as(begin).await? {
             Summary::Success(response) => {
                 let connection = DiscardOnAbandon::new(connection);
@@ -263,5 +311,32 @@ pub(crate) mod private {
         fn connection(&mut self) -> &mut ManagedConnection {
             (**self).connection()
         }
+    }
+}
+
+#[cfg(test)]
+mod transaction_config_tests {
+    use super::TransactionConfig;
+
+    #[test]
+    fn options_are_optional_and_preserve_values() {
+        let default = TransactionConfig::default();
+        assert_eq!(default.tx_timeout, None);
+        assert_eq!(default.tx_metadata, None);
+
+        let configured = TransactionConfig::default()
+            .with_tx_timeout(15_000)
+            .with_tx_metadata(vec![
+                ("operation".into(), "probe".into()),
+                ("request_id".into(), "request-1".into()),
+            ]);
+        assert_eq!(configured.tx_timeout, Some(15_000));
+        assert_eq!(
+            configured.tx_metadata,
+            Some(vec![
+                ("operation".into(), "probe".into()),
+                ("request_id".into(), "request-1".into()),
+            ])
+        );
     }
 }

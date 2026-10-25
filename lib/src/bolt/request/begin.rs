@@ -225,18 +225,21 @@ mod tests {
                 ]
                 .to_vec(),
             )
+            .with_tx_timeout(15_000)
             .build(Version::V4);
         let bytes = begin.to_bytes().unwrap();
 
         let expected = bolt()
             .structure(1, 0x11)
-            .tiny_map(3)
+            .tiny_map(4)
             .tiny_string("bookmarks")
             .tiny_list(2)
             .string8("example-bookmark:1")
             .string8("example-bookmark:2")
             .tiny_string("mode")
             .tiny_string("w")
+            .tiny_string("tx_timeout")
+            .int16(15_000)
             .tiny_string("tx_metadata")
             .tiny_map(2)
             .tiny_string("user")

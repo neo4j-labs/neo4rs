@@ -167,8 +167,10 @@ impl BoltRequest {
         feature = "unstable-bolt-protocol-impl-v2",
         deprecated(since = "0.9.0", note = "Use `crate::bolt::Begin` instead.")
     )]
-    pub fn begin(db: Option<&str>) -> BoltRequest {
-        let extra = db.into_iter().map(|db| ("db".into(), db.into())).collect();
+    pub fn begin(db: Option<&str>, mut extra: BoltMap) -> BoltRequest {
+        if let Some(db) = db {
+            extra.put("db".into(), db.into());
+        }
         let begin = Begin::new(extra);
         BoltRequest::Begin(begin)
     }
@@ -249,5 +251,54 @@ impl BoltResponse {
             BoltResponse::Ignore(ignore) => Error::Neo4j(ignore.into_error()),
             _ => Error::UnexpectedMessage(format!("unexpected response for {msg}: {self:?}")),
         }
+    }
+}
+
+#[cfg(all(test, not(feature = "unstable-bolt-protocol-impl-v2")))]
+mod begin_options_tests {
+    use super::*;
+
+    #[test]
+    fn begin_serializes_transaction_options_for_supported_bolt_versions() {
+        for version in [Version::V4, Version::V4_1] {
+            let mut metadata = BoltMap::new();
+            metadata.put("operation".into(), "probe".into());
+            metadata.put("request_id".into(), "request-1".into());
+
+            let mut options = BoltMap::new();
+            options.put("tx_timeout".into(), 15_000_u32.into());
+            options.put("tx_metadata".into(), BoltType::Map(metadata.clone()));
+
+            let bytes = BoltRequest::begin(Some("neo4j"), options)
+                .into_bytes(version)
+                .unwrap();
+            let mut fields = bytes.slice(2..);
+            let actual = BoltMap::parse(version, &mut fields).unwrap();
+            let expected: BoltMap = [
+                ("db".into(), "neo4j".into()),
+                ("tx_timeout".into(), 15_000_u32.into()),
+                ("tx_metadata".into(), BoltType::Map(metadata)),
+            ]
+            .into_iter()
+            .collect();
+
+            assert_eq!(actual, expected);
+            assert!(fields.is_empty());
+        }
+    }
+
+    #[test]
+    fn begin_without_transaction_options_keeps_only_database_selection() {
+        let bytes = BoltRequest::begin(Some("neo4j"), BoltMap::new())
+            .into_bytes(Version::V4_1)
+            .unwrap();
+        let mut fields = bytes.slice(2..);
+        let actual = BoltMap::parse(Version::V4_1, &mut fields).unwrap();
+
+        assert_eq!(
+            actual,
+            [("db".into(), "neo4j".into())].into_iter().collect()
+        );
+        assert!(fields.is_empty());
     }
 }

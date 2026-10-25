@@ -1,6 +1,9 @@
 use crate::config::ImpersonateUser;
 use crate::summary::Counters;
-use crate::{Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult};
+use crate::{
+    Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult,
+    TransactionConfig,
+};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
@@ -142,6 +145,16 @@ impl Session {
         &mut self,
         queries: Vec<impl Into<Query>>,
     ) -> crate::Result<Counters> {
+        self.write_transaction_with_config(queries, TransactionConfig::default())
+            .await
+    }
+
+    /// Executes a write transaction with the provided transaction options.
+    pub async fn write_transaction_with_config(
+        &mut self,
+        queries: Vec<impl Into<Query>>,
+        config: TransactionConfig,
+    ) -> crate::Result<Counters> {
         self.update_db_name().await?;
         let mut txn = self
             .driver
@@ -151,6 +164,7 @@ impl Session {
                 self.imp_user.clone(),
                 &self.bookmarks,
                 self.fetch_size,
+                config,
             )
             .await?;
         match txn.run_queries(queries).await {
@@ -170,6 +184,16 @@ impl Session {
     }
 
     pub async fn read_transaction(&mut self, query: impl Into<Query>) -> crate::Result<RowStream> {
+        self.read_transaction_with_config(query, TransactionConfig::default())
+            .await
+    }
+
+    /// Executes a read transaction with the provided transaction options.
+    pub async fn read_transaction_with_config(
+        &mut self,
+        query: impl Into<Query>,
+        config: TransactionConfig,
+    ) -> crate::Result<RowStream> {
         self.update_db_name().await?;
         let mut txn = self
             .driver
@@ -179,6 +203,7 @@ impl Session {
                 self.imp_user.clone(),
                 &self.bookmarks,
                 self.fetch_size,
+                config,
             )
             .await?;
         txn.execute(query).await
