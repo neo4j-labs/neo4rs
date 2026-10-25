@@ -9,9 +9,56 @@ use crate::{
 use backon::ExponentialBuilder;
 use deadpool::managed::{Manager, Metrics, Object, Pool, RecycleResult};
 use log::{info, trace};
+use std::ops::{Deref, DerefMut};
 
 pub type ConnectionPool = Pool<ConnectionManager>;
 pub type ManagedConnection = Object<ConnectionManager>;
+
+pub(crate) struct DiscardOnAbandon<M: Manager> {
+    connection: Option<Object<M>>,
+    open_transaction: bool,
+}
+
+impl<M: Manager> DiscardOnAbandon<M> {
+    pub(crate) fn new(connection: Object<M>) -> Self {
+        Self {
+            connection: Some(connection),
+            open_transaction: false,
+        }
+    }
+
+    pub(crate) fn set_open_transaction(&mut self, open: bool) {
+        self.open_transaction = open;
+    }
+}
+
+impl<M: Manager> Deref for DiscardOnAbandon<M> {
+    type Target = Object<M>;
+
+    fn deref(&self) -> &Self::Target {
+        self.connection
+            .as_ref()
+            .expect("connection is present until drop")
+    }
+}
+
+impl<M: Manager> DerefMut for DiscardOnAbandon<M> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.connection
+            .as_mut()
+            .expect("connection is present until drop")
+    }
+}
+
+impl<M: Manager> Drop for DiscardOnAbandon<M> {
+    fn drop(&mut self) {
+        if self.open_transaction {
+            if let Some(connection) = self.connection.take() {
+                drop(Object::take(connection));
+            }
+        }
+    }
+}
 
 pub struct ConnectionManager {
     info: ConnectionInfo,
@@ -121,7 +168,54 @@ pub fn create_pool(config: &Config) -> Result<ConnectionPool> {
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
-    use std::time::Duration;
+    use std::{
+        convert::Infallible,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
+    struct TestManager {
+        created: Arc<AtomicUsize>,
+        dropped: Arc<AtomicUsize>,
+    }
+
+    struct TestConnection(Arc<AtomicUsize>);
+
+    impl Drop for TestConnection {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl Manager for TestManager {
+        type Type = TestConnection;
+        type Error = Infallible;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
+            self.created.fetch_add(1, Ordering::SeqCst);
+            Ok(TestConnection(self.dropped.clone()))
+        }
+
+        async fn recycle(&self, _: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
+            Ok(())
+        }
+    }
+
+    fn test_manager() -> (TestManager, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+        let created = Arc::new(AtomicUsize::new(0));
+        let dropped = Arc::new(AtomicUsize::new(0));
+        (
+            TestManager {
+                created: created.clone(),
+                dropped: dropped.clone(),
+            },
+            created,
+            dropped,
+        )
+    }
 
     #[test]
     fn should_create_pool_with_default_config() {
@@ -147,5 +241,38 @@ mod tests {
             .unwrap();
         let pool = create_pool(&config);
         assert!(pool.is_ok());
+    }
+
+    #[tokio::test]
+    async fn abandoned_transaction_discards_connection_immediately() {
+        let (manager, created, dropped) = test_manager();
+        let pool = Pool::builder(manager).max_size(1).build().unwrap();
+        let connection = pool.get().await.unwrap();
+        let mut guarded = DiscardOnAbandon::new(connection);
+        guarded.set_open_transaction(true);
+
+        drop(guarded);
+
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+        assert_eq!(pool.status().size, 0);
+
+        let _connection = pool.get().await.unwrap();
+        assert_eq!(created.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn completed_transaction_returns_connection_to_pool() {
+        let (manager, created, dropped) = test_manager();
+        let pool = Pool::builder(manager).max_size(1).build().unwrap();
+        let connection = pool.get().await.unwrap();
+        let mut guarded = DiscardOnAbandon::new(connection);
+        guarded.set_open_transaction(true);
+        guarded.set_open_transaction(false);
+
+        drop(guarded);
+
+        assert_eq!(dropped.load(Ordering::SeqCst), 0);
+        let _connection = pool.get().await.unwrap();
+        assert_eq!(created.load(Ordering::SeqCst), 1);
     }
 }

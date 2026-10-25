@@ -9,18 +9,24 @@ use {
 
 use crate::config::ImpersonateUser;
 use crate::{
-    Operation, RunResult, config::Database, errors::Result, pool::ManagedConnection, query::Query,
+    Operation, RunResult,
+    config::Database,
+    errors::Result,
+    pool::{ConnectionManager, DiscardOnAbandon, ManagedConnection},
+    query::Query,
     stream::RowStream,
 };
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
 ///
-/// When a transaction is started, a dedicated connection is reserved and moved into the handle which
-/// will be released to the connection pool when the [`Txn`] handle is dropped.
+/// When a transaction is started, a dedicated connection is reserved and moved into the handle.
+/// If the handle is dropped before the transaction is committed or rolled back, the connection is
+/// discarded so the server can roll back the transaction. Completed transactions return their
+/// connections to the pool when the handle is dropped.
 pub struct Txn {
     db: Option<Database>,
     fetch_size: usize,
-    connection: ManagedConnection,
+    connection: DiscardOnAbandon<ConnectionManager>,
     operation: Operation,
     imp_user: Option<ImpersonateUser>,
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -38,13 +44,17 @@ impl Txn {
     ) -> Result<Self> {
         let begin = BoltRequest::begin(db.as_deref());
         match connection.send_recv(begin).await? {
-            BoltResponse::Success(_) => Ok(Txn {
-                db,
-                fetch_size,
-                connection,
-                operation,
-                imp_user,
-            }),
+            BoltResponse::Success(_) => {
+                let mut connection = DiscardOnAbandon::new(connection);
+                connection.set_open_transaction(true);
+                Ok(Txn {
+                    db,
+                    fetch_size,
+                    connection,
+                    operation,
+                    imp_user,
+                })
+            }
             msg => Err(msg.into_error("BEGIN")),
         }
     }
@@ -63,14 +73,18 @@ impl Txn {
             .with_bookmarks(bookmarks.to_vec())
             .build(connection.version());
         match connection.send_recv_as(begin).await? {
-            Summary::Success(response) => Ok(Txn {
-                db: response.metadata.db.or(db),
-                fetch_size,
-                connection,
-                operation,
-                bookmark: None,
-                imp_user,
-            }),
+            Summary::Success(response) => {
+                let mut connection = DiscardOnAbandon::new(connection);
+                connection.set_open_transaction(true);
+                Ok(Txn {
+                    db: response.metadata.db.or(db),
+                    fetch_size,
+                    connection,
+                    operation,
+                    bookmark: None,
+                    imp_user,
+                })
+            }
             Summary::Ignored => Err(crate::errors::Error::Ignored("Failed to start transaction")),
             Summary::Failure(failure) => Err(failure.into_error()),
         }
@@ -152,7 +166,10 @@ impl Txn {
     pub async fn commit(mut self) -> Result<()> {
         let commit = BoltRequest::commit();
         match self.connection.send_recv(commit).await? {
-            BoltResponse::Success(_) => Ok(()),
+            BoltResponse::Success(_) => {
+                self.connection.set_open_transaction(false);
+                Ok(())
+            }
             msg => Err(msg.into_error("COMMIT")),
         }
     }
@@ -162,6 +179,7 @@ impl Txn {
         match self.connection.send_recv_as(Commit).await? {
             Summary::Success(resp) => {
                 self.save_bookmark_state(&resp.metadata);
+                self.connection.set_open_transaction(false);
                 Ok(self.bookmark)
             }
             msg => Err(msg.into_error("COMMIT")),
@@ -174,7 +192,10 @@ impl Txn {
         {
             let rollback = BoltRequest::rollback();
             match self.connection.send_recv(rollback).await? {
-                BoltResponse::Success(_) => Ok(()),
+                BoltResponse::Success(_) => {
+                    self.connection.set_open_transaction(false);
+                    Ok(())
+                }
                 msg => Err(msg.into_error("ROLLBACK")),
             }
         }
@@ -182,7 +203,10 @@ impl Txn {
         #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
         {
             match self.connection.send_recv_as(Rollback).await? {
-                Summary::Success(_) => Ok(()),
+                Summary::Success(_) => {
+                    self.connection.set_open_transaction(false);
+                    Ok(())
+                }
                 msg => Err(msg.into_error("ROLLBACK")),
             }
         }
