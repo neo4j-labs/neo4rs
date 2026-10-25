@@ -5,7 +5,7 @@ use crate::messages::HelloBuilder;
 use {
     crate::bolt::{
         ConnectionsHints, ExpectedResponse, Hello, HelloBuilder, Message, MessageResponse, Reset,
-        Summary,
+        Rollback, Summary,
     },
     log::debug,
 };
@@ -210,6 +210,26 @@ impl Connection {
                     "unexpected response for RESET: {:?}",
                     msg
                 ))),
+            }
+        }
+    }
+
+    pub(crate) async fn rollback_transaction(&mut self) -> Result<()> {
+        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
+        {
+            match self.send_recv(BoltRequest::rollback()).await? {
+                BoltResponse::Success(_) => Ok(()),
+                BoltResponse::Ignore(_) => self.reset().await,
+                msg => Err(msg.into_error("ROLLBACK")),
+            }
+        }
+
+        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+        {
+            match self.send_recv_as(Rollback).await? {
+                Summary::Success(_) => Ok(()),
+                Summary::Ignored => self.reset().await,
+                msg => Err(msg.into_error("ROLLBACK")),
             }
         }
     }
