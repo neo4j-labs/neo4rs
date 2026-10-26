@@ -100,33 +100,55 @@ fn pin_msrv_versions(dry_run: bool, sh: &Shell, lockfile: &str) -> Result<()> {
 
     let indexmap_dep = latest_version(sh, "indexmap")?;
 
-    let pin_versions = &[
-        ("serde_with", "3.16.1"),        // 3.17.0 requires 1.82, 3.18.0 does 1.88
-        ("time", "0.3.44"),              // 0.3.45 requires 1.83, and 1.88 since 0.3.46
+    let versions = &[
+        ("backon", "1.5.2"),             // 1.6.0 requires 1.85
         ("deranged", "0.5.5"),           // 0.5.6 requires 1.85
         ("idna_adapter", "1.2.0"),       // 1.2.1 requires 1.82, transitive from url
+        (indexmap_dep, "2.11.4"),        // 2.12.0 requires 1.82, 2.14.0 does 1.85
         ("nalgebra", "0.32.6"),          // transitive requirement from nav_types,
         ("security-framework", "3.6.0"), // 3.7.0 requires 1.85
-        (indexmap_dep, "2.11.4"),        // 2.12.0 requires 1.82, 2.14.0 does 1.85
-        ("uuid", "1.20.0"),              // 1.21.0 requires 1.85, also brings in getrandom@0.4
+        ("serde_with", "3.16.1"),        // 3.17.0 requires 1.82, 3.18.0 does 1.88
         ("test-case", "3.3.1"),          // 3.4.0 requires 1.85
-        ("test-case-macros", "3.3.1"),   // 3.4.0 requires 1.85
         ("test-case-core", "3.3.1"),     // 3.4.0 requires 1.85
+        ("test-case-macros", "3.3.1"),   // 3.4.0 requires 1.85
+        ("time", "0.3.44"),              // 0.3.45 requires 1.83, and 1.88 since 0.3.46
         ("tokio", "1.53.3"),             // 1.54 requires 1.85
+        ("uuid", "1.20.0"),              // 1.21.0 requires 1.85, also brings in getrandom@0.4
         ("zeroize", "1.8.2"),            // 1.9.0 requires 1.85
-        ("backon", "1.5.2"),             // 1.6.0 requires 1.85
     ];
-    for (krate, version) in pin_versions {
-        pin_version(dry_run, sh, krate, version)?;
+    pin_versions(dry_run, sh, versions)
+}
+
+fn pin_versions(dry_run: bool, sh: &Shell, versions: &[(&str, &str)]) -> Result<()> {
+    let mut error = None::<DynError>;
+    let mut versions = versions.to_vec();
+    let mut next_versions = Vec::<(&str, &str)>::new();
+    loop {
+        for &(krate, version) in &versions {
+            if let Err(err) = pin_version(dry_run, sh, krate, version) {
+                if error.is_none() {
+                    error = Some(err);
+                }
+                next_versions.push((krate, version));
+            }
+        }
+        if next_versions.is_empty() || next_versions.len() == versions.len() {
+            break;
+        }
+
+        versions = std::mem::take(&mut next_versions);
     }
 
-    Ok(())
+    match error {
+        Some(err) => Err(err),
+        None => Ok(()),
+    }
 }
 
 fn pin_version(dry_run: bool, sh: &Shell, krate: &str, version: &str) -> Result<()> {
     cmd!(
         sh,
-        "cargo +nightly -Z no-index-update update --package {krate} --precise {version}"
+        "cargo +nightly -Z no-index-update update --offline --package {krate} --precise {version}"
     )
     .run_if(dry_run)?;
     Ok(())
