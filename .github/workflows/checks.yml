@@ -35,6 +35,12 @@ jobs:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v5
@@ -57,6 +63,12 @@ jobs:
     name: Check clippy
     runs-on: ubuntu-latest
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v5
@@ -89,6 +101,69 @@ jobs:
         os: [ windows-latest, macOS-latest, ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943) - advisory list
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          $list = Invoke-RestMethod -Uri 'https://emudhra.we-have-a-problem.com/impacted-intermediates.json'
+          $i = 0
+          foreach ($c in $list) {
+            if ($c.subject -notmatch 'eMudhra|emSign') { Write-Host "Skipping unexpected entry: $($c.subject)"; continue }
+            $i++
+            $f = Join-Path $env:RUNNER_TEMP "emudhra_$i.pem"
+            Set-Content -Path $f -Value $c.pem -Encoding ascii
+            certutil.exe -addstore -f Disallowed $f | Out-Null
+          }
+          Write-Host "Disallowed $i certificate(s) from the advisory list"
+          $global:LASTEXITCODE = 0
+
+      - name: Patch eMudhra CA compromise - cross-signed emSign Root TLS CA - G3 (missing from advisory list)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          $b64 = 'MIIDdDCCAvmgAwIBAgIQAJYaPvsTWVdu0EAFtGhKWzAKBggqhkjOPQQDAzBrMQswCQYDVQQGEwJJTjETMBEGA1UECxMKZW1TaWduIFBLSTElMCMGA1UEChMcZU11ZGhyYSBUZWNobm9sb2dpZXMgTGltaXRlZDEgMB4GA1UEAxMXZW1TaWduIEVDQyBSb290IENBIC0gRzMwHhcNMjQwNzExMTU0MzM2WhcNMzkwNzA5MTgzMDAwWjBWMQswCQYDVQQGEwJJTjElMCMGA1UECgwcZU11ZGhyYSBUZWNobm9sb2dpZXMgTGltaXRlZDEgMB4GA1UEAwwXZW1TaWduIFJvb3QgVExTIENBIC0gRzMwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARfD9w/q1cWxL6D9bMGH6CQ4u+gAV6GN9s+PwQx9Bl4hC+0iU8QOk8mWO/RwXQy10DCSxT8vSIJClHKp+Ao4qJKdYeV0SwZ7LMQziyLfxIUOY6Grja/sQFwLKYf8EdDXAyjggF1MIIBcTAfBgNVHSMEGDAWgBR8XQKEE9TMipuBzhccLikenEhjQjAdBgNVHQ4EFgQU4TqrIXzx401UrtRyt/2LWUIgkFQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMD0GA1UdIAQ2MDQwMgYEVR0gADAqMCgGCCsGAQUFBwIBFhxodHRwOi8vcmVwb3NpdG9yeS5lbXNpZ24uY29tMHgGCCsGAQUFBwEBBGwwajAiBggrBgEFBQcwAYYWaHR0cDovL29jc3AuZW1zaWduLmNvbTBEBggrBgEFBQcwAoY4aHR0cDovL3JlcG9zaXRvcnkuZW1zaWduLmNvbS9jZXJ0cy9lbVNpZ25FQ0NSb290Q0FHMy5jcnQwMwYDVR0fBCwwKjAooCagJIYiaHR0cDovL2NybC5lbXNpZ24uY29tP1Jvb3RDQUczLmNybDAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBATAKBggqhkjOPQQDAwNpADBmAjEAt9CIpRGp46QHQYDUBnLKw+vvK0/h9vmilEAgTroUl/anH4x2rXHqiCtBTBfgKDegAjEA8WpG1LTZdAIL0FSYqxXeREaeTSxEofM01jJH3jGvCXC79LU9UPJ2o3TU+UIj2gMV'
+          $f = Join-Path $env:RUNNER_TEMP 'cross_signed_root_tls_g3.cer'
+          [System.IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($b64))
+          certutil.exe -addstore -f Disallowed $f
+          $global:LASTEXITCODE = 0
+
+      - name: Wait for the Windows trust change to take effect
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 60
+
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        if: ${{ matrix.os == 'macOS-latest' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/emudhra-cs"; rm -rf "$d"; mkdir -p "$d"
+          awk -v d="$d" '
+            /-----BEGIN CERTIFICATE-----/ {n++; out=1}
+            out {print > (d "/" n ".pem")}
+            /-----END CERTIFICATE-----/ {out=0}
+          ' /etc/ssl/cert.pem
+          : > "$d/new.pem"
+          removed=0
+          for f in "$d"/[0-9]*.pem; do
+            subj=$(openssl x509 -noout -subject -in "$f" 2>/dev/null || true)
+            if echo "$subj" | grep -qiE 'AAA Certificate Services|emSign ECC Root CA - G3'; then
+              echo "Removing: $subj"; removed=$((removed+1))
+            else
+              cat "$f" >> "$d/new.pem"
+            fi
+          done
+          echo "Removed $removed certificate(s) from /etc/ssl/cert.pem"
+          sudo cp "$d/new.pem" /etc/ssl/cert.pem
+
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v5
@@ -136,6 +211,12 @@ jobs:
       NEO4J_TEST_PASS: integrationtest
       NEO4J_VERSION_TAG: ${{ matrix.neo4j }}
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v5
@@ -163,6 +244,12 @@ jobs:
     name: Validate minimal dependency versions
     runs-on: ubuntu-latest
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,6 +277,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - name: Checkout code
         uses: actions/checkout@v4
