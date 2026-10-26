@@ -148,7 +148,7 @@ fn pin_versions(dry_run: bool, sh: &Shell, versions: &[(&str, &str)]) -> Result<
 fn pin_version(dry_run: bool, sh: &Shell, krate: &str, version: &str) -> Result<()> {
     cmd!(
         sh,
-        "cargo +nightly -Z no-index-update update --offline --package {krate} --precise {version}"
+        "cargo +nightly -Z no-index-update update --package {krate} --precise {version}"
     )
     .run_if(dry_run)?;
     Ok(())
