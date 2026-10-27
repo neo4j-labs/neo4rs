@@ -3,8 +3,8 @@ use serde::de::{Deserialize, Deserializer, Error};
 use super::de::{impl_visitor, impl_visitor_ref};
 
 use super::{
-    urel::UnboundRelationship, urel::UnboundRelationshipRef, Node, NodeRef, Relationship,
-    RelationshipRef,
+    Node, NodeRef, Relationship, RelationshipRef, urel::UnboundRelationship,
+    urel::UnboundRelationshipRef,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -412,7 +412,7 @@ impl<'de> Deserialize<'de> for Path {
 mod tests {
     use bytes::Bytes;
 
-    use crate::packstream::{bolt, from_bytes_ref, Data};
+    use crate::packstream::{Data, bolt, from_bytes_ref};
 
     use super::*;
 

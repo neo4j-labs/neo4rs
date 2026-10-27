@@ -2,16 +2,16 @@ use core::fmt;
 use std::{iter::Peekable, marker::PhantomData};
 
 use serde::de::{
-    value::{BorrowedStrDeserializer, MapDeserializer},
     DeserializeSeed, Error, IntoDeserializer, MapAccess, SeqAccess, Visitor,
+    value::{BorrowedStrDeserializer, MapDeserializer},
 };
 
 use crate::{
-    types::{
-        serde::builder::SetOnce, BoltDateTime, BoltDateTimeZoneId, BoltInteger, BoltLocalDateTime,
-        BoltString,
-    },
     DeError,
+    types::{
+        BoltDateTime, BoltDateTimeZoneId, BoltInteger, BoltLocalDateTime, BoltString,
+        serde::builder::SetOnce,
+    },
 };
 
 crate::cenum!(Fields {
@@ -190,7 +190,7 @@ impl<'de, T: DateTimeIsh> Visitor<'de> for BoltDateTimeVisitor<T> {
                             "tz_id",
                             "days",
                         ],
-                    ))
+                    ));
                 }
             }
         }

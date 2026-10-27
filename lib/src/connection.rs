@@ -13,17 +13,17 @@ use {
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::routing::{Route, RoutingTable};
 use crate::{
+    BoltMap, BoltString, BoltType,
     connection::stream::ConnectionStream,
     errors::{Error, Result},
     messages::{BoltRequest, BoltResponse},
     version::Version,
-    BoltMap, BoltString, BoltType,
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use log::{info, warn};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::CryptoProvider;
-use rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer, UnixTime};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, UnixTime, pem::PemObject};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use rustls_platform_verifier::BuilderVerifierExt;
 use std::fmt::{Debug, Display, Formatter};
@@ -34,11 +34,11 @@ use tokio::{
     net::TcpStream,
 };
 use tokio_rustls::{
-    rustls::{
-        pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName},
-        ClientConfig, RootCertStore,
-    },
     TlsConnector,
+    rustls::{
+        ClientConfig, RootCertStore,
+        pki_types::{IpAddr, Ipv4Addr, Ipv6Addr, ServerName},
+    },
 };
 use url::{Host, Url};
 
@@ -292,7 +292,7 @@ impl Connection {
             _ => {
                 return Err(Error::UnexpectedMessage(
                     "unknown Bolt response signature".into(),
-                ))
+                ));
             }
         }
         self.io_in_progress = false;

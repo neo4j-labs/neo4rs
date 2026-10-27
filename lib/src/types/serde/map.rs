@@ -1,10 +1,11 @@
 use serde::{
+    Deserialize, Deserializer,
     de::{
-        value::{MapDeserializer, SeqDeserializer},
         DeserializeSeed, EnumAccess, Error as _, IntoDeserializer, Unexpected, VariantAccess,
         Visitor,
+        value::{MapDeserializer, SeqDeserializer},
     },
-    forward_to_deserialize_any, Deserialize, Deserializer,
+    forward_to_deserialize_any,
 };
 
 use crate::{BoltMap, BoltString, BoltType};

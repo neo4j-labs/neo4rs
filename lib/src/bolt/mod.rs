@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 
 use bytes::Bytes;
 use serde::{
-    de::{Deserialize, DeserializeOwned, Deserializer, EnumAccess, Unexpected, VariantAccess as _},
     Serialize,
+    de::{Deserialize, DeserializeOwned, Deserializer, EnumAccess, Unexpected, VariantAccess as _},
 };
 
 mod detail;
@@ -25,7 +25,7 @@ pub use structs::{
 };
 pub use summary::{Failure, Success, Summary};
 
-use crate::packstream::{de, from_bytes, from_bytes_ref, ser, to_bytes, Data};
+use crate::packstream::{Data, de, from_bytes, from_bytes_ref, ser, to_bytes};
 
 pub(crate) trait Message: Serialize {
     /// Serialize this type into a packstream encoded byte slice.

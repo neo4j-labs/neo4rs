@@ -421,7 +421,7 @@ impl<'de> Deserialize<'de> for LegacyDateTimeZoneId {
 mod tests {
     use chrono::{Datelike, FixedOffset, Timelike};
 
-    use crate::packstream::{bolt, from_bytes_ref, Data};
+    use crate::packstream::{Data, bolt, from_bytes_ref};
 
     use super::*;
 

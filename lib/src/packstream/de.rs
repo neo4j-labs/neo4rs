@@ -3,8 +3,8 @@ use std::{any::type_name, fmt, marker::PhantomData};
 use bytes::{Buf, Bytes};
 use serde::{
     de::{
-        self, value::SeqDeserializer, DeserializeSeed, EnumAccess, IgnoredAny,
-        IntoDeserializer as _, MapAccess, SeqAccess, VariantAccess, Visitor,
+        self, DeserializeSeed, EnumAccess, IgnoredAny, IntoDeserializer as _, MapAccess, SeqAccess,
+        VariantAccess, Visitor, value::SeqDeserializer,
     },
     forward_to_deserialize_any,
 };

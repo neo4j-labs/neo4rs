@@ -2,10 +2,10 @@ use serde::de::{Deserialize, DeserializeOwned, Deserializer};
 
 use crate::{
     bolt::{Node, NodeRef},
-    packstream::{de, from_bytes, from_bytes_ref, from_bytes_seed, Data},
+    packstream::{Data, de, from_bytes, from_bytes_ref, from_bytes_seed},
 };
 
-use super::de::{impl_visitor, impl_visitor_ref, Keys, Single};
+use super::de::{Keys, Single, impl_visitor, impl_visitor_ref};
 
 /// A relationship within the graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -281,10 +281,10 @@ mod tests {
 
     use bytes::Bytes;
     use serde::Deserialize;
-    use serde_test::{assert_de_tokens, Token};
+    use serde_test::{Token, assert_de_tokens};
     use test_case::{test_case, test_matrix};
 
-    use crate::packstream::{bolt, from_bytes_ref, BoltBytesBuilder, Data};
+    use crate::packstream::{BoltBytesBuilder, Data, bolt, from_bytes_ref};
 
     use super::*;
 

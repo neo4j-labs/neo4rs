@@ -1,8 +1,8 @@
 use crate::{
+    DeError,
     errors::{Error, Result},
     types::BoltWireFormat,
     version::Version,
-    DeError,
 };
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::{borrow::Borrow, str::from_utf8};
@@ -74,7 +74,7 @@ impl BoltWireFormat for BoltString {
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid string marker {marker}"
-                )))
+                )));
             }
         };
 

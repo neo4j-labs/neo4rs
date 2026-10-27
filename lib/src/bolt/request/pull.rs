@@ -1,7 +1,7 @@
 use crate::{
     bolt::{
-        request::extra::{Extra, WrapExtra},
         ExpectedResponse, Summary,
+        request::extra::{Extra, WrapExtra},
     },
     errors::Result,
     summary::Streaming,

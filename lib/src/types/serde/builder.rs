@@ -6,7 +6,7 @@ use crate::types::{
 use std::result::Result;
 
 use delegate::delegate;
-use serde::{de::Error, Deserialize};
+use serde::{Deserialize, de::Error};
 
 #[derive(Debug, Clone, Default)]
 pub struct BoltNodeBuilder {

@@ -1,7 +1,7 @@
 use crate::{
-    errors::Neo4jError,
-    types::{serde::DeError, BoltMap},
     BoltType,
+    errors::Neo4jError,
+    types::{BoltMap, serde::DeError},
 };
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;

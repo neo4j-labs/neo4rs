@@ -13,10 +13,10 @@ mod run;
 mod success;
 
 use crate::{
+    BoltString, BoltType,
     errors::{Error, Result},
     types::{BoltMap, BoltWireFormat},
     version::Version,
-    BoltString, BoltType,
 };
 use begin::Begin;
 use bytes::Bytes;

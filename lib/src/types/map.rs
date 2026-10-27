@@ -1,6 +1,6 @@
 use crate::{
     errors::{Error, Result},
-    types::{serde::DeError, BoltString, BoltType, BoltWireFormat},
+    types::{BoltString, BoltType, BoltWireFormat, serde::DeError},
     version::Version,
 };
 use ::serde::Deserialize;
@@ -86,7 +86,7 @@ impl BoltWireFormat for BoltMap {
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid map marker {marker}"
-                )))
+                )));
             }
         };
 

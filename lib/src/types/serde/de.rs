@@ -3,17 +3,17 @@ use std::{collections::HashMap, marker::PhantomData};
 use bytes::Bytes;
 use chrono::FixedOffset;
 use serde::{
-    de::{Error, SeqAccess, Unexpected, Visitor},
     Deserialize, Deserializer,
+    de::{Error, SeqAccess, Unexpected, Visitor},
 };
 
 use crate::{
-    types::{
-        serde::Properties, BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap,
-        BoltNull, BoltString, BoltType,
-    },
     EndNodeId, Id, Indices, Keys, Labels, Nodes, Offset, Relationships, StartNodeId, Timezone,
     Type,
+    types::{
+        BoltBoolean, BoltBytes, BoltFloat, BoltInteger, BoltList, BoltMap, BoltNull, BoltString,
+        BoltType, serde::Properties,
+    },
 };
 
 impl<'de> Deserialize<'de> for BoltString {

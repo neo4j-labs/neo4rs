@@ -9,8 +9,8 @@ use {
 
 use crate::config::ImpersonateUser;
 use crate::{
-    config::Database, errors::Result, pool::ManagedConnection, query::Query, stream::RowStream,
-    Operation, RunResult,
+    Operation, RunResult, config::Database, errors::Result, pool::ManagedConnection, query::Query,
+    stream::RowStream,
 };
 
 /// A handle which is used to control a transaction, created as a result of [`crate::Graph::start_txn`]
@@ -219,7 +219,7 @@ impl TransactionHandle for ManagedConnection {}
 impl<T: TransactionHandle> TransactionHandle for &mut T {}
 
 pub(crate) mod private {
-    use crate::{pool::ManagedConnection, Txn};
+    use crate::{Txn, pool::ManagedConnection};
 
     pub trait Handle {
         fn connection(&mut self) -> &mut ManagedConnection;

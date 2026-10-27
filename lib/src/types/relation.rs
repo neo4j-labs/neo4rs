@@ -1,4 +1,4 @@
-use crate::types::{serde::DeError, BoltInteger, BoltMap, BoltString, BoltType, Result};
+use crate::types::{BoltInteger, BoltMap, BoltString, BoltType, Result, serde::DeError};
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
@@ -63,7 +63,7 @@ impl From<BoltUnboundedRelation> for BoltType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{types::BoltWireFormat, Version};
+    use crate::{Version, types::BoltWireFormat};
     use bytes::Bytes;
 
     #[test]

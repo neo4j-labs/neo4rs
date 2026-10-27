@@ -1,20 +1,20 @@
 use crate::{
-    cenum,
+    Point2D, Point3D, cenum,
     types::{
-        serde::{builder::SetOnce, BoltKind},
         BoltFloat, BoltInteger, BoltPoint2D, BoltPoint3D,
+        serde::{BoltKind, builder::SetOnce},
     },
-    Point2D, Point3D,
 };
 
 use std::{fmt, marker::PhantomData, result::Result};
 
 use serde::{
+    Deserialize,
     de::{
         DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer, MapAccess, SeqAccess,
         VariantAccess, Visitor,
     },
-    forward_to_deserialize_any, Deserialize,
+    forward_to_deserialize_any,
 };
 
 impl<'de> Deserialize<'de> for Point2D {
@@ -489,7 +489,7 @@ impl<'de, E: Error> VariantAccess<'de> for BoltPointDeserializer<'de, E> {
 mod tests {
     use std::{fmt::Debug, marker::PhantomData};
 
-    use crate::{types::BoltType, DeError};
+    use crate::{DeError, types::BoltType};
 
     use super::*;
 

@@ -1,23 +1,24 @@
 use crate::{
+    BoltMap, DeError, Type, UnboundedRelation,
     types::{
+        BoltString, BoltUnboundedRelation,
         serde::{
+            BoltKind, Properties,
             builder::{BoltUnboundedRelationBuilder, Id},
             element::{ElementDataDeserializer, ElementDataKey},
-            BoltKind, Properties,
         },
-        BoltString, BoltUnboundedRelation,
     },
-    BoltMap, DeError, Type, UnboundedRelation,
 };
 
 use std::{fmt, result::Result};
 
 use serde::{
+    Deserialize,
     de::{
-        value::MapDeserializer, DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer,
-        Visitor,
+        DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer, Visitor,
+        value::MapDeserializer,
     },
-    forward_to_deserialize_any, Deserialize,
+    forward_to_deserialize_any,
 };
 
 impl<'de> Deserialize<'de> for UnboundedRelation {
@@ -111,7 +112,7 @@ impl<'de> Visitor<'de> for BoltUnboundedRelationVisitor {
                     return Err(Error::unknown_field(
                         otherwise.name(),
                         &["Id", "Type", "Properties"],
-                    ))
+                    ));
                 }
             }
         }
@@ -227,8 +228,8 @@ mod tests {
     };
 
     use crate::{
-        types::{BoltInteger, BoltType},
         Id, Keys,
+        types::{BoltInteger, BoltType},
     };
 
     use super::*;

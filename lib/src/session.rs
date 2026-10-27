@@ -1,9 +1,9 @@
 use crate::config::ImpersonateUser;
 use crate::summary::Counters;
 use crate::{Database, DetachedRowStream, Error, Graph, Operation, Query, RowStream, RunResult};
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::Arc;
 
 #[derive(Default)]
 pub struct SessionConfig {

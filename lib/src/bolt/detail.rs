@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use ::serde::{
-    de::{self, VariantAccess as _},
     Deserialize,
+    de::{self, VariantAccess as _},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

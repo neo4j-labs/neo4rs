@@ -211,7 +211,7 @@ impl<'de> Deserialize<'de> for Duration {
 
 #[cfg(test)]
 mod tests {
-    use crate::packstream::{bolt, from_bytes_ref, BoltBytesBuilder, Data};
+    use crate::packstream::{BoltBytesBuilder, Data, bolt, from_bytes_ref};
 
     use super::*;
 

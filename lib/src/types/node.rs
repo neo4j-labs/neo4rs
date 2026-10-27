@@ -1,4 +1,4 @@
-use crate::types::{serde::DeError, BoltInteger, BoltList, BoltMap, BoltType, Result};
+use crate::types::{BoltInteger, BoltList, BoltMap, BoltType, Result, serde::DeError};
 use ::serde::Deserialize;
 use neo4rs_macros::BoltStruct;
 
