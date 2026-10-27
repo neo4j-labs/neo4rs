@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "neo4rs"
-version = "0.9.0-rc.10"
+version = "0.9.0-rc.11"
 dependencies = [
  "backon",
  "bytes",
