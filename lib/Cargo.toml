@@ -5,7 +5,7 @@ authors = [
     "Neo4j Labs <devrel@neo4j.com>",
     "John Pradeep Vincent <yehohanan7@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 description = "Rust driver for Neo4j"
 license = "MIT"
 repository = "https://github.com/neo4j-labs/neo4rs"
@@ -13,7 +13,7 @@ documentation = "https://docs.rs/neo4rs"
 readme = "../README.md"
 keywords = ["neo4j", "driver", "bolt", "cypher", "tokio"]
 categories = ["database", "network-programming", "asynchronous"]
-rust-version = "1.81"
+rust-version = "1.85"
 include = ["/src", "/integrationtests", "/examples"]
 
 [features]
@@ -87,7 +87,7 @@ pretty_env_logger = "0.5.0"
 serde_bytes = "0.11"
 serde_json = "1"
 serde_test = "1.0.176"
-serde_with = "3"
+serde_with = { version = "3", default-features=false, features=["macros", "alloc"]}
 tap = "1.0.1"
 test-case = "3.3.1"
 time = { version = "0.3.22", features = ["serde"] }

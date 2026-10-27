@@ -1,4 +1,4 @@
-# Neo4rs [![CI Status][ci-badge]][ci-url]  [![Crates.io][crates-badge]][crates-url]
+# Neo4rs [![CI Status][ci-badge]][ci-url] [![Crates.io][crates-badge]][crates-url]
 
 > This is an experimental Neo4j Labs project and not part of Neo4j's supported product lineup. See the [Neo4j Labs disclaimer](./LABS_DISCLAIMER.txt).
 
@@ -19,7 +19,6 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 ## API Documentation: [![Docs.rs][docs-badge]][docs-url]
 
 ## [Getting Started](https://neo4j.com/docs/getting-started/languages-guides/community-drivers/#neo4j-rust)
-
 
 ## Example
 
@@ -57,10 +56,10 @@ Only the latest 5.x version is supported, following the [Neo4j Version support p
 
 ## MSRV
 
-The crate has a minimum supported Rust version (MSRV) of `1.81.0` as of 0.9.x.
+The crate has a minimum supported Rust version (MSRV) of `1.85.0` as of 0.9.x.
 The version [0.8.x](https://crates.io/crates/neo4rs/0.8.0) has an MSRV of `1.63.0`
 
-A change in the MSRV is *not* considered a breaking change.
+A change in the MSRV is _not_ considered a breaking change.
 For versions past 1.0.0, a change in the MSRV can be done in a minor version increment (1.1.3 -> 1.2.0)
 for versions before 1.0.0, a change in the MSRV can be done in a patch version increment (0.1.3 -> 0.1.4).
 
@@ -163,7 +162,6 @@ cargo xtask msrv
 
 Using `xtask` requires that `curl` and `jq` are available on the system.
 
-
 #### Update `ci/Cargo.lock.min`
 
 ```bash
@@ -173,10 +171,9 @@ cargo xtask min
 
 Using `xtask` requires that `curl` and `jq` are available on the system.
 
-
 ## License
 
 Neo4rs is licensed under either of the following, at your option:
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
