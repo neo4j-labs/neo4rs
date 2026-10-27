@@ -9,9 +9,9 @@ use std::{iter, marker::PhantomData, result::Result};
 use delegate::delegate;
 use serde::{
     de::{
-        value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
         DeserializeSeed, Deserializer, Error, IntoDeserializer, MapAccess, Unexpected,
         VariantAccess, Visitor,
+        value::{BorrowedStrDeserializer, I64Deserializer, MapDeserializer, SeqDeserializer},
     },
     forward_to_deserialize_any,
 };
@@ -674,7 +674,7 @@ impl<'de> ElementData<'de> for &'de BoltPath {
 mod tests {
     use super::*;
 
-    use serde::{de::value::MapAccessDeserializer, Deserialize};
+    use serde::{Deserialize, de::value::MapAccessDeserializer};
     use std::collections::HashMap;
 
     use crate::types::{BoltInteger, BoltList, BoltString};

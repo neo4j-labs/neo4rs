@@ -7,24 +7,24 @@ use {
     std::sync::Arc,
 };
 
+use crate::RunResult;
 use crate::config::ImpersonateUser;
 use crate::pool::ManagedConnection;
 use crate::query::RetryableQuery;
 use crate::retry::Retry;
-use crate::RunResult;
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
+    Error,
+    session::{Session, SessionConfig},
+};
+use crate::{
+    Operation,
     config::{Config, ConfigBuilder, Database, LiveConfig},
     errors::Result,
-    pool::{create_pool, ConnectionPool},
+    pool::{ConnectionPool, create_pool},
     query::Query,
     stream::DetachedRowStream,
     txn::Txn,
-    Operation,
-};
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::{
-    session::{Session, SessionConfig},
-    Error,
 };
 use backon::{ExponentialBuilder, RetryableWithContext};
 use std::time::Duration;

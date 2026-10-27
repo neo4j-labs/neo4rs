@@ -1,10 +1,10 @@
 use core::fmt;
 
-use serde::de::{value::SeqDeserializer, Error, MapAccess, SeqAccess, Visitor};
+use serde::de::{Error, MapAccess, SeqAccess, Visitor, value::SeqDeserializer};
 
 use crate::{
-    types::{serde::builder::SetOnce, BoltDuration, BoltInteger},
     DeError,
+    types::{BoltDuration, BoltInteger, serde::builder::SetOnce},
 };
 
 crate::cenum!(Fields {

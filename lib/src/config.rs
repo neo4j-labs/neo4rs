@@ -447,22 +447,28 @@ mod tests {
 
     #[test]
     fn should_reject_invalid_config() {
-        assert!(ConfigBuilder::default()
-            .user("some_user")
-            .password("some_password")
-            .build()
-            .is_err());
+        assert!(
+            ConfigBuilder::default()
+                .user("some_user")
+                .password("some_password")
+                .build()
+                .is_err()
+        );
 
-        assert!(ConfigBuilder::default()
-            .uri("127.0.0.1:7687")
-            .password("some_password")
-            .build()
-            .is_err());
+        assert!(
+            ConfigBuilder::default()
+                .uri("127.0.0.1:7687")
+                .password("some_password")
+                .build()
+                .is_err()
+        );
 
-        assert!(ConfigBuilder::default()
-            .uri("127.0.0.1:7687")
-            .user("some_user")
-            .build()
-            .is_err());
+        assert!(
+            ConfigBuilder::default()
+                .uri("127.0.0.1:7687")
+                .user("some_user")
+                .build()
+                .is_err()
+        );
     }
 }

@@ -1,8 +1,8 @@
 use std::{fmt, marker::PhantomData};
 
 use serde::{
-    de::{self, VariantAccess as _, Visitor},
     Deserialize,
+    de::{self, VariantAccess as _, Visitor},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,7 +87,7 @@ impl<'de, R: Deserialize<'de>> Deserialize<'de> for Summary<R> {
 mod tests {
     use super::*;
     use crate::packstream::bolt;
-    use crate::{bolt::MessageResponse as _, BoltMap, BoltString, BoltType};
+    use crate::{BoltMap, BoltString, BoltType, bolt::MessageResponse as _};
 
     #[test]
     fn parse_hello_success() {

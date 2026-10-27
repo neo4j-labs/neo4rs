@@ -105,7 +105,7 @@ impl BoltWireFormat for BoltList {
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid list marker {marker}"
-                )))
+                )));
             }
         };
 

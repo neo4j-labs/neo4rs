@@ -1,9 +1,9 @@
 use crate::config::ImpersonateUser;
 use crate::connection::NeoUrl;
-use crate::pool::{create_pool, ConnectionPool};
+use crate::pool::{ConnectionPool, create_pool};
+use crate::routing::RoutingTable;
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::types::{BoltServer, DatabaseServerMap, DatabaseTable, PoolRegistry};
-use crate::routing::RoutingTable;
 use crate::utils::ConcurrentHashMap;
 use crate::{Config, Database, Error};
 use log::{debug, error};
@@ -181,8 +181,8 @@ mod tests {
     use std::collections::VecDeque;
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn make_config() -> Config {
         Config {
@@ -477,9 +477,11 @@ mod tests {
         let db = Some(Database::from("neo4j"));
         let servers = registry.servers(db.clone(), None, &[], None).await;
         assert_eq!(provider.fetch_count(), 1);
-        assert!(servers
-            .iter()
-            .any(|s| s.role == "WRITE" && s.address == "host1"));
+        assert!(
+            servers
+                .iter()
+                .any(|s| s.role == "WRITE" && s.address == "host1")
+        );
 
         registry.mark_unavailable(&BoltServer {
             address: "host1".to_string(),
@@ -492,14 +494,18 @@ mod tests {
 
         let servers = registry.refresh_servers(db.clone(), None, &[], None).await;
         assert_eq!(provider.fetch_count(), 2);
-        assert!(servers
-            .iter()
-            .any(|s| s.role == "WRITE" && s.address == "host2"));
+        assert!(
+            servers
+                .iter()
+                .any(|s| s.role == "WRITE" && s.address == "host2")
+        );
 
         let servers = registry.servers(db, None, &[], None).await;
         assert_eq!(provider.fetch_count(), 2);
-        assert!(servers
-            .iter()
-            .any(|s| s.role == "WRITE" && s.address == "host2"));
+        assert!(
+            servers
+                .iter()
+                .any(|s| s.role == "WRITE" && s.address == "host2")
+        );
     }
 }

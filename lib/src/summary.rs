@@ -1,8 +1,8 @@
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::bookmarks::Bookmark;
 use serde::{
-    de::{self, Visitor},
     Deserialize,
+    de::{self, Visitor},
 };
 use std::{fmt, time::Duration};
 

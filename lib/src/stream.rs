@@ -4,19 +4,19 @@ use crate::messages::{BoltRequest, BoltResponse};
 use crate::summary::{ResultSummary, Streaming};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{
-    bolt::{Bolt, Discard, Pull, Response, WrapExtra as _},
     BoltType,
+    bolt::{Bolt, Discard, Pull, Response, WrapExtra as _},
 };
 use crate::{
+    DeError, RunResult,
     errors::{Error, Result},
     pool::ManagedConnection,
     row::Row,
     txn::TransactionHandle,
     types::BoltList,
-    DeError, RunResult,
 };
 
-use futures::{stream::try_unfold, TryStream};
+use futures::{TryStream, stream::try_unfold};
 use serde::de::DeserializeOwned;
 
 use std::collections::VecDeque;

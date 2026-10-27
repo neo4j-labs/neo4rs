@@ -1,7 +1,7 @@
 use std::num::TryFromIntError;
 
 use crate::errors::{Error, Result};
-use serde::{ser::SerializeStruct as _, Serialize};
+use serde::{Serialize, ser::SerializeStruct as _};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extra {

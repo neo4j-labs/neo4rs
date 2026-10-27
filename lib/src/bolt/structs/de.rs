@@ -1,11 +1,11 @@
 use std::{collections::HashMap, fmt, marker::PhantomData};
 
 use serde::{
+    Deserialize, Deserializer,
     de::{
         DeserializeSeed, EnumAccess, Error, IgnoredAny, MapAccess, SeqAccess, VariantAccess as _,
         Visitor,
     },
-    Deserialize, Deserializer,
 };
 
 use super::{

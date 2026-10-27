@@ -95,7 +95,7 @@ mod tests {
     use bytes::Bytes;
     use chrono::Datelike;
 
-    use crate::packstream::{bolt, from_bytes_ref, Data};
+    use crate::packstream::{Data, bolt, from_bytes_ref};
 
     use super::*;
 

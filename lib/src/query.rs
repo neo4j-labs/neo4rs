@@ -1,9 +1,8 @@
 use std::cell::{Cell, RefCell};
 
 use crate::config::ImpersonateUser;
-#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-use crate::{bolt::Summary, summary::ResultSummary};
 use crate::{
+    Database, Error, Operation,
     errors::Result,
     graph::ConnectionPoolManager,
     messages::{BoltRequest, BoltResponse},
@@ -11,8 +10,9 @@ use crate::{
     retry::Retry,
     stream::{DetachedRowStream, RowStream, State},
     types::{BoltList, BoltMap, BoltString, BoltType},
-    Database, Error, Operation,
 };
+#[cfg(feature = "unstable-bolt-protocol-impl-v2")]
+use crate::{bolt::Summary, summary::ResultSummary};
 use log::warn;
 
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]

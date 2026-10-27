@@ -45,7 +45,7 @@ impl BoltWireFormat for BoltBytes {
             _ => {
                 return Err(Error::InvalidTypeMarker(format!(
                     "invalid bytes marker {marker}"
-                )))
+                )));
             }
         };
 

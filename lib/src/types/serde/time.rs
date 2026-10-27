@@ -1,14 +1,15 @@
 use serde::{
-    de::{value::MapDeserializer, Error, IntoDeserializer, MapAccess, SeqAccess},
-    forward_to_deserialize_any, Deserializer,
+    Deserializer,
+    de::{Error, IntoDeserializer, MapAccess, SeqAccess, value::MapDeserializer},
+    forward_to_deserialize_any,
 };
 
 use crate::{
-    types::{
-        serde::date_time::{DateTimeIsh, DateTimeIshBuilder, Fields},
-        BoltDate, BoltInteger, BoltLocalTime, BoltTime,
-    },
     DeError,
+    types::{
+        BoltDate, BoltInteger, BoltLocalTime, BoltTime,
+        serde::date_time::{DateTimeIsh, DateTimeIshBuilder, Fields},
+    },
 };
 
 impl BoltTime {

@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
 
 use crate::{
-    bolt::{ExpectedResponse, Summary},
     Version,
+    bolt::{ExpectedResponse, Summary},
 };
-use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, ser::SerializeMap};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hello<'a> {

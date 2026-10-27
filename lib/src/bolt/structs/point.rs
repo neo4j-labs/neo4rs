@@ -433,7 +433,7 @@ impl<'de> Deserialize<'de> for Point {
 
 #[cfg(test)]
 mod tests {
-    use crate::packstream::{bolt, from_bytes_ref, Data};
+    use crate::packstream::{Data, bolt, from_bytes_ref};
 
     use super::*;
 

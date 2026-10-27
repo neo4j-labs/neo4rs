@@ -1,11 +1,11 @@
+use crate::Database;
 use crate::config::ImpersonateUser;
 use crate::pool::ManagedConnection;
+use crate::routing::RoundRobinStrategy;
 use crate::routing::connection_registry::ConnectionRegistry;
 use crate::routing::load_balancing::LoadBalancingStrategy;
 use crate::routing::routing_table_provider::RoutingTableProvider;
 use crate::routing::types::BoltServer;
-use crate::routing::RoundRobinStrategy;
-use crate::Database;
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use crate::{Config, Error, Operation};
 use backon::ExponentialBuilder;
@@ -83,7 +83,9 @@ impl RoutedConnectionManager {
                 match pool.get().await {
                     Ok(conn) => return Ok(conn),
                     Err(e) => {
-                        error!("Failed to get connection from pool for server {selected_server:?}: {e}");
+                        error!(
+                            "Failed to get connection from pool for server {selected_server:?}: {e}"
+                        );
                         self.connection_registry.mark_unavailable(&selected_server);
                         servers.retain(|s| !s.has_same_address(&selected_server));
                         continue; // Try selecting another server
@@ -136,16 +138,16 @@ impl RoutedConnectionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Version;
     use crate::config::ConfigBuilder;
     use crate::packstream::bolt;
     use crate::pool::ConnectionPool;
     use crate::routing::{RoutingTable, Server};
-    use crate::Version;
     use std::collections::VecDeque;
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
@@ -344,9 +346,11 @@ mod tests {
             .servers(db, None, &[], None)
             .await;
         assert_eq!(provider.fetch_count(), 2);
-        assert!(cached
-            .iter()
-            .any(|s| s.role == "WRITE" && s.port == new_writer_port));
+        assert!(
+            cached
+                .iter()
+                .any(|s| s.role == "WRITE" && s.port == new_writer_port)
+        );
         assert!(!cached.iter().any(|s| s.port == dead_writer_port));
 
         drop(connection);

@@ -1,6 +1,6 @@
+use crate::DeError;
 #[cfg(feature = "unstable-serde-packstream-format")]
 use crate::packstream::{de, ser};
-use crate::DeError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -33,7 +33,9 @@ pub enum Error {
     #[error("connection error")]
     ConnectionError,
 
-    #[error("connection has an incomplete Bolt exchange; pending responses must be consumed before sending another request, and interrupted I/O requires a new connection")]
+    #[error(
+        "connection has an incomplete Bolt exchange; pending responses must be consumed before sending another request, and interrupted I/O requires a new connection"
+    )]
     IncompleteBoltExchange,
 
     #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
@@ -106,7 +108,9 @@ pub enum Error {
     #[error("Failed to fetch the routing table [{}]: {}", _0.0, _0.1)]
     RoutingTableError((String, String)),
 
-    #[error("The request has been ignored by the server. This can happen if the server is under pressure or there was an issue with the memory.")]
+    #[error(
+        "The request has been ignored by the server. This can happen if the server is under pressure or there was an issue with the memory."
+    )]
     RequestIgnoredError,
 
     #[error("{0}")]

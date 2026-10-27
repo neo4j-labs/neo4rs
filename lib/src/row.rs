@@ -1,9 +1,9 @@
 use crate::{
-    types::{
-        serde::DeError, BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D,
-        BoltRelation, BoltUnboundedRelation,
-    },
     BoltString, BoltType,
+    types::{
+        BoltList, BoltMap, BoltNode, BoltPath, BoltPoint2D, BoltPoint3D, BoltRelation,
+        BoltUnboundedRelation, serde::DeError,
+    },
 };
 
 use serde::Deserialize;

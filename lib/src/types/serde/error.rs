@@ -271,14 +271,18 @@ mod tests {
     fn error_message_for_missing_property() {
         let message = "The property `frobnicate` is missing";
 
-        assert!(DeError::PropertyMissingButRequired(Some("frobnicate"))
-            .to_string()
-            .starts_with(message),);
+        assert!(
+            DeError::PropertyMissingButRequired(Some("frobnicate"))
+                .to_string()
+                .starts_with(message),
+        );
 
         let message = "A property is missing";
 
-        assert!(DeError::PropertyMissingButRequired(None)
-            .to_string()
-            .starts_with(message));
+        assert!(
+            DeError::PropertyMissingButRequired(None)
+                .to_string()
+                .starts_with(message)
+        );
     }
 }

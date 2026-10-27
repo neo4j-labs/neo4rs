@@ -1,6 +1,11 @@
 use crate::{
+    DeError,
     types::{
+        BoltBoolean, BoltBytes, BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger,
+        BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNull, BoltString, BoltTime,
+        BoltType,
         serde::{
+            BoltKind,
             date_time::BoltDateTimeVisitor,
             duration::BoltDurationVisitor,
             element::ElementDataDeserializer,
@@ -10,27 +15,22 @@ use crate::{
             point::{BoltPointDeserializer, BoltPointVisitor},
             rel::BoltRelationVisitor,
             urel::BoltUnboundedRelationVisitor,
-            BoltKind,
         },
-        BoltBoolean, BoltBytes, BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltFloat, BoltInteger,
-        BoltList, BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNull, BoltString, BoltTime,
-        BoltType,
     },
-    DeError,
 };
 
 use std::{fmt, result::Result};
 
 use bytes::Bytes;
 use serde::{
+    Deserialize,
     de::{
+        DeserializeSeed, Deserializer, EnumAccess, Error, Expected, IntoDeserializer,
+        Unexpected as Unexp, VariantAccess, Visitor,
         value::{
             BorrowedBytesDeserializer, BorrowedStrDeserializer, MapDeserializer, SeqDeserializer,
         },
-        DeserializeSeed, Deserializer, EnumAccess, Error, Expected, IntoDeserializer,
-        Unexpected as Unexp, VariantAccess, Visitor,
     },
-    Deserialize,
 };
 
 impl<'de> Deserialize<'de> for BoltType {
@@ -1026,12 +1026,12 @@ mod tests {
     use super::*;
 
     use crate::{
+        EndNodeId, Id, Keys, Labels, Node, Offset, Row, StartNodeId, Timezone, Type,
         types::{
             BoltDate, BoltDateTime, BoltDateTimeZoneId, BoltDuration, BoltInteger,
             BoltLocalDateTime, BoltLocalTime, BoltMap, BoltNode, BoltNull, BoltPoint2D,
             BoltPoint3D, BoltRelation, BoltTime, BoltUnboundedRelation,
         },
-        EndNodeId, Id, Keys, Labels, Node, Offset, Row, StartNodeId, Timezone, Type,
     };
 
     use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
@@ -1425,7 +1425,7 @@ mod tests {
 
     #[test]
     fn serde_with_bytes() {
-        use serde_with::{serde_as, Bytes};
+        use serde_with::{Bytes, serde_as};
 
         #[serde_as]
         #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -2105,7 +2105,7 @@ mod tests {
 
         let actual = bolt.to::<(NaiveTime, Offset)>().unwrap();
         assert_eq!(actual.0, time);
-        assert_eq!(actual.1 .0, FixedOffset::east_opt(2 * 3600).unwrap());
+        assert_eq!(actual.1.0, FixedOffset::east_opt(2 * 3600).unwrap());
     }
 
     #[test]

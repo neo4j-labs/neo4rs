@@ -1,6 +1,6 @@
 use crate::config::ImpersonateUser;
 use crate::connection::ConnectionInfo;
-use crate::pool::{create_pool, ConnectionPool};
+use crate::pool::{ConnectionPool, create_pool};
 use crate::routing::{RouteBuilder, RoutingTable};
 use crate::{Config, Database, Error};
 use std::future::Future;

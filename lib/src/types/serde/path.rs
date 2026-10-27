@@ -1,24 +1,24 @@
 use crate::{
-    cenum,
+    DeError, Indices, Nodes, Path, Relationships, cenum,
     types::{
+        BoltList, BoltPath, BoltType,
         serde::{
+            BoltKind,
             builder::BoltPathBuilder,
             element::{ElementDataDeserializer, ElementDataKey},
-            BoltKind,
         },
-        BoltList, BoltPath, BoltType,
     },
-    DeError, Indices, Nodes, Path, Relationships,
 };
 
 use std::{fmt, result::Result};
 
 use serde::{
+    Deserialize,
     de::{
-        value::{MapDeserializer, SeqDeserializer},
         DeserializeSeed, Deserializer, EnumAccess, Error, IntoDeserializer, Visitor,
+        value::{MapDeserializer, SeqDeserializer},
     },
-    forward_to_deserialize_any, Deserialize,
+    forward_to_deserialize_any,
 };
 
 impl<'de> Deserialize<'de> for Path {
@@ -120,7 +120,7 @@ impl<'de> Visitor<'de> for BoltPathVisitor {
                     return Err(Error::unknown_field(
                         otherwise.name(),
                         &["nodes", "relationships", "indices"],
-                    ))
+                    ));
                 }
             }
         }
@@ -245,8 +245,8 @@ mod tests {
     use std::fmt::Debug;
 
     use crate::{
-        types::{BoltInteger, BoltNode, BoltString, BoltType, BoltUnboundedRelation},
         Node, UnboundedRelation,
+        types::{BoltInteger, BoltNode, BoltString, BoltType, BoltUnboundedRelation},
     };
 
     use super::*;

@@ -1,6 +1,6 @@
 use bytes::{Bytes, BytesMut};
 
-use crate::{errors::Result, Version};
+use crate::{Version, errors::Result};
 
 pub(crate) trait BoltWireFormat: Sized {
     // TODO: remove
