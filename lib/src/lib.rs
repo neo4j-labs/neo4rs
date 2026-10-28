@@ -87,7 +87,7 @@
 //!
 //! Use [`TransactionConfig`] with [`Graph::start_txn_with_config`] or
 //! [`Graph::start_txn_on_with_config`] to attach transaction metadata or set a server-side
-//! timeout in milliseconds.
+//! timeout.
 //!
 //! Note that the handle takes a connection from the connection pool, which will be released once
 //! the Txn is dropped
@@ -98,7 +98,7 @@
 //!     .start_txn_with_config(
 //!         neo4rs::TransactionConfig::default()
 //!             .with_tx_metadata(vec![("operation".into(), "import".into())])
-//!             .with_tx_timeout(15_000),
+//!             .with_tx_timeout(std::time::Duration::from_secs(15)),
 //!     )
 //!     .await?;
 //! txn.rollback().await?;

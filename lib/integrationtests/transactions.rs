@@ -1,4 +1,5 @@
 use neo4rs::*;
+use std::time::Duration;
 
 mod container;
 
@@ -24,7 +25,7 @@ async fn transactions() {
         .start_txn_with_config(
             TransactionConfig::default()
                 .with_tx_metadata(vec![("operation".into(), "example".into())])
-                .with_tx_timeout(15_000),
+                .with_tx_timeout(Duration::from_secs(15)),
         )
         .await
         .unwrap();
@@ -46,7 +47,7 @@ async fn transaction_metadata_is_visible_to_the_server() {
     let graph = neo4j.graph();
     let request_id = uuid::Uuid::new_v4().to_string();
     let config = TransactionConfig::default()
-        .with_tx_timeout(30_000)
+        .with_tx_timeout(Duration::from_secs(30))
         .with_tx_metadata(vec![
             ("operation".into(), "transaction-metadata-test".into()),
             ("request_id".into(), request_id.clone()),

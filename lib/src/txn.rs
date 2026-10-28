@@ -18,19 +18,22 @@ use crate::{
     query::Query,
     stream::RowStream,
 };
+use std::time::Duration;
 
 /// Options sent to Neo4j when an explicit transaction is started.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TransactionConfig {
-    tx_timeout: Option<u32>,
+    tx_timeout: Option<Duration>,
     tx_metadata: Option<Vec<(String, String)>>,
 }
 
 impl TransactionConfig {
-    /// Sets the server-side transaction timeout in milliseconds.
+    /// Sets the server-side transaction timeout.
     ///
     /// A timeout of zero disables the transaction timeout.
-    pub fn with_tx_timeout(mut self, tx_timeout: u32) -> Self {
+    /// Positive sub-millisecond timeouts are rounded up to one millisecond.
+    /// Timeouts larger than the Bolt protocol supports return an error when the transaction starts.
+    pub fn with_tx_timeout(mut self, tx_timeout: Duration) -> Self {
         self.tx_timeout = Some(tx_timeout);
         self
     }
@@ -41,11 +44,21 @@ impl TransactionConfig {
         self
     }
 
+    fn tx_timeout_millis(timeout: Duration) -> Result<i64> {
+        let millis = timeout.as_millis();
+        let millis = millis + u128::from(timeout.subsec_nanos() % 1_000_000 != 0);
+        i64::try_from(millis)
+            .map_err(|error| crate::errors::Error::IntegerOverflow("tx_timeout", error))
+    }
+
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-    fn into_bolt_map(self) -> BoltMap {
+    fn into_bolt_map(self) -> Result<BoltMap> {
         let mut extra = BoltMap::new();
-        if let Some(tx_timeout) = self.tx_timeout {
-            extra.put("tx_timeout".into(), tx_timeout.into());
+        if let Some(timeout) = self.tx_timeout {
+            extra.put(
+                "tx_timeout".into(),
+                Self::tx_timeout_millis(timeout)?.into(),
+            );
         }
         if let Some(tx_metadata) = self.tx_metadata {
             let metadata = tx_metadata
@@ -54,7 +67,7 @@ impl TransactionConfig {
                 .collect();
             extra.put("tx_metadata".into(), BoltType::Map(metadata));
         }
-        extra
+        Ok(extra)
     }
 }
 
@@ -84,7 +97,7 @@ impl Txn {
         imp_user: Option<ImpersonateUser>,
         config: TransactionConfig,
     ) -> Result<Self> {
-        let begin = BoltRequest::begin(db.as_deref(), config.into_bolt_map());
+        let begin = BoltRequest::begin(db.as_deref(), config.into_bolt_map()?);
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => {
                 let connection = DiscardOnAbandon::new(connection);
@@ -112,8 +125,8 @@ impl Txn {
     ) -> Result<Self> {
         debug!("Starting transaction with bookmarks: {:?}", bookmarks);
         let mut builder = Begin::builder(db.as_deref()).with_bookmarks(bookmarks.to_vec());
-        if let Some(tx_timeout) = config.tx_timeout {
-            builder = builder.with_tx_timeout(tx_timeout);
+        if let Some(timeout) = config.tx_timeout {
+            builder = builder.with_tx_timeout(TransactionConfig::tx_timeout_millis(timeout)?);
         }
         if let Some(tx_metadata) = config.tx_metadata {
             builder = builder.with_tx_metadata(tx_metadata);
@@ -317,6 +330,8 @@ pub(crate) mod private {
 #[cfg(test)]
 mod transaction_config_tests {
     use super::TransactionConfig;
+    use crate::errors::Error;
+    use std::time::Duration;
 
     #[test]
     fn options_are_optional_and_preserve_values() {
@@ -325,12 +340,12 @@ mod transaction_config_tests {
         assert_eq!(default.tx_metadata, None);
 
         let configured = TransactionConfig::default()
-            .with_tx_timeout(15_000)
+            .with_tx_timeout(Duration::from_secs(15))
             .with_tx_metadata(vec![
                 ("operation".into(), "probe".into()),
                 ("request_id".into(), "request-1".into()),
             ]);
-        assert_eq!(configured.tx_timeout, Some(15_000));
+        assert_eq!(configured.tx_timeout, Some(Duration::from_secs(15)));
         assert_eq!(
             configured.tx_metadata,
             Some(vec![
@@ -338,5 +353,36 @@ mod transaction_config_tests {
                 ("request_id".into(), "request-1".into()),
             ])
         );
+    }
+
+    #[test]
+    fn timeout_is_rounded_up_to_milliseconds() {
+        assert_eq!(
+            TransactionConfig::tx_timeout_millis(Duration::ZERO).unwrap(),
+            0
+        );
+        assert_eq!(
+            TransactionConfig::tx_timeout_millis(Duration::from_nanos(1)).unwrap(),
+            1
+        );
+        assert_eq!(
+            TransactionConfig::tx_timeout_millis(Duration::from_micros(1_500)).unwrap(),
+            2
+        );
+        assert_eq!(
+            TransactionConfig::tx_timeout_millis(Duration::from_millis(15_000)).unwrap(),
+            15_000
+        );
+    }
+
+    #[test]
+    fn timeout_outside_bolt_integer_range_returns_an_error() {
+        let timeout = Duration::from_millis(i64::MAX as u64)
+            .checked_add(Duration::from_millis(1))
+            .unwrap();
+        assert!(matches!(
+            TransactionConfig::tx_timeout_millis(timeout),
+            Err(Error::IntegerOverflow("tx_timeout", _))
+        ));
     }
 }

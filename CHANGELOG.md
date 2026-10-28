@@ -9,8 +9,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 
 ### Added
 
-- Expose `tx_metadata` and `tx_timeout` when starting explicit transactions with
-  `TransactionConfig`. Configured transaction methods are available on `Graph` and `Session`;
+- Expose `tx_metadata` and a `Duration`-based `tx_timeout` when starting explicit transactions
+  with `TransactionConfig`. Configured transaction methods are available on `Graph` and `Session`;
   existing methods retain their default behavior [#304](https://github.com/neo4j-labs/neo4rs/issues/304).
 
 ### Changed
