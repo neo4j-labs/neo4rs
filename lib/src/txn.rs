@@ -45,8 +45,7 @@ impl Txn {
         let begin = BoltRequest::begin(db.as_deref());
         match connection.send_recv(begin).await? {
             BoltResponse::Success(_) => {
-                let mut connection = DiscardOnAbandon::new(connection);
-                connection.set_open_transaction(true);
+                let connection = DiscardOnAbandon::new(connection);
                 Ok(Txn {
                     db,
                     fetch_size,
@@ -74,8 +73,7 @@ impl Txn {
             .build(connection.version());
         match connection.send_recv_as(begin).await? {
             Summary::Success(response) => {
-                let mut connection = DiscardOnAbandon::new(connection);
-                connection.set_open_transaction(true);
+                let connection = DiscardOnAbandon::new(connection);
                 Ok(Txn {
                     db: response.metadata.db.or(db),
                     fetch_size,
@@ -167,7 +165,7 @@ impl Txn {
         let commit = BoltRequest::commit();
         match self.connection.send_recv(commit).await? {
             BoltResponse::Success(_) => {
-                self.connection.set_open_transaction(false);
+                self.connection.close_transaction();
                 Ok(())
             }
             msg => Err(msg.into_error("COMMIT")),
@@ -179,7 +177,7 @@ impl Txn {
         match self.connection.send_recv_as(Commit).await? {
             Summary::Success(resp) => {
                 self.save_bookmark_state(&resp.metadata);
-                self.connection.set_open_transaction(false);
+                self.connection.close_transaction();
                 Ok(self.bookmark)
             }
             msg => Err(msg.into_error("COMMIT")),
@@ -193,7 +191,7 @@ impl Txn {
             let rollback = BoltRequest::rollback();
             match self.connection.send_recv(rollback).await? {
                 BoltResponse::Success(_) => {
-                    self.connection.set_open_transaction(false);
+                    self.connection.close_transaction();
                     Ok(())
                 }
                 msg => Err(msg.into_error("ROLLBACK")),
@@ -204,7 +202,7 @@ impl Txn {
         {
             match self.connection.send_recv_as(Rollback).await? {
                 Summary::Success(_) => {
-                    self.connection.set_open_transaction(false);
+                    self.connection.close_transaction();
                     Ok(())
                 }
                 msg => Err(msg.into_error("ROLLBACK")),

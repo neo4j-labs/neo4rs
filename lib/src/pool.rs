@@ -15,20 +15,28 @@ pub type ConnectionPool = Pool<ConnectionManager>;
 pub type ManagedConnection = Object<ConnectionManager>;
 
 pub(crate) struct DiscardOnAbandon<M: Manager> {
-    connection: Option<Object<M>>,
-    open_transaction: bool,
+    repr: Repr<M>,
+}
+
+enum Repr<M: Manager> {
+    Open(Object<M>),
+    Closed(Object<M>),
+    Dropped,
 }
 
 impl<M: Manager> DiscardOnAbandon<M> {
     pub(crate) fn new(connection: Object<M>) -> Self {
         Self {
-            connection: Some(connection),
-            open_transaction: false,
+            repr: Repr::Open(connection),
         }
     }
 
-    pub(crate) fn set_open_transaction(&mut self, open: bool) {
-        self.open_transaction = open;
+    pub(crate) fn close_transaction(&mut self) {
+        let repr = std::mem::replace(&mut self.repr, Repr::Dropped);
+        self.repr = match repr {
+            Repr::Open(connection) => Repr::Closed(connection),
+            repr => repr,
+        };
     }
 }
 
@@ -36,26 +44,27 @@ impl<M: Manager> Deref for DiscardOnAbandon<M> {
     type Target = Object<M>;
 
     fn deref(&self) -> &Self::Target {
-        self.connection
-            .as_ref()
-            .expect("connection is present until drop")
+        match &self.repr {
+            Repr::Open(connection) | Repr::Closed(connection) => connection,
+            Repr::Dropped => panic!("connection is taken while dropping"),
+        }
     }
 }
 
 impl<M: Manager> DerefMut for DiscardOnAbandon<M> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.connection
-            .as_mut()
-            .expect("connection is present until drop")
+        match &mut self.repr {
+            Repr::Open(connection) | Repr::Closed(connection) => connection,
+            Repr::Dropped => panic!("connection is taken while dropping"),
+        }
     }
 }
 
 impl<M: Manager> Drop for DiscardOnAbandon<M> {
     fn drop(&mut self) {
-        if self.open_transaction {
-            if let Some(connection) = self.connection.take() {
-                drop(Object::take(connection));
-            }
+        let repr = std::mem::replace(&mut self.repr, Repr::Dropped);
+        if let Repr::Open(connection) = repr {
+            drop(Object::take(connection));
         }
     }
 }
@@ -248,8 +257,7 @@ mod tests {
         let (manager, created, dropped) = test_manager();
         let pool = Pool::builder(manager).max_size(1).build().unwrap();
         let connection = pool.get().await.unwrap();
-        let mut guarded = DiscardOnAbandon::new(connection);
-        guarded.set_open_transaction(true);
+        let guarded = DiscardOnAbandon::new(connection);
 
         drop(guarded);
 
@@ -266,8 +274,7 @@ mod tests {
         let pool = Pool::builder(manager).max_size(1).build().unwrap();
         let connection = pool.get().await.unwrap();
         let mut guarded = DiscardOnAbandon::new(connection);
-        guarded.set_open_transaction(true);
-        guarded.set_open_transaction(false);
+        guarded.close_transaction();
 
         drop(guarded);
 
