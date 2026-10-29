@@ -152,8 +152,13 @@ jobs:
           echo "Removed $removed certificate(s) from /etc/ssl/cert.pem"
           sudo cp "$d/new.pem" /etc/ssl/cert.pem
 
-      - <<: *patch-emudhra
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
 
       - *checkout-code
       - *setup-msrv-rust
