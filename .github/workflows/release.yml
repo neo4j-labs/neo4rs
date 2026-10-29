@@ -52,7 +52,7 @@ jobs:
           command: release
           verbose: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
 
   release-plz-pr:
     name: Create a PR preparing the next release
@@ -78,4 +78,4 @@ jobs:
           command: release-pr
           verbose: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
