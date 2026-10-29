@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  RUSTUP_TOOLCHAIN: stable
+  MSRV: 1.85.1
+
+jobs:
+  release-plz-release:
+    name: Release unpublished packages
+    if: ${{ github.repository_owner == 'neo4j-labs' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      deployment: false
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: read
+    steps:
+      - &patch-emudhra
+        name: Patch eMudhra CA compromise (CVE-2026-111943)
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --only-upgrade -y ca-certificates
+          sudo update-ca-certificates --fresh
+
+      - &checkout
+        name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - &install-rust
+        name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - &rust-cache
+        name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run release-plz
+        uses: release-plz/action@63ab0c2746bedc448370bad4b0b3d536458398b0
+        with:
+          command: release
+          verbose: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-plz-pr:
+    name: Create a PR preparing the next release
+    if: ${{ github.repository_owner == 'neo4j-labs' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      deployment: false
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - *patch-emudhra
+      - *checkout
+      - *install-rust
+      - *rust-cache
+      - name: Run release-plz
+        uses: release-plz/action@63ab0c2746bedc448370bad4b0b3d536458398b0
+        with:
+          command: release-pr
+          verbose: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
