@@ -35,25 +35,29 @@ jobs:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+      - &patch-emudhra
+        name: Patch eMudhra CA compromise (CVE-2026-111943)
         shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install --only-upgrade -y ca-certificates
           sudo update-ca-certificates --fresh
 
-      - name: Checkout code
+      - &checkout-code
+        name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
-      - name: Set up Rust
+      - &setup-stable-rust
+        name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           components: rustfmt
 
-      - name: Set up Rust cache
+      - &rust-cache
+        name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo fmt
@@ -63,31 +67,22 @@ jobs:
     name: Check clippy
     runs-on: ubuntu-latest
     steps:
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --only-upgrade -y ca-certificates
-          sudo update-ca-certificates --fresh
-
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 2
-
-      - name: Set up Rust
+      - *patch-emudhra
+      - *checkout-code
+      - &setup-msrv-rust
+        name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
           components: clippy
+      - *rust-cache
 
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-hack
+      - &install-hack
+        name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Prepare MSRV lockfile
+      - &msrv-lockfile
+        name: Prepare MSRV lockfile
         run: cp ci/Cargo.lock.msrv Cargo.lock
 
       - name: Run clippy
@@ -157,36 +152,17 @@ jobs:
           echo "Removed $removed certificate(s) from /etc/ssl/cert.pem"
           sudo cp "$d/new.pem" /etc/ssl/cert.pem
 
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
+      - <<: *patch-emudhra
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --only-upgrade -y ca-certificates
-          sudo update-ca-certificates --fresh
 
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 2
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.MSRV }}
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
-      - name: Install cargo-nextest
+      - *checkout-code
+      - *setup-msrv-rust
+      - *rust-cache
+      - *install-hack
+      - &install-nextest
+        name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-
-      - name: Prepare MSRV lockfile
-        run: cp ci/Cargo.lock.msrv Cargo.lock
-
+      - *msrv-lockfile
       - name: Run unit tests
         run: cargo +${{ env.MSRV }} --locked  hack --package neo4rs ${{ env.HACK_OPTS }} nextest run --lib
 
@@ -211,32 +187,12 @@ jobs:
       NEO4J_TEST_PASS: integrationtest
       NEO4J_VERSION_TAG: ${{ matrix.neo4j }}
     steps:
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --only-upgrade -y ca-certificates
-          sudo update-ca-certificates --fresh
-
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 2
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
+      - *patch-emudhra
+      - *checkout-code
+      - *setup-stable-rust
+      - *rust-cache
+      - *install-hack
+      - *install-nextest
       - name: Run integration tests
         run: cargo hack ${{ env.HACK_OPTS }} nextest --manifest-path './integrationtests/Cargo.toml' run -E 'kind(test)'
 
@@ -244,30 +200,13 @@ jobs:
     name: Validate minimal dependency versions
     runs-on: ubuntu-latest
     steps:
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --only-upgrade -y ca-certificates
-          sudo update-ca-certificates --fresh
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.MSRV }}
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
+      - *patch-emudhra
+      - *checkout-code
+      - *setup-msrv-rust
+      - *rust-cache
+      - *install-nextest
       - name: Prepare minimal dependency versions lockfile
         run: cp ci/Cargo.lock.min Cargo.lock
-
       - name: Run minimal dependency versions unit tests
         run: cargo +${{ env.MSRV }} nextest run --package neo4rs --lib --all-features --locked
 
@@ -277,26 +216,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Patch eMudhra CA compromise (CVE-2026-111943)
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --only-upgrade -y ca-certificates
-          sudo update-ca-certificates --fresh
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Set up Rust cache
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: Swatinem/rust-cache@v2
-
+      - *patch-emudhra
+      - *checkout-code
+      - *setup-stable-rust
+      - *rust-cache
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         env:
