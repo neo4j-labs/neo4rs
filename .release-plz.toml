@@ -1,0 +1,16 @@
+[changelog]
+body = """
+
+## [{{ version | trim_start_matches(pat="v") }}](https://github.com/knutwalker/sessionizer/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for commit in commits  %}
+{%- if loop.first %}
+### Changes
+{% endif %}
+- {{ commit.message | upper_first | trim_end }}{%- if commit.links %} ({% for link in commit.links %}[{{link.text}}]({{link.href}}) {% endfor -%}){% endif %}
+{%- endfor %}
+\n"""
+
+commit_parsers = [
+  { message = "^chore: release", skip = true },
+  { message = "^.*", group = "Changes" },
+]
