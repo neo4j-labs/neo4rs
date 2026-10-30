@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs_include_snippet"
-version = "0.9.0-rc.10"
+version = "0.9.0-rc.11"
 authors = [
     "Neo4j Labs <devrel@neo4j.com>",
     "John Pradeep Vincent <yehohanan7@gmail.com>",

@@ -1,6 +1,6 @@
 [package]
 name = "neo4rs-macros"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Neo4j Labs <devrel@neo4j.com>", "John Pradeep Vincent <yehohanan7@gmail.com>"]
 edition = "2021"
 description = "Macros used by neo4rs"
