@@ -45,7 +45,7 @@ jobs:
 
       - &checkout-code
         name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -79,7 +79,9 @@ jobs:
 
       - &install-hack
         name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
 
       - &msrv-lockfile
         name: Prepare MSRV lockfile
@@ -166,7 +168,9 @@ jobs:
       - *install-hack
       - &install-nextest
         name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
       - *msrv-lockfile
       - name: Run unit tests
         run: cargo +${{ env.MSRV }} --locked  hack --package neo4rs ${{ env.HACK_OPTS }} nextest run --lib

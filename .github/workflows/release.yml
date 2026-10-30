@@ -33,21 +33,23 @@ jobs:
 
       - &checkout
         name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - &install-rust
         name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - &rust-cache
         name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run release-plz
-        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c
+        uses: release-plz/action
         with:
           command: release
           verbose: true
@@ -73,7 +75,7 @@ jobs:
       - *install-rust
       - *rust-cache
       - name: Run release-plz
-        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c
+        uses: release-plz/action
         with:
           command: release-pr
           verbose: true

@@ -43,7 +43,7 @@ jobs:
           sudo update-ca-certificates --fresh
 
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -68,7 +68,9 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@cargo-semver-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
 
       - name: Install cargo-workspaces
         uses: taiki-e/install-action@v2
