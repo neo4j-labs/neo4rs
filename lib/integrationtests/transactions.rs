@@ -52,7 +52,8 @@ async fn transaction_metadata_is_visible_to_the_server() {
             ("operation".into(), "transaction-metadata-test".into()),
             ("request_id".into(), request_id.clone()),
         ]);
-    let txn = graph.start_txn_with_config(config).await.unwrap();
+    let mut txn = graph.start_txn_with_config(config).await.unwrap();
+    txn.run("RETURN 1").await.unwrap();
 
     let mut result = graph
         .execute(
