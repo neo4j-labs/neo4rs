@@ -36,7 +36,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
+          token: ${{ secrets.RELEASE_PLZ_PAT }}
 
       - &install-rust
         name: Install Rust toolchain
@@ -81,3 +82,14 @@ jobs:
           verbose: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+      - name: Update CI lockfiles
+        run: cargo xtask msrv min
+      - name: Commit the lockfiles
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+        run: |
+          set -e
+          git add ci/Cargo.lock.min
+          git add ci/Cargo.lock.msrv
+          git commit -m "Update CI lockfiles"
+          git push
