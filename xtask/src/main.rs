@@ -20,6 +20,7 @@ fn try_main() -> Result {
         match task {
             "msrv" => update_msrv_lock()?,
             "min" => update_min_lock()?,
+            "sync" => sync_lockfiles()?,
             _ => {
                 print_help();
                 return Ok(());
@@ -166,6 +167,32 @@ fn latest_version(sh: &Shell, krate: &str) -> Result<&'static str> {
     let name = Box::leak(name.into_boxed_str());
 
     Ok(name)
+}
+
+fn sync_lockfiles() -> Result {
+    let Env {
+        lockfile,
+        ci_dir,
+        dry_run,
+        ..
+    } = task_env();
+
+    let sh = Shell::new()?;
+    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+
+    cmd!(sh, "mv {lockfile} {lockfile}.backup").run_if(dry_run)?;
+
+    cmd!(sh, "cp {ci_dir}/Cargo.lock.min {lockfile}").run_if(dry_run)?;
+    let _ = cmd!(sh, "cargo check --keep-going").run_if(dry_run);
+    cmd!(sh, "mv {lockfile} {ci_dir}/Cargo.lock.min").run_if(dry_run)?;
+
+    cmd!(sh, "cp {ci_dir}/Cargo.lock.msrv {lockfile}").run_if(dry_run)?;
+    let _ = cmd!(sh, "cargo check --keep-going").run_if(dry_run);
+    cmd!(sh, "mv {lockfile} {ci_dir}/Cargo.lock.msrv").run_if(dry_run)?;
+
+    cmd!(sh, "mv {lockfile}.backup {lockfile}").run_if(dry_run)?;
+
+    Ok(())
 }
 
 struct Env {

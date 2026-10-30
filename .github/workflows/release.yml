@@ -83,10 +83,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
       - name: Update CI lockfiles
-        run: |
-          set -e
-          cargo update
-          cargo xtask msrv min
+        run: cargo sync
       - name: Commit the lockfiles
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
