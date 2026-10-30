@@ -1,7 +1,14 @@
+[workspace]
+release = false
+
+[[package]]
+name = "neo4rs"
+release = true
+
 [changelog]
 body = """
 
-## [{{ version | trim_start_matches(pat="v") }}](https://github.com/knutwalker/sessionizer/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+## [{{ version | trim_start_matches(pat="v") }}](https://github.com/neo4j-labs/neo4rs/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
 {% for commit in commits  %}
 {%- if loop.first %}
 ### Changes

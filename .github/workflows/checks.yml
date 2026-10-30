@@ -45,20 +45,20 @@ jobs:
 
       - &checkout-code
         name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           fetch-depth: 2
 
       - &setup-stable-rust
         name: Set up Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
         with:
           toolchain: stable
           components: rustfmt
 
       - &rust-cache
         name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 #v2.9.3
 
       - name: Run cargo fmt
         run: cargo +stable fmt --all -- --check
@@ -71,7 +71,7 @@ jobs:
       - *checkout-code
       - &setup-msrv-rust
         name: Set up Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
         with:
           toolchain: ${{ env.MSRV }}
           components: clippy
@@ -79,7 +79,9 @@ jobs:
 
       - &install-hack
         name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
+        uses: taiki-e/install-action@v2.88.0
+        with:
+          tool: cargo-hack
 
       - &msrv-lockfile
         name: Prepare MSRV lockfile
@@ -166,7 +168,9 @@ jobs:
       - *install-hack
       - &install-nextest
         name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@v2.88.0
+        with:
+          tool: nextest
       - *msrv-lockfile
       - name: Run unit tests
         run: cargo +${{ env.MSRV }} --locked  hack --package neo4rs ${{ env.HACK_OPTS }} nextest run --lib

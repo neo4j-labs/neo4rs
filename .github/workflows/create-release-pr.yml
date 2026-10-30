@@ -43,44 +43,46 @@ jobs:
           sudo update-ca-certificates --fresh
 
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           fetch-depth: 2
 
-      - uses: chainguard-dev/actions/setup-gitsign@main
+      - uses: chainguard-dev/actions/setup-gitsign@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
 
       - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 #v2.9.3
 
       - name: Set up Rust nightly
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
         with:
           toolchain: nightly
 
       - name: Set up Rust MSRV
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
         with:
           toolchain: ${{ env.MSRV }}
 
       - name: Set up Rust stable
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
         with:
           toolchain: stable
 
       - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@cargo-semver-checks
+        uses: taiki-e/install-action@v2.88.0
+        with:
+          tool: cargo-semver-checks
 
       - name: Install cargo-workspaces
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.88.0
         with:
           tool: cargo-workspaces
 
       - name: Install cargo-release
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.88.0
         with:
           tool: cargo-release
 
-      - uses: cargo-bins/release-pr@v2
+      - uses: cargo-bins/release-pr@dca4a39944c532bbde5e485142fb05a8158edec1 #v2.1.4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}

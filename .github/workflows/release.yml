@@ -33,21 +33,24 @@ jobs:
 
       - &checkout
         name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
+          token: ${{ secrets.RELEASE_PLZ_PAT }}
 
       - &install-rust
         name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 #master
+        with:
+          toolchain: stable
 
       - &rust-cache
         name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 #v2.9.3
 
       - name: Run release-plz
-        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c
+        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c #v0.5.147
         with:
           command: release
           verbose: true
@@ -73,9 +76,20 @@ jobs:
       - *install-rust
       - *rust-cache
       - name: Run release-plz
-        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c
+        uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c #v0.5.147
         with:
           command: release-pr
           verbose: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+      - name: Update CI lockfiles
+        run: cargo xtask msrv min
+      - name: Commit the lockfiles
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+        run: |
+          set -e
+          git add ci/Cargo.lock.min
+          git add ci/Cargo.lock.msrv
+          git commit -m "Update CI lockfiles"
+          git push
