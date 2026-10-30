@@ -2,7 +2,7 @@
 use crate::messages::{BoltRequest, BoltResponse};
 #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
 use {
-    crate::bolt::{Begin, Commit, Rollback, Summary},
+    crate::bolt::{Begin, Commit, Summary},
     crate::bookmarks::Bookmark,
     log::debug,
 };
@@ -245,30 +245,14 @@ impl Txn {
         }
     }
 
-    /// rollback/abort the current transaction
+    /// Rolls back the current transaction.
+    ///
+    /// If the server ignores the rollback because the transaction is in a failed state,
+    /// the connection is reset before it can be reused.
     pub async fn rollback(mut self) -> Result<()> {
-        #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
-        {
-            let rollback = BoltRequest::rollback();
-            match self.connection.send_recv(rollback).await? {
-                BoltResponse::Success(_) => {
-                    self.connection.close_transaction();
-                    Ok(())
-                }
-                msg => Err(msg.into_error("ROLLBACK")),
-            }
-        }
-
-        #[cfg(feature = "unstable-bolt-protocol-impl-v2")]
-        {
-            match self.connection.send_recv_as(Rollback).await? {
-                Summary::Success(_) => {
-                    self.connection.close_transaction();
-                    Ok(())
-                }
-                msg => Err(msg.into_error("ROLLBACK")),
-            }
-        }
+        self.connection.rollback_transaction().await?;
+        self.connection.close_transaction();
+        Ok(())
     }
 
     pub fn handle(&mut self) -> &mut impl TransactionHandle {

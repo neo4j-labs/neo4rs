@@ -58,6 +58,14 @@ async fn send_response(peer: &mut TcpStream, bytes: &[u8]) {
     peer.write_u16(0).await.unwrap();
 }
 
+async fn receive_request(peer: &mut TcpStream) -> Vec<u8> {
+    let chunk_size = peer.read_u16().await.unwrap() as usize;
+    let mut request = vec![0; chunk_size];
+    peer.read_exact(&mut request).await.unwrap();
+    assert_eq!(peer.read_u16().await.unwrap(), 0);
+    request
+}
+
 async fn receive_response(connection: &mut Connection) -> Result<()> {
     #[cfg(not(feature = "unstable-bolt-protocol-impl-v2"))]
     {
@@ -73,6 +81,69 @@ async fn receive_response(connection: &mut Connection) -> Result<()> {
             .await
             .map(|_| ())
     }
+}
+
+#[tokio::test]
+async fn rollback_success_does_not_send_reset() {
+    let (mut connection, mut peer) = connection().await;
+    {
+        let rollback = connection.rollback_transaction();
+        tokio::pin!(rollback);
+
+        tokio::select! {
+            biased;
+            result = &mut rollback => panic!("rollback finished before response: {result:?}"),
+            request = receive_request(&mut peer) => assert_eq!(request, [0xb0, 0x13]),
+        }
+        send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+        rollback.await.unwrap();
+    }
+    assert!(connection.is_reusable());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), receive_request(&mut peer))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn ignored_rollback_resets_connection_before_reuse() {
+    let (mut connection, mut peer) = connection().await;
+    let rollback = async { connection.rollback_transaction().await };
+    let server = async {
+        assert_eq!(receive_request(&mut peer).await, [0xb0, 0x13]);
+        send_response(&mut peer, &[0xb0, IGNORED_SIGNATURE]).await;
+        assert_eq!(receive_request(&mut peer).await, [0xb0, 0x0f]);
+        send_response(&mut peer, &[0xb1, SUCCESS_SIGNATURE, 0xa0]).await;
+    };
+
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+        tokio::join!(rollback, server)
+    })
+    .await
+    .expect("rollback recovery exchange timed out");
+    result.unwrap();
+    assert!(connection.is_reusable());
+}
+
+#[tokio::test]
+async fn ignored_rollback_returns_error_when_reset_is_ignored() {
+    let (mut connection, mut peer) = connection().await;
+    let rollback = async { connection.rollback_transaction().await };
+    let server = async {
+        assert_eq!(receive_request(&mut peer).await, [0xb0, 0x13]);
+        send_response(&mut peer, &[0xb0, IGNORED_SIGNATURE]).await;
+        assert_eq!(receive_request(&mut peer).await, [0xb0, 0x0f]);
+        send_response(&mut peer, &[0xb0, IGNORED_SIGNATURE]).await;
+    };
+
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+        tokio::join!(rollback, server)
+    })
+    .await
+    .expect("rollback recovery exchange timed out");
+    assert!(result.is_err());
+    assert!(connection.is_reusable());
 }
 
 #[tokio::test]

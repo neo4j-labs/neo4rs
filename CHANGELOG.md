@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 ### Fixed
 
 - Dropping an explicit transaction without committing or rolling it back now discards its connection, allowing Neo4j to roll back the transaction and release its locks promptly.
+- An explicit rollback ignored by a failed transaction now sends `RESET` and only reports success after the server acknowledges the reset; connections are discarded if rollback recovery fails.
 - The connection pool logs the host and port of the server instead of the configured URI. A URI can carry credentials, which ended up in the log at `INFO` level.
 - A record that cannot be decoded no longer leaves the stream stuck. The next `next()` or `finish()` call continues to receive the same batch, so the connection stays in sync and is reused by the pool instead of being discarded [#300](https://github.com/neo4j-labs/neo4rs/issues/300).
 
