@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 
 ## [Unreleased]
 
+### Added
+
+- Expose `tx_metadata` and a `Duration`-based `tx_timeout` when starting explicit transactions
+  with `TransactionConfig`. Configured transaction methods are available on `Graph` and `Session`;
+  existing methods retain their default behavior [#304](https://github.com/neo4j-labs/neo4rs/issues/304).
+
 ### Changed
 
 - `Graph::execute` pipelines the first `PULL` with `RUN`, and `Graph::run`/`Txn::run` pipeline `DISCARD` with `RUN`, in a single network flush. A query on a pooled connection now costs one round-trip less. As a result, `Graph::execute` runs the query on the server right away, even if the returned stream is never consumed; before, the query only ran on the first `next()` [#112](https://github.com/neo4j-labs/neo4rs/issues/112). `Txn::execute` is unchanged and still runs the query on the first `next()`, because several streams can share the connection of a transaction. A stream that is dropped before it is consumed no longer costs a new connection: the pool drains the pending responses, then resets the connection and reuses it [#293](https://github.com/neo4j-labs/neo4rs/issues/293).

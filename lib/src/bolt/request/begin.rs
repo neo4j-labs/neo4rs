@@ -28,7 +28,7 @@ pub struct TxMetadata(Vec<(String, String)>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BeginMeta<'a> {
     pub(crate) bookmarks: Vec<String>,
-    pub(crate) tx_timeout: Option<u32>,
+    pub(crate) tx_timeout: Option<i64>,
     pub(crate) tx_metadata: Option<TxMetadata>,
     pub(crate) mode: &'a str,
     pub(crate) extra: BeginExtra<'a>,
@@ -39,7 +39,7 @@ pub struct BeginMeta<'a> {
 
 pub struct BeginBuilder<'a> {
     bookmarks: Vec<String>,
-    tx_timeout: Option<u32>,
+    tx_timeout: Option<i64>,
     tx_metadata: Option<TxMetadata>,
     mode: &'a str,
     db: Option<&'a str>,
@@ -66,7 +66,7 @@ impl<'a> BeginBuilder<'a> {
         self
     }
 
-    pub fn with_tx_timeout(mut self, tx_timeout: u32) -> Self {
+    pub fn with_tx_timeout(mut self, tx_timeout: i64) -> Self {
         self.tx_timeout = Some(tx_timeout);
         self
     }
@@ -225,18 +225,21 @@ mod tests {
                 ]
                 .to_vec(),
             )
+            .with_tx_timeout(15_000)
             .build(Version::V4);
         let bytes = begin.to_bytes().unwrap();
 
         let expected = bolt()
             .structure(1, 0x11)
-            .tiny_map(3)
+            .tiny_map(4)
             .tiny_string("bookmarks")
             .tiny_list(2)
             .string8("example-bookmark:1")
             .string8("example-bookmark:2")
             .tiny_string("mode")
             .tiny_string("w")
+            .tiny_string("tx_timeout")
+            .int16(15_000)
             .tiny_string("tx_metadata")
             .tiny_map(2)
             .tiny_string("user")
