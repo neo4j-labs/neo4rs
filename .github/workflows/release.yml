@@ -76,6 +76,7 @@ jobs:
       - *install-rust
       - *rust-cache
       - name: Run release-plz
+        id: release-plz
         uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c #v0.5.147
         with:
           command: release-pr
@@ -83,13 +84,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
       - name: Update CI lockfiles
-        run: cargo xtask sync
-      - name: Commit the lockfiles
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+          PR: ${{ steps.release-plz.outputs.pr }}
         run: |
           set -e
-          git add ci/Cargo.lock.min
-          git add ci/Cargo.lock.msrv
-          git commit -m "Update CI lockfiles"
-          git push
+
+          pr_number=${{ fromJSON(steps.release-plz.outputs.pr).number }}
+          if [[ -n "$pr_number" ]]; then
+            gh pr checkout $pr_number
+            cargo xtask sync
+            git add ci/Cargo.lock.min
+            git add ci/Cargo.lock.msrv
+            git commit -m "Update CI lockfiles" || true
+            git push
+          fi
