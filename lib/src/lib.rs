@@ -109,6 +109,7 @@
 //!
 //! ```no_run
 //! use neo4rs::*;
+//! use std::time::Duration;
 //!
 //! #[tokio::main]
 //! async fn main() {
