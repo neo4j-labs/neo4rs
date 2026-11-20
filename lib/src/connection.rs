@@ -65,8 +65,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Opens a connection, giving up after `connection_timeout` for the whole setup: TCP connect,
-    /// TLS handshake, Bolt version negotiation and HELLO.
+    /// Applies one deadline to the entire connection setup, including HELLO.
     pub(crate) async fn new(info: &ConnectionInfo) -> Result<Self> {
         tokio::time::timeout(info.prepare.connection_timeout, Self::establish(info))
             .await
@@ -905,10 +904,9 @@ mod tests {
     const RECV_TIMEOUT: Duration = Duration::from_secs(30);
     const READ_LOOP_DEADLINE: Duration = Duration::from_secs(5);
 
-    /// A listener that never accepts still completes the TCP handshake (the socket waits in its
-    /// backlog), but nothing answers the Bolt version negotiation.
     #[tokio::test]
     async fn connection_timeout_bounds_a_server_that_never_answers_the_handshake() {
+        // The listen backlog lets TCP connect while Bolt negotiation waits for a reply.
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let info = ConnectionInfo::new(
