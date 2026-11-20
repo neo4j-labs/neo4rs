@@ -65,7 +65,14 @@ pub struct Connection {
 }
 
 impl Connection {
+    /// Applies one deadline to the entire connection setup, including HELLO.
     pub(crate) async fn new(info: &ConnectionInfo) -> Result<Self> {
+        tokio::time::timeout(info.prepare.connection_timeout, Self::establish(info))
+            .await
+            .map_err(|_| Error::ConnectionTimedOut)?
+    }
+
+    async fn establish(info: &ConnectionInfo) -> Result<Self> {
         let mut connection = Self::prepare(&info.prepare).await?;
         let hello = info.init.to_hello(connection.version);
         connection.hello(hello).await?;
@@ -886,8 +893,8 @@ impl ServerCertVerifier for NoCertificateVerification {
 mod tests {
     use url::Host;
 
-    use super::{Connection, NeoUrl};
-    use crate::{errors::Error, version::Version};
+    use super::{Connection, ConnectionInfo, NeoUrl};
+    use crate::{auth::ConnectionTLSConfig, errors::Error, version::Version};
     use std::{io::ErrorKind, sync::mpsc, thread, time::Duration};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
@@ -896,6 +903,29 @@ mod tests {
 
     const RECV_TIMEOUT: Duration = Duration::from_secs(30);
     const READ_LOOP_DEADLINE: Duration = Duration::from_secs(5);
+
+    #[tokio::test]
+    async fn connection_timeout_bounds_a_server_that_never_answers_the_handshake() {
+        // The listen backlog lets TCP connect while Bolt negotiation waits for a reply.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let info = ConnectionInfo::new(
+            &format!("bolt://{address}"),
+            "neo4j",
+            "password",
+            &ConnectionTLSConfig::None,
+            Duration::from_millis(250),
+            None,
+        )
+        .unwrap();
+
+        let connecting = tokio::time::timeout(Duration::from_secs(5), Connection::new(&info));
+
+        assert!(matches!(
+            connecting.await,
+            Ok(Err(Error::ConnectionTimedOut))
+        ));
+    }
 
     #[test]
     fn should_parse_uri() {
