@@ -105,6 +105,8 @@ impl Connection {
 
         // Configure TCP keepalive on the raw socket
         Self::configure_tcp_keepalive(&stream, opts.tcp_keepalive)?;
+        // Avoid Nagle delays when a Bolt request spans several socket writes.
+        stream.set_nodelay(true)?;
 
         Ok(match &opts.encryption {
             Some((connector, domain)) => {
